@@ -20,6 +20,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           extensions: ctype
+          coverage: pcov
 
       - name: Prepare environment
         run: echo "COMPOSER_CACHE=$(composer config cache-dir)" >> $GITHUB_ENV
