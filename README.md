@@ -1,6 +1,23 @@
-# Eventjet Expressions
+# Ausdruck
 
-## Accessing scope variables
+A small generic expression engine for PHP
+
+## Quick start
+
+```
+composer require eventjet/ausdruck
+```
+
+```php
+use Eventjet\Ausdruck\Parser\ExpressionParser;
+
+ExpressionParser::parse('foo:int > 5')
+    ->evaluate(new Scope(['foo' => 6])); // true
+```
+
+## Documentation
+
+### Accessing scope variables
 
 Syntax: `varName:type`
 
@@ -15,19 +32,19 @@ $x = ExpressionParser::parse('foo:int')
 assert($x === 123); 
 ```
 
-### Examples
+#### Examples
 
 `foo:int`, `foo:list<string>`
 
 See [Types](#types)
 
-## Literals
+### Literals
 
 - `123`: Integer
 - `"foo"`: String
 - `1.23`: Float
 
-## Operators
+### Operators
 
 Both operands must be of the same type.
 
@@ -40,7 +57,7 @@ Both operands must be of the same type.
 
 Where's the rest? We're implementing more as we need them.
 
-## Types
+### Types
 
 The following types are supported:
 
@@ -52,17 +69,17 @@ The following types are supported:
 - `map<K, V>`: Map with key type K and value type V
 - `My\Class\Name`: Fully qualified class name
 
-## Functions
+### Functions
 
 Syntax: `target.functionName:returnType(arg1, arg2, ...)`
 
 The target can be any expression. It will be passed as the first argument to the function.
 
-### Example
+#### Example
 
 `haystack:list<string>.contains:bool(needle:string)`
 
-### Built-In Functions
+#### Built-In Functions
 
 | Function   | Description                                                 | Example                                          |
 |------------|-------------------------------------------------------------|--------------------------------------------------|
@@ -71,7 +88,7 @@ The target can be any expression. It will be passed as the first argument to the
 | `some`     | Returns whether any element matches a [predicate](#lambdas) | `foo:list<int>.some:bool(\|item\| item:int > 5)` |
 | `substr`   | Returns a substring of a string                             | `foo:string.substr:string(0, 5)`                 |
 
-### Custom Functions
+#### Custom Functions
 
 You can pass custom functions along with the scope variables:
 
@@ -89,12 +106,12 @@ assert($result === 'xxxxxxxxx');
 The target of the function/method call (`foo:string` in the example above) will be passed as the first argument to the
 function.
 
-## Lambdas
+### Lambdas
 
 Syntax: `|arg1, arg2, ... | expression`
 
 To access an argument, you must specify its type, just like when accessing scope variables.
 
-### Example
+#### Example
 
 `|item| item:int > 5`

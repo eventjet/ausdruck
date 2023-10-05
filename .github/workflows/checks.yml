@@ -21,16 +21,16 @@ jobs:
           php-version: ${{ matrix.php }}
           extensions: ctype
 
-      - name: Prepare environment
-        run: echo "COMPOSER_CACHE=$(composer config cache-dir)" >> $GITHUB_ENV
+#      - name: Prepare environment
+#        run: echo "COMPOSER_CACHE=$(composer config cache-dir)" >> $GITHUB_ENV
 
-      - name: Composer Cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ${{ env.COMPOSER_CACHE }}
-            vendor
-          key: ${{ runner.os }}-composer
+#      - name: Composer Cache
+#        uses: actions/cache@v3
+#        with:
+#          path: |
+#            ${{ env.COMPOSER_CACHE }}
+#            vendor
+#          key: ${{ runner.os }}-composer
 
       - name: Install dependencies
         run: |
