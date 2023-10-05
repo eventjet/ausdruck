@@ -9,10 +9,22 @@ composer require eventjet/ausdruck
 ```
 
 ```php
-use Eventjet\Ausdruck\Parser\ExpressionParser;
+use Eventjet\Ausdruck\Parser\ExpressionParser;use Eventjet\Ausdruck\Parser\Types;
 
-ExpressionParser::parse('foo:int > 5')
-    ->evaluate(new Scope(['foo' => 6])); // true
+class Person { public function __construct(public string $name) {} }
+
+$expression = ExpressionParser::parse(
+    'joe:Person.name:string()',
+    new Types(['Person' => Person::class]),
+);
+$scope = new Scope(
+    // Passing values to the expression
+    ['joe' => new Person('Joe')],
+    // Custom function definitions
+    ['name' => static fn (Person $person): string => $person->name],
+);
+$name = $expression->evaluate($scope);
+assert($name === 'Joe');
 ```
 
 ## Documentation
