@@ -4,7 +4,8 @@
     "description": "",
     "license": "proprietary",
     "require": {
-        "php": ">=8.2"
+        "php": ">=8.2",
+        "ext-ctype": "*"
     },
     "require-dev": {
         "eventjet/coding-standard": "^3.12",
@@ -33,8 +34,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Eventjet\\Test\\Functional\\Ausdruck\\": "tests/functional",
-            "Eventjet\\Test\\Unit\\Ausdruck\\": "tests/unit"
+            "Eventjet\\Ausdruck\\Test\\Unit\\": "tests/unit"
         }
     },
     "minimum-stability": "stable",

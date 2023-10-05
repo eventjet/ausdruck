@@ -9,9 +9,6 @@
         <testsuite name="Eventjet\Ausdruck\Unit">
             <directory>tests/unit</directory>
         </testsuite>
-        <testsuite name="Eventjet\Ausdruck\Functional">
-            <directory>tests/functional</directory>
-        </testsuite>
     </testsuites>
     <source>
         <include>
