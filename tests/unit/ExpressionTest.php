@@ -31,7 +31,6 @@ final class ExpressionTest extends TestCase
      */
     public static function evaluateCases(): iterable
     {
-        $empty = new Scope();
         $s = Type::string();
         $cases = [
             [static fn(): Expression => Expr::get('foo', $s), new Scope(['foo' => 'bar']), 'bar'],
@@ -42,16 +41,6 @@ final class ExpressionTest extends TestCase
             ],
             [Expr::get('foo', $s)->eq(Expr::literal('bar')), new Scope(['foo' => 'bar']), true],
             [Expr::get('foo', $s)->eq(Expr::literal('bar')), new Scope(['foo' => 'nope']), false],
-            [
-                static fn(): Expression => Expr::literal(['foo'])->offset(Expr::literal(0)),
-                $empty,
-                'foo',
-            ],
-            [
-                static fn(): Expression => Expr::literal(['foo' => 'bar'])->offset('foo'),
-                $empty,
-                'bar',
-            ],
             [Expr::get('foo', $s), (new Scope(['foo' => 'bar']))->sub(['nothere' => 'nope']), 'bar'],
             [
                 static fn(): Expression => Expr::get('test', $s)->eq(Expr::literal('foo'))
@@ -70,11 +59,6 @@ final class ExpressionTest extends TestCase
                     ->or_(Expr::get('test', $s)->eq(Expr::literal('foo'))),
                 new Scope(['test' => 'baz']),
                 false,
-            ],
-            [
-                static fn(): Expression => Expr::get('map', Type::mapOf(Type::string(), Type::int()))->offset('b'),
-                new Scope(['map' => ['a' => 1, 'b' => 2]]),
-                2,
             ],
             [
                 Expr::get('items', Type::listOf(Type::string()))
@@ -140,7 +124,8 @@ final class ExpressionTest extends TestCase
                 'obj:MyCustomObject.matches:bool()',
                 new Scope(['obj' => new SomeObject()], ['matches' => static fn(mixed $value): bool => $value instanceof SomeObject]),
                 true,
-                ],
+            ],
+            ['myMap:map<int, string>', new Scope(['myMap' => [42 => 'a', 69 => 'b']]), [42 => 'a', 69 => 'b']],
         ];
         foreach ($cases as [$expr, $scope, $expected]) {
             $expectedStr = (string)Expr::literal($expected);
@@ -172,14 +157,6 @@ final class ExpressionTest extends TestCase
             Expr::get('foo', Type::string()),
             new Scope(),
             'Unknown variable',
-        ];
-        yield 'Accessing a non-existent string offset' => [
-            Expr::literal(['foo' => 'bar'])->offset('baz'),
-            new Scope(),
-        ];
-        yield 'Accessing a non-existent int offset' => [
-            Expr::literal(['foo'])->offset(1),
-            new Scope(),
         ];
         yield 'Get string variable, but it\'s not a string' => [
             Expr::get('foo', Type::string()),
@@ -291,14 +268,6 @@ final class ExpressionTest extends TestCase
         yield 'Int int map literal' => [
             Expr::literal([1 => 2]),
             Type::mapOf(Type::int(), Type::int()),
-        ];
-        yield 'Offset of string list' => [
-            Expr::get('foo', Type::listOf(Type::string()))->offset(0),
-            Type::string(),
-        ];
-        yield 'Offset of string int map' => [
-            Expr::get('foo', Type::mapOf(Type::string(), Type::int()))->offset('bar'),
-            Type::int(),
         ];
         yield 'Or' => [
             Expr::or_(Expr::get('foo', Type::bool()), Expr::get('bar', Type::bool())),

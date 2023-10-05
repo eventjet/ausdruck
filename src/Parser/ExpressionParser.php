@@ -8,12 +8,10 @@ use Eventjet\Ausdruck\Call;
 use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\Get;
-use Eventjet\Ausdruck\Offset;
 use Eventjet\Ausdruck\Scope;
 use Eventjet\Ausdruck\Type;
 
 use function assert;
-use function in_array;
 use function is_string;
 use function sprintf;
 use function str_split;
@@ -105,23 +103,6 @@ final readonly class ExpressionParser
         if ($token instanceof Literal) {
             $tokens->next();
             return Expr::literal($token->value);
-        }
-        if ($token === Token::OpenBracket) {
-            if ($left === null) {
-                self::unexpectedToken($token);
-            }
-            $expressionTypeName = $left->getType()->name;
-            if (!in_array($expressionTypeName, ['list', 'map'], true)) {
-                throw new TypeError(
-                    sprintf(
-                        'Offset access is only supported for lists and maps, got %s',
-                        $expressionTypeName,
-                    ),
-                );
-            }
-            /** @var Expression<array<array-key, mixed>> | Expression<list<mixed>> $expr */
-            $expr = $left;
-            return self::offset($expr, $tokens, $types);
         }
         if ($token === Token::TripleEquals) {
             $tokens->next();
@@ -305,42 +286,6 @@ final readonly class ExpressionParser
         }
         self::skip($tokens, Token::Comma);
         return $type;
-    }
-
-    /**
-     * foo:array<string, string>["bar"]
-     *                          =======
-     *
-     * @psalm-suppress InvalidReturnType False positive
-     * @template K of array-key
-     * @template V
-     * @param Expression<array<K, V>> $arrayExpr
-     * @param Peekable<AnyToken> $tokens
-     * @return Offset<K, V>
-     */
-    private static function offset(Expression $arrayExpr, Peekable $tokens, Types $types): Offset
-    {
-        self::expect($tokens, Token::OpenBracket);
-        $key = self::parseExpression($tokens, $types);
-        self::expect($tokens, Token::CloseBracket);
-        $arrayType = $arrayExpr->getType();
-        /** @var Type<string> | Type<int> $exprKeyType */
-        $exprKeyType = $arrayType->name === 'list' ? Type::int() : $arrayType->args[0];
-        /** @phpstan-ignore-next-line False positive */
-        if (!$key->matchesType($exprKeyType)) {
-            /** @psalm-suppress ImplicitToStringCast */
-            throw new TypeError(
-                sprintf(
-                    'Can\'t use %s offset (%s) on %s (type %s)',
-                    $key->getType(),
-                    $key,
-                    $arrayExpr,
-                    $arrayType,
-                ),
-            );
-        }
-        /** @psalm-suppress InvalidReturnStatement False positive */
-        return Expr::offset($arrayExpr, $key);
     }
 
     /**
