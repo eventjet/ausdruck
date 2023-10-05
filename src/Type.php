@@ -19,7 +19,7 @@ use function sprintf;
 
 /**
  * @template-covariant T
- * @internal
+ * @api
  */
 final readonly class Type implements Stringable
 {
