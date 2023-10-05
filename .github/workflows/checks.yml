@@ -60,7 +60,7 @@ jobs:
         run: |
           git fetch origin $GITHUB_BASE_REF $GITHUB_HEAD_REF
           vendor/bin/infection \
-            --coverage=build/coverage
+            --coverage=build/coverage \
             --git-diff-base=origin/$GITHUB_BASE_REF \
             --git-diff-lines \
             --logger-github \
