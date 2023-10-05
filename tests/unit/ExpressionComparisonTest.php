@@ -1,0 +1,218 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Eventjet\Ausdruck\Test\Unit;
+
+use Eventjet\Ausdruck\Call;
+use Eventjet\Ausdruck\Eq;
+use Eventjet\Ausdruck\Expr;
+use Eventjet\Ausdruck\Expression;
+use Eventjet\Ausdruck\Get;
+use Eventjet\Ausdruck\Gt;
+use Eventjet\Ausdruck\Lambda;
+use Eventjet\Ausdruck\Literal;
+use Eventjet\Ausdruck\Offset;
+use Eventjet\Ausdruck\Or_;
+use Eventjet\Ausdruck\Subtract;
+use Eventjet\Ausdruck\Type;
+use PHPUnit\Framework\TestCase;
+
+final class ExpressionComparisonTest extends TestCase
+{
+    /**
+     * @return iterable<array-key, array{Expression<mixed>, Expression<mixed>}>
+     */
+    public static function equalsCases(): iterable
+    {
+        yield [
+            Expr::eq(Expr::literal('a'), Expr::literal('b')),
+            Expr::eq(Expr::literal('a'), Expr::literal('b')),
+        ];
+        yield [
+            Expr::get('a', Type::string()),
+            Expr::get('a', Type::string()),
+        ];
+        yield [
+            Expr::literal('foo'),
+            Expr::literal('foo'),
+        ];
+        yield [
+            Expr::offset(Expr::literal(['a']), 0),
+            Expr::offset(Expr::literal(['a']), 0),
+        ];
+        yield [
+            Expr::or_(Expr::literal(true), Expr::literal(false)),
+            Expr::or_(Expr::literal(true), Expr::literal(false)),
+        ];
+        yield [
+            Expr::subtract(Expr::literal(1), Expr::literal(2)),
+            Expr::subtract(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield [
+            Expr::gt(Expr::literal(1), Expr::literal(2)),
+            Expr::gt(Expr::literal(1), Expr::literal(2)),
+        ];
+    }
+
+    /**
+     * @return iterable<string, array{Expression<mixed>, Expression<mixed>}>
+     */
+    public static function notEqualsCases(): iterable
+    {
+        yield Eq::class . ': left is different' => [
+            Expr::eq(Expr::literal('a'), Expr::literal('a')),
+            Expr::eq(Expr::literal('b'), Expr::literal('a')),
+        ];
+        yield Eq::class . ': right is different' => [
+            Expr::eq(Expr::literal('a'), Expr::literal('a')),
+            Expr::eq(Expr::literal('a'), Expr::literal('b')),
+        ];
+        yield Eq::class . ': different type' => [
+            Expr::eq(Expr::literal('a'), Expr::literal('a')),
+            Expr::or_(Expr::literal(true), Expr::literal(false)),
+        ];
+        yield Get::class . ': different names' => [
+            Expr::get('a', Type::string()),
+            Expr::get('b', Type::string()),
+        ];
+        yield Get::class . ': different types' => [
+            Expr::get('a', Type::string()),
+            Expr::get('a', Type::int()),
+        ];
+        yield Get::class . ': different type' => [
+            Expr::get('a', Type::string()),
+            Expr::literal('a'),
+        ];
+        yield Lambda::class .': different number of parameters' => [
+            Expr::lambda(Expr::literal(true), ['foo']),
+            Expr::lambda(Expr::literal(true), ['foo', 'bar']),
+        ];
+        yield Lambda::class .': different parameter' => [
+            Expr::lambda(Expr::literal(true), ['a', 'b', 'c']),
+            Expr::lambda(Expr::literal(true), ['a', 'x', 'c']),
+        ];
+        yield Lambda::class .': different body' => [
+            Expr::lambda(Expr::literal(true), ['a', 'b', 'c']),
+            Expr::lambda(Expr::literal(false), ['a', 'b', 'c']),
+        ];
+        yield Lambda::class . ': different type' => [
+            Expr::lambda(Expr::literal(true), ['a']),
+            Expr::literal(true),
+        ];
+        yield Literal::class . ': different values' => [
+            Expr::literal('foo'),
+            Expr::literal('bar'),
+        ];
+        yield Literal::class . ': different type' => [
+            Expr::literal('foo'),
+            Expr::get('foo', Type::string()),
+        ];
+        yield Offset::class . ': different arrays' => [
+            Expr::offset(Expr::literal(['a']), 0),
+            Expr::offset(Expr::literal(['b']), 0),
+        ];
+        yield Offset::class . ': different offsets' => [
+            Expr::offset(Expr::literal(['a']), 0),
+            Expr::offset(Expr::literal(['a']), 1),
+        ];
+        yield Offset::class . ': different type' => [
+            Expr::offset(Expr::literal(['a']), 0),
+            Expr::literal(['a']),
+        ];
+        yield Or_::class . ': left is different' => [
+            Expr::or_(Expr::literal(true), Expr::literal(false)),
+            Expr::or_(Expr::literal(false), Expr::literal(false)),
+        ];
+        yield Or_::class . ': right is different' => [
+            Expr::or_(Expr::literal(true), Expr::literal(false)),
+            Expr::or_(Expr::literal(true), Expr::literal(true)),
+        ];
+        yield Or_::class . ': both are different' => [
+            Expr::or_(Expr::literal(true), Expr::literal(false)),
+            Expr::or_(Expr::literal(false), Expr::literal(true)),
+        ];
+        yield Or_::class . ': different type' => [
+            Expr::or_(Expr::literal(true), Expr::literal(false)),
+            Expr::eq(Expr::literal(true), Expr::literal(false)),
+        ];
+        yield Subtract::class . ': minuend is different' => [
+            Expr::subtract(Expr::literal(1), Expr::literal(2)),
+            Expr::subtract(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield Subtract::class . ': subtrahend is different' => [
+            Expr::subtract(Expr::literal(1), Expr::literal(2)),
+            Expr::subtract(Expr::literal(1), Expr::literal(1)),
+        ];
+        yield Subtract::class . ': subtrahend and minuend are different' => [
+            Expr::subtract(Expr::literal(1), Expr::literal(2)),
+            Expr::subtract(Expr::literal(2), Expr::literal(1)),
+        ];
+        yield Subtract::class . ': different type' => [
+            Expr::subtract(Expr::literal(1), Expr::literal(2)),
+            Expr::literal(1),
+        ];
+        yield Call::class . ': target is different' => [
+            Expr::call(Expr::literal(1), 'foo', Type::int(), []),
+            Expr::call(Expr::literal(2), 'foo', Type::int(), []),
+        ];
+        yield Call::class . ': name is different' => [
+            Expr::call(Expr::literal(1), 'foo', Type::int(), []),
+            Expr::call(Expr::literal(1), 'bar', Type::int(), []),
+        ];
+        yield Call::class . ': type is different' => [
+            Expr::call(Expr::literal(1), 'foo', Type::int(), []),
+            Expr::call(Expr::literal(1), 'foo', Type::string(), []),
+        ];
+        yield Call::class . ': different number of arguments' => [
+            Expr::call(Expr::literal(1), 'foo', Type::int(), []),
+            Expr::call(Expr::literal(1), 'foo', Type::int(), [Expr::literal(1)]),
+        ];
+        yield Call::class . ': argument is different' => [
+            Expr::call(Expr::literal(1), 'foo', Type::int(), [Expr::literal(1), Expr::literal(2), Expr::literal(3)]),
+            Expr::call(Expr::literal(1), 'foo', Type::int(), [Expr::literal(1), Expr::literal(9), Expr::literal(3)]),
+        ];
+        yield Call::class . ': different type' => [
+            Expr::call(Expr::literal(1), 'foo', Type::int(), []),
+            Expr::literal(1),
+        ];
+        yield Gt::class . ': left is different' => [
+            Expr::gt(Expr::literal(1), Expr::literal(2)),
+            Expr::gt(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield Gt::class . ': right is different' => [
+            Expr::gt(Expr::literal(1), Expr::literal(2)),
+            Expr::gt(Expr::literal(1), Expr::literal(1)),
+        ];
+        yield Gt::class . ': both are different' => [
+            Expr::gt(Expr::literal(1), Expr::literal(2)),
+            Expr::gt(Expr::literal(2), Expr::literal(1)),
+        ];
+        yield Gt::class . ': different type' => [
+            Expr::gt(Expr::literal(1), Expr::literal(2)),
+            Expr::eq(Expr::literal(1), Expr::literal(2)),
+        ];
+    }
+
+    /**
+     * @param Expression<mixed> $a
+     * @param Expression<mixed> $b
+     * @dataProvider equalsCases
+     */
+    public function testEquals(Expression $a, Expression $b): void
+    {
+        self::assertTrue($a->equals($b));
+        self::assertTrue($b->equals($a));
+    }
+
+    /**
+     * @param Expression<mixed> $a
+     * @param Expression<mixed> $b
+     * @dataProvider notEqualsCases
+     */
+    public function testNotEquals(Expression $a, Expression $b): void
+    {
+        self::assertFalse($a->equals($b));
+        self::assertFalse($b->equals($a));
+    }
+}

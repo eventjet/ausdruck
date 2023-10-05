@@ -9,5 +9,11 @@
         "text": "infection-log.txt"
     },
     "minMsi": 100,
-    "minCoveredMsi": 100
+    "minCoveredMsi": 100,
+    "mutators": {
+        "global-ignoreSourceCodeByRegex": [
+            "assert\\(.+\\);"
+        ],
+        "@default": true
+    }
 }
