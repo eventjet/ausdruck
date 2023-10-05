@@ -70,6 +70,9 @@ jobs:
             --ignore-msi-with-no-mutations \
             -jmax
 
+      - name: "Check for BC breaks"
+        uses: docker://nyholm/roave-bc-check-ga
+
       - name: Save Infection result
         uses: actions/upload-artifact@v3
         if: always()
