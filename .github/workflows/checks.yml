@@ -48,11 +48,19 @@ jobs:
       - name: Psalm
         run: composer psalm
 
+      - name: PHPUnit
+        run: |
+          vendor/bin/phpunit \
+            --coverage-xml=build/coverage/coverage-xml \
+            --log-junit=build/coverage/junit.xml \
+            --coverage-clover=coverage.xml
+
       - name: Infection coverage of changed lines
         if: "!contains(github.event.pull_request.labels.*.name, 'skip-infection')"
         run: |
           git fetch origin $GITHUB_BASE_REF $GITHUB_HEAD_REF
           vendor/bin/infection \
+            --coverage=build/coverage
             --git-diff-base=origin/$GITHUB_BASE_REF \
             --git-diff-lines \
             --logger-github \
@@ -67,16 +75,3 @@ jobs:
         with:
           name: infection-log-${{ matrix.php }}.txt
           path: infection-log.txt
-
-      - name: PHPUnit
-        run: vendor/bin/phpunit --coverage-clover=coverage.xml --stop-on-failure
-
-      - name: Monitor coverage
-        uses: slavcodev/coverage-monitor-action@v1
-        with:
-          coverage_path: "coverage.xml"
-          comment: false
-          comment_context: Coverage PHP ${{ matrix.php }}
-          status_context: Coverage PHP ${{ matrix.php }}
-          threshold_alert: ${{ inputs.coverage_threshold_alert }}
-          threshold_warning: ${{ inputs.coverage_threshold_warning }}
