@@ -1,0 +1,6 @@
+/.php-cs-fixer.cache
+/.phpstan.neon
+/.phpunit.result.cache
+/composer.lock
+/infection-log.txt
+/vendor/

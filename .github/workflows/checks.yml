@@ -1,0 +1,76 @@
+name: Continuous Integration PHP
+
+on: [pull_request]
+
+jobs:
+  qa:
+    strategy:
+      matrix:
+        php:
+          - "8.2"
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Prepare environment
+        run: echo "COMPOSER_CACHE=$(composer config cache-dir)" >> $GITHUB_ENV
+
+      - name: Composer Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ env.COMPOSER_CACHE }}
+            vendor
+          key: ${{ runner.os }}-composer
+
+      - name: Install dependencies
+        run: |
+          composer update --no-progress --no-interaction ${{ matrix.php }} > /dev/null
+
+      - name: Check Dependencies
+        run: composer check-deps
+
+      - name: Check Code Style
+        run: composer cs-check
+
+      - name: PHPStan
+        run: composer phpstan -- --no-progress
+
+      - name: Psalm
+        run: composer psalm
+
+      - name: Infection coverage of changed lines
+        if: "!contains(github.event.pull_request.labels.*.name, 'skip-infection')"
+        run: |
+          git fetch origin $GITHUB_BASE_REF $GITHUB_HEAD_REF
+          vendor/bin/infection \
+            --git-diff-base=origin/$GITHUB_BASE_REF \
+            --git-diff-lines \
+            --logger-github \
+            --min-msi=100 \
+            --min-covered-msi=100 \
+            --ignore-msi-with-no-mutations \
+            -jmax
+
+      - name: Save Infection result
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: infection-log-${{ matrix.php }}.txt
+          path: infection-log.txt
+
+      - name: PHPUnit
+        run: vendor/bin/phpunit --coverage-clover=coverage.xml --stop-on-failure
+
+      - name: Monitor coverage
+        uses: slavcodev/coverage-monitor-action@v1
+        with:
+          coverage_path: "coverage.xml"
+          comment: false
+          comment_context: Coverage PHP ${{ matrix.php }}
+          status_context: Coverage PHP ${{ matrix.php }}
+          threshold_alert: ${{ inputs.coverage_threshold_alert }}
+          threshold_warning: ${{ inputs.coverage_threshold_warning }}
