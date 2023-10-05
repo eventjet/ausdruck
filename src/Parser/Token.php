@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+/**
+ * @internal
+ */
 enum Token: string
 {
     case Dot = '.';

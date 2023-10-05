@@ -8,6 +8,7 @@ use Stringable;
 
 /**
  * @template-covariant T
+ * @internal
  */
 abstract readonly class Expression implements Stringable
 {

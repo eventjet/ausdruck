@@ -10,6 +10,9 @@ use function sprintf;
 use function str_contains;
 use function substr;
 
+/**
+ * @internal
+ */
 final readonly class Tokenizer
 {
     public const NON_IDENTIFIER_CHARS = '.[]()"=|<>{}:, -';

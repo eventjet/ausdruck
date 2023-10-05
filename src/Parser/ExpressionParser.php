@@ -20,6 +20,7 @@ use function str_split;
 
 /**
  * @phpstan-type AnyToken Token | string | Literal<string | int | float>
+ * @api
  */
 final readonly class ExpressionParser
 {

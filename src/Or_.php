@@ -8,6 +8,7 @@ use function sprintf;
 
 /**
  * @extends Expression<bool>
+ * @internal
  */
 final readonly class Or_ extends Expression
 {

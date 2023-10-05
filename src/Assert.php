@@ -18,6 +18,7 @@ use function sprintf;
 
 /**
  * @phpstan-type Validator callable(mixed): (true | string)
+ * @internal
  */
 final readonly class Assert
 {

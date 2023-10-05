@@ -25,6 +25,7 @@ use function sprintf;
  *     vars?: array<string, string | int | bool | null>,
  *     parent?: mixed,
  * }
+ * @api
  */
 final readonly class Scope
 {

@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Parser;
 
 use Stringable;
-
 use function is_string;
 use function sprintf;
 
 /**
  * @template-covariant T of string | int | float
+ * @internal
  */
 final readonly class Literal implements Stringable
 {

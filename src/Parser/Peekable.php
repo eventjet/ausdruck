@@ -8,6 +8,7 @@ use Generator;
 
 /**
  * @template T
+ * @internal
  */
 final readonly class Peekable
 {

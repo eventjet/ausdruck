@@ -8,7 +8,6 @@ use InvalidArgumentException;
 use LogicException;
 use Stringable;
 use TypeError;
-
 use function array_is_list;
 use function array_key_first;
 use function gettype;
@@ -19,6 +18,7 @@ use function sprintf;
 
 /**
  * @template-covariant T
+ * @internal
  */
 final readonly class Type implements Stringable
 {

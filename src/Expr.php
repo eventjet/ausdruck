@@ -6,6 +6,9 @@ namespace Eventjet\Ausdruck;
 
 use function is_string;
 
+/**
+ * @internal
+ */
 final readonly class Expr
 {
     /**

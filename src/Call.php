@@ -13,6 +13,7 @@ use function sprintf;
 /**
  * @template T
  * @extends Expression<T>
+ * @internal
  */
 final readonly class Call extends Expression
 {

@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Parser;
 
 use Eventjet\Ausdruck\Type;
-
 use function count;
 use function sprintf;
 
+/**
+ * @api
+ */
 final readonly class Types
 {
     /**

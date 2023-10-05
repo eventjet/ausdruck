@@ -9,6 +9,7 @@ use function sprintf;
 /**
  * @template T of int | float
  * @extends Expression<T>
+ * @internal
  */
 final readonly class Subtract extends Expression
 {

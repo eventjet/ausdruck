@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use LogicException;
-
 use function implode;
 use function sprintf;
 
 /**
  * @template T
  * @extends Expression<callable(Scope): T>
+ * @internal
  */
 final readonly class Lambda extends Expression
 {

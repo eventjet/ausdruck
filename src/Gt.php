@@ -9,6 +9,7 @@ use function sprintf;
 /**
  * @template T of int | float
  * @extends Expression<bool>
+ * @internal
  */
 final readonly class Gt extends Expression
 {
