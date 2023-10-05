@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Parser;
 
 use Stringable;
+
 use function implode;
 use function sprintf;
 
