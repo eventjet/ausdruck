@@ -1,6 +1,6 @@
 # Ausdruck
 
-A small generic expression engine for PHP
+A small expression engine for PHP.
 
 ## Quick start
 
@@ -9,13 +9,14 @@ composer require eventjet/ausdruck
 ```
 
 ```php
-use Eventjet\Ausdruck\Parser\ExpressionParser;use Eventjet\Ausdruck\Parser\Types;
+use Eventjet\Ausdruck\Parser\ExpressionParser;
+use Eventjet\Ausdruck\Parser\Types;
 
 class Person { public function __construct(public string $name) {} }
 
 $expression = ExpressionParser::parse(
-    'joe:Person.name:string()',
-    new Types(['Person' => Person::class]),
+    'joe:MyPersonType.name:string()',
+    new Types(['MyPersonType' => Person::class]),
 );
 $scope = new Scope(
     // Passing values to the expression
