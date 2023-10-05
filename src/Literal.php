@@ -18,6 +18,7 @@ use function sprintf;
  * @template T of string | int | float | bool | null | array<array-key, mixed>
  * @extends Expression<T>
  * @internal
+ * @psalm-internal Eventjet\Ausdruck
  */
 final readonly class Literal extends Expression
 {

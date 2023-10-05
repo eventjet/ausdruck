@@ -13,6 +13,7 @@ use function sprintf;
  * @template V
  * @extends Expression<V>
  * @internal
+ * @psalm-internal Eventjet\Ausdruck
  */
 final readonly class Offset extends Expression
 {

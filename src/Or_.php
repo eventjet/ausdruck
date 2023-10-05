@@ -9,6 +9,7 @@ use function sprintf;
 /**
  * @extends Expression<bool>
  * @internal
+ * @psalm-internal Eventjet\Ausdruck
  */
 final readonly class Or_ extends Expression
 {

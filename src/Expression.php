@@ -9,6 +9,7 @@ use Stringable;
 /**
  * @template-covariant T
  * @internal
+ * @psalm-internal Eventjet\Ausdruck
  */
 abstract readonly class Expression implements Stringable
 {

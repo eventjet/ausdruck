@@ -20,6 +20,7 @@ use function sprintf;
 /**
  * @template-covariant T
  * @internal
+ * @psalm-internal Eventjet\Ausdruck
  */
 final readonly class Type implements Stringable
 {
