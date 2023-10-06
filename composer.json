@@ -17,6 +17,7 @@
         "phpstan/phpstan-strict-rules": "^1.5",
         "phpunit/phpunit": "^10.2",
         "psalm/plugin-phpunit": "^0.18.4",
+        "roave/backward-compatibility-check": "^8.3",
         "vimeo/psalm": "^5.10"
     },
     "config": {
