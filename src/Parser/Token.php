@@ -6,6 +6,7 @@ namespace Eventjet\Ausdruck\Parser;
 
 /**
  * @internal
+ * @psalm-internal Eventjet\Ausdruck
  */
 enum Token: string
 {

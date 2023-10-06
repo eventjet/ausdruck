@@ -10,6 +10,7 @@ use function sprintf;
  * @template T of int | float
  * @extends Expression<T>
  * @internal
+ * @psalm-internal Eventjet\Ausdruck
  */
 final readonly class Subtract extends Expression
 {

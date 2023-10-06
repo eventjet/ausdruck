@@ -11,6 +11,7 @@ use function sprintf;
 
 /**
  * @internal
+ * @psalm-internal Eventjet\Ausdruck
  */
 final readonly class TypeNode implements Stringable
 {

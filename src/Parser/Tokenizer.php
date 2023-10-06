@@ -12,6 +12,7 @@ use function substr;
 
 /**
  * @internal
+ * @psalm-internal Eventjet\Ausdruck
  */
 final readonly class Tokenizer
 {
