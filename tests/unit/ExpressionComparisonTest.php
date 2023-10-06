@@ -12,7 +12,6 @@ use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Gt;
 use Eventjet\Ausdruck\Lambda;
 use Eventjet\Ausdruck\Literal;
-use Eventjet\Ausdruck\Offset;
 use Eventjet\Ausdruck\Or_;
 use Eventjet\Ausdruck\Subtract;
 use Eventjet\Ausdruck\Type;
@@ -36,10 +35,6 @@ final class ExpressionComparisonTest extends TestCase
         yield [
             Expr::literal('foo'),
             Expr::literal('foo'),
-        ];
-        yield [
-            Expr::offset(Expr::literal(['a']), 0),
-            Expr::offset(Expr::literal(['a']), 0),
         ];
         yield [
             Expr::or_(Expr::literal(true), Expr::literal(false)),
@@ -107,18 +102,6 @@ final class ExpressionComparisonTest extends TestCase
         yield Literal::class . ': different type' => [
             Expr::literal('foo'),
             Expr::get('foo', Type::string()),
-        ];
-        yield Offset::class . ': different arrays' => [
-            Expr::offset(Expr::literal(['a']), 0),
-            Expr::offset(Expr::literal(['b']), 0),
-        ];
-        yield Offset::class . ': different offsets' => [
-            Expr::offset(Expr::literal(['a']), 0),
-            Expr::offset(Expr::literal(['a']), 1),
-        ];
-        yield Offset::class . ': different type' => [
-            Expr::offset(Expr::literal(['a']), 0),
-            Expr::literal(['a']),
         ];
         yield Or_::class . ': left is different' => [
             Expr::or_(Expr::literal(true), Expr::literal(false)),

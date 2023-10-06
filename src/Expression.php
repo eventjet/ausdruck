@@ -45,17 +45,6 @@ abstract readonly class Expression implements Stringable
     }
 
     /**
-     * @param self<array-key> | array-key $offset
-     * @return Offset<array-key, mixed>
-     */
-    public function offset(self|string|int $offset): Offset
-    {
-        /** @var self<array<array-key, mixed>> $self */
-        $self = $this;
-        return Expr::offset($self, $offset);
-    }
-
-    /**
      * @param self<bool> $other
      */
     public function or_(self $other): Or_
