@@ -14,6 +14,7 @@ use function sprintf;
  * @template T
  * @extends Expression<T>
  * @internal
+ * @psalm-internal Eventjet\Ausdruck
  */
 final readonly class Call extends Expression
 {

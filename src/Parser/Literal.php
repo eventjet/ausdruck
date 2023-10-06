@@ -12,6 +12,7 @@ use function sprintf;
 /**
  * @template-covariant T of string | int | float
  * @internal
+ * @psalm-internal Eventjet\Ausdruck
  */
 final readonly class Literal implements Stringable
 {

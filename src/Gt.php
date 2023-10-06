@@ -10,6 +10,7 @@ use function sprintf;
  * @template T of int | float
  * @extends Expression<bool>
  * @internal
+ * @psalm-internal Eventjet\Ausdruck
  */
 final readonly class Gt extends Expression
 {

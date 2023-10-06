@@ -13,6 +13,7 @@ use function sprintf;
  * @template T
  * @extends Expression<callable(Scope): T>
  * @internal
+ * @psalm-internal Eventjet\Ausdruck
  */
 final readonly class Lambda extends Expression
 {

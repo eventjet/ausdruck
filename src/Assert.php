@@ -19,6 +19,7 @@ use function sprintf;
 /**
  * @phpstan-type Validator callable(mixed): (true | string)
  * @internal
+ * @psalm-internal Eventjet\Ausdruck
  */
 final readonly class Assert
 {

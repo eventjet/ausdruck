@@ -9,6 +9,7 @@ use Generator;
 /**
  * @template T
  * @internal
+ * @psalm-internal Eventjet\Ausdruck
  */
 final readonly class Peekable
 {
