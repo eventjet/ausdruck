@@ -80,7 +80,13 @@ The following types are supported:
 - `float`: Floating point number
 - `list<T>`: List of type T
 - `map<K, V>`: Map with key type K and value type V
-- `My\Class\Name`: Fully qualified class name
+- Any other type will be treated as an alias that you will have to provide when parsing the expression:
+  ```php
+  use Eventjet\Ausdruck\Parser\ExpressionParser;
+  use Eventjet\Ausdruck\Type;
+  
+  ExpressionParser::parse('foo:MyType', ['MyType' => Type::object(Foo::class)]);
+  ```
 
 ### Functions
 
