@@ -32,8 +32,6 @@ final readonly class Tokenizer
             }
             $singleCharToken = match ($char) {
                 '.' => Token::Dot,
-                '[' => Token::OpenBracket,
-                ']' => Token::CloseBracket,
                 '(' => Token::OpenParen,
                 ')' => Token::CloseParen,
                 '<' => Token::OpenAngle,

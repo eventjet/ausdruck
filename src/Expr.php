@@ -51,18 +51,6 @@ final readonly class Expr
     }
 
     /**
-     * @template K of array-key
-     * @template V
-     * @param Expression<array<K, V>> $array
-     * @param Expression<K> | K $offset
-     * @return Offset<K, V>
-     */
-    public static function offset(Expression $array, Expression|string|int $offset): Offset
-    {
-        return new Offset($array, $offset);
-    }
-
-    /**
      * @template T
      * @param Expression<mixed> $target
      * @param list<Expression<mixed>> $arguments
