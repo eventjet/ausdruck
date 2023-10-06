@@ -70,12 +70,12 @@ jobs:
             --ignore-msi-with-no-mutations \
             -jmax
 
-      - name: "Check for BC breaks"
-        run: vendor/bin/roave-backward-compatibility-check
-
       - name: Save Infection result
         uses: actions/upload-artifact@v3
         if: always()
         with:
           name: infection-log-${{ matrix.php }}.txt
           path: infection-log.txt
+
+      - name: "Check for BC breaks"
+        run: vendor/bin/roave-backward-compatibility-check
