@@ -25,8 +25,6 @@ final class ExpressionParserTest extends TestCase
         $cases = [
             ['foo:string', Expr::get('foo', $s)],
             ['"my-literal"', Expr::literal('my-literal')],
-            ['attr:map<string, string>["MyKey"]', Expr::get('attr', Type::mapOf($s, $s))->offset('MyKey')],
-            ['attr:list<string>[5]', Expr::get('attr', Type::listOf($s))->offset(5)],
             ['foo:string === bar:string', Expr::get('foo', Type::string())->eq(Expr::get('bar', Type::string()))],
             ['foo:bool || bar:bool', Expr::get('foo', Type::bool())->or_(Expr::get('bar', Type::bool()))],
             [
@@ -45,7 +43,6 @@ final class ExpressionParserTest extends TestCase
             ['-23.42', Expr::literal(-23.42)],
             ['69', Expr::literal(69)],
             ['-69', Expr::literal(-69)],
-            ['foo:map<string, int>["test"]', Expr::get('foo', Type::mapOf($s, Type::int()))->offset('test')],
             ['69 - foo:int', Expr::literal(69)->subtract(Expr::get('foo', Type::int()))],
             [
                 'a:int - b:int - c:int',
@@ -58,6 +55,7 @@ final class ExpressionParserTest extends TestCase
                 ),
             ],
             ['"💩"', Expr::literal('💩')],
+            ['myMap:map<string, int>', Expr::get('myMap', Type::mapOf(Type::string(), Type::int()))],
         ];
         foreach ($cases as $case) {
             yield $case[0] => $case;
@@ -123,7 +121,6 @@ final class ExpressionParserTest extends TestCase
             'haystack:list<string>.some:bool(|item| item:string === needle:string',
             'Expected ), got end of input',
         ];
-        yield 'offset: missing closing bracket' => ['foo:list<string>[bar:int', 'Expected ], got end of input'];
         yield 'missing right hand side of minus' => ['foo:int -'];
         yield 'empty string' => ['', 'Expected expression, got end of input'];
         yield 'missing left hand side of >' => ['> foo:int'];
@@ -139,16 +136,10 @@ final class ExpressionParserTest extends TestCase
      */
     public static function invalidExpressions(): iterable
     {
-        yield 'offset syntax on string' => ['foo:string["bar"]'];
-        yield 'bool offset on list' => ['foo:list<string>[mykey:bool]'];
-        yield 'bool offset on map' => ['foo:map<string, string>[mykey:bool]'];
         yield 'map type with bool key type' => ['foo:map<bool, string>'];
         yield 'or with string on the left' => ['foo:string || bar:bool'];
         yield 'or with string on the right' => ['foo:bool || bar:string'];
         yield 'equals: different operand types' => ['foo:string === bar:int'];
-        yield 'bool offset' => ['foo:list<string>[bar:bool]', 'Can\'t use bool offset'];
-        yield 'string offset on list' => ['foo:list<string>["bar"]'];
-        yield 'int offset on string string map' => ['foo:map<string, string>[42]'];
         yield 'subtract int from float' => ['foo:float - bar:int'];
         yield 'subtract float from int' => ['foo:int - bar:float'];
         yield 'subtract string from string' => ['foo:string - bar:string'];

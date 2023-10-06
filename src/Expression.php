@@ -8,7 +8,7 @@ use Stringable;
 
 /**
  * @template-covariant T
- * @internal
+ * @api
  */
 abstract readonly class Expression implements Stringable
 {
@@ -42,17 +42,6 @@ abstract readonly class Expression implements Stringable
         /** @var self<U> $self */
         $self = $this;
         return Expr::gt($self, $right);
-    }
-
-    /**
-     * @param self<array-key> | array-key $offset
-     * @return Offset<array-key, mixed>
-     */
-    public function offset(self|string|int $offset): Offset
-    {
-        /** @var self<array<array-key, mixed>> $self */
-        $self = $this;
-        return Expr::offset($self, $offset);
     }
 
     /**
