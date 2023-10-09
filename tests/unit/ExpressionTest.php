@@ -291,7 +291,7 @@ final class ExpressionTest extends TestCase
             $expression = $expression();
         } elseif (is_string($expression)) {
             $types = new Types(['MyCustomObject' => Type::object(SomeObject::class)]);
-            $expression = ExpressionParser::parse($expression, $types);
+            $expression = ExpressionParser::parse($expression, $types)->value;
         }
 
         self::assertSame($expected, $expression->evaluate($scope));

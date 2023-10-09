@@ -11,6 +11,7 @@ use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Scope;
 use Eventjet\Ausdruck\Type;
 
+use function array_map;
 use function assert;
 use function is_string;
 use function sprintf;
@@ -23,9 +24,9 @@ use function str_split;
 final readonly class ExpressionParser
 {
     /**
-     * @return Expression<mixed>
+     * @return Span<Expression<mixed>>
      */
-    public static function parse(string $expression, Types|null $types = null): Expression
+    public static function parse(string $expression, Types|null $types = null): Span
     {
         /**
          * @infection-ignore-all Currently, there's no difference between str_split and its multibyte version. Multibyte
@@ -38,26 +39,26 @@ final readonly class ExpressionParser
     /**
      * @template T
      * @param Type<T> $type
-     * @return Expression<T>
+     * @return Span<Expression<T>>
      */
-    public static function parseTyped(string $expression, Type $type, Types|null $types = null): Expression
+    public static function parseTyped(string $expression, Type $type, Types|null $types = null): Span
     {
         $expr = self::parse($expression, $types);
         /** @psalm-suppress ImplicitToStringCast */
         return self::assertExpressionType($expr, $type, sprintf(
             'Expected parsed expression to be of type %s, got %s',
             $type,
-            $expr->getType(),
+            $expr->value->getType(),
         ));
     }
 
     /**
      * @param Peekable<Span<AnyToken>> $tokens
-     * @return Expression<mixed>
+     * @return Span<Expression<mixed>>
      */
-    private static function parseExpression(Peekable $tokens, Types $types): Expression
+    private static function parseExpression(Peekable $tokens, Types $types): Span
     {
-        /** @var Expression<mixed> | null $expr */
+        /** @var Span<Expression<mixed>> | null $expr */
         $expr = null;
         while (true) {
             $newExpr = self::parseLazy($expr, $tokens, $types);
@@ -78,16 +79,18 @@ final readonly class ExpressionParser
     }
 
     /**
-     * @param Expression<mixed> | null $left
+     * @param Span<Expression<mixed>> | null $left
      * @param Peekable<Span<AnyToken>> $tokens
-     * @return Expression<mixed> | null
+     * @return Span<Expression<mixed>> | null
      */
-    private static function parseLazy(Expression|null $left, Peekable $tokens, Types $types): Expression|null
+    private static function parseLazy(Span|null $left, Peekable $tokens, Types $types): Span|null
     {
-        $token = $tokens->peek()?->value;
+        $span = $tokens->peek();
+        $token = $span?->value;
         if ($token === null) {
             return null;
         }
+        assert($span !== null);
         if ($token === Token::Dot) {
             if ($left === null) {
                 self::unexpectedToken($token);
@@ -102,7 +105,13 @@ final readonly class ExpressionParser
         }
         if ($token instanceof Literal) {
             $tokens->next();
-            return Expr::literal($token->value);
+            return new Span(
+                Expr::literal($token->value),
+                $span->startLine,
+                $span->startColumn,
+                $span->endLine,
+                $span->endColumn,
+            );
         }
         if ($token === Token::TripleEquals) {
             $tokens->next();
@@ -111,12 +120,18 @@ final readonly class ExpressionParser
             }
             $right = self::parseExpression($tokens, $types);
             /** @psalm-suppress ImplicitToStringCast */
-            $right = self::assertExpressionType($right, $left->getType(), sprintf(
+            $right = self::assertExpressionType($right, $left->value->getType(), sprintf(
                 'The expressions of both sides of === must be of the same type. Left: %s, right: %s',
-                $left->getType(),
-                $right->getType(),
+                $left->value->getType(),
+                $right->value->getType(),
             ));
-            return $left->eq($right);
+            return new Span(
+                $left->value->eq($right->value),
+                $left->startLine,
+                $left->startColumn,
+                $right->endLine,
+                $right->endColumn,
+            );
         }
         if ($token === Token::Or) {
             $tokens->next();
@@ -127,16 +142,22 @@ final readonly class ExpressionParser
             $left = self::assertExpressionType($left, Type::bool(), sprintf(
                 'The expression on the left side of %s must be boolean, got %s',
                 Token::print($token),
-                $left->getType(),
+                $left->value->getType(),
             ));
             $right = self::parseExpression($tokens, $types);
             /** @psalm-suppress ImplicitToStringCast */
             $right = self::assertExpressionType($right, Type::bool(), sprintf(
                 'The expression on the right side of %s must be boolean, got %s',
                 Token::print($token),
-                $right->getType(),
+                $right->value->getType(),
             ));
-            return $left->or_($right);
+            return new Span(
+                $left->value->or_($right->value),
+                $left->startLine,
+                $left->startColumn,
+                $right->endLine,
+                $right->endColumn,
+            );
         }
         if ($token === Token::Pipe) {
             return self::lambda($tokens, $types);
@@ -149,16 +170,26 @@ final readonly class ExpressionParser
                 throw new SyntaxError('Expected expression after minus');
             }
             /** @phpstan-ignore-next-line False positive */
-            if (!$subtrahend->matchesType(Type::int()) && !$subtrahend->matchesType(Type::float())) {
+            if (!$subtrahend->value->matchesType(Type::int()) && !$subtrahend->value->matchesType(Type::float())) {
                 /** @psalm-suppress ImplicitToStringCast */
-                throw new TypeError(sprintf('Can\'t subtract %s from %s', $subtrahend->getType(), $left->getType()));
+                throw new TypeError(
+                    sprintf('Can\'t subtract %s from %s', $subtrahend->value->getType(), $left->value->getType()),
+                );
             }
-            if (!$left->getType()->equals($subtrahend->getType())) {
+            if (!$left->value->getType()->equals($subtrahend->value->getType())) {
                 /** @psalm-suppress ImplicitToStringCast */
-                throw new TypeError(sprintf('Can\'t subtract %s from %s', $subtrahend->getType(), $left->getType()));
+                throw new TypeError(
+                    sprintf('Can\'t subtract %s from %s', $subtrahend->value->getType(), $left->value->getType()),
+                );
             }
-            /** @phpstan-ignore-next-line False positive */
-            return $left->subtract($subtrahend);
+            return new Span(
+                /** @phpstan-ignore-next-line False positive */
+                $left->value->subtract($subtrahend->value),
+                $left->startLine,
+                $left->startColumn,
+                $subtrahend->endLine,
+                $subtrahend->endColumn,
+            );
         }
         if ($token === Token::CloseAngle) {
             if ($left === null) {
@@ -167,16 +198,26 @@ final readonly class ExpressionParser
             $tokens->next();
             $right = self::parseExpression($tokens, $types);
             /** @phpstan-ignore-next-line False positive */
-            if (!$right->matchesType(Type::int()) && !$right->matchesType(Type::float())) {
+            if (!$right->value->matchesType(Type::int()) && !$right->value->matchesType(Type::float())) {
                 /** @psalm-suppress ImplicitToStringCast */
-                throw new TypeError(sprintf('Can\'t compare %s to %s', $right->getType(), $left->getType()));
+                throw new TypeError(
+                    sprintf('Can\'t compare %s to %s', $right->value->getType(), $left->value->getType()),
+                );
             }
-            if (!$left->matchesType($right->getType())) {
+            if (!$left->value->matchesType($right->value->getType())) {
                 /** @psalm-suppress ImplicitToStringCast */
-                throw new TypeError(sprintf('Can\'t compare %s to %s', $left->getType(), $right->getType()));
+                throw new TypeError(
+                    sprintf('Can\'t compare %s to %s', $left->value->getType(), $right->value->getType()),
+                );
             }
-            /** @phpstan-ignore-next-line False positive */
-            return $left->gt($right);
+            return new Span(
+                /** @phpstan-ignore-next-line False positive */
+                $left->value->gt($right->value),
+                $left->startLine,
+                $left->startColumn,
+                $right->endLine,
+                $right->endColumn,
+            );
         }
         return null;
     }
@@ -186,21 +227,25 @@ final readonly class ExpressionParser
      * ===========
      *
      * @param Peekable<Span<AnyToken>> $tokens
-     * @return Get<mixed>
+     * @return Span<Get<mixed>>
      */
-    private static function variable(string $name, Peekable $tokens, Types $types): Get
+    private static function variable(string $name, Peekable $tokens, Types $types): Span
     {
+        $startLine = $tokens->peek()?->startLine;
+        $startColumn = $tokens->peek()?->startColumn;
         self::expect($tokens, $name);
+        assert($startLine !== null);
+        assert($startColumn !== null);
         self::expect($tokens, Token::Colon);
         $typeNode = self::parseType($tokens);
         if ($typeNode === null) {
             throw new SyntaxError('Expected type after colon');
         }
-        $type = $types->resolve($typeNode);
+        $type = $types->resolve($typeNode->value);
         if ($type instanceof TypeError) {
             throw $type;
         }
-        return Expr::get($name, $type);
+        return new Span(Expr::get($name, $type), $startLine, $startColumn, $typeNode->endLine, $typeNode->endColumn);
     }
 
     /**
@@ -235,21 +280,37 @@ final readonly class ExpressionParser
 
     /**
      * @param Peekable<Span<AnyToken>> $tokens
+     * @return Span<TypeNode> | null
      */
-    private static function parseType(Peekable $tokens): TypeNode|null
+    private static function parseType(Peekable $tokens): Span|null
     {
-        $name = $tokens->peek()?->value;
+        $idSpan = $tokens->peek();
+        $name = $idSpan?->value;
         if (!is_string($name)) {
             return null;
         }
+        assert($idSpan !== null);
         $tokens->next();
         if ($tokens->peek()?->value !== Token::OpenAngle) {
-            return new TypeNode($name);
+            return new Span(
+                new TypeNode($name),
+                $idSpan->startLine,
+                $idSpan->startColumn,
+                $idSpan->endLine,
+                $idSpan->endColumn,
+            );
         }
         $tokens->next();
         $args = self::parseTypeArgs($tokens);
+        $endToken = $tokens->peek();
         self::expect($tokens, Token::CloseAngle);
-        return new TypeNode($name, $args);
+        return new Span(
+            new TypeNode($name, array_map(static fn(Span $s): TypeNode => $s->value, $args)),
+            $idSpan->startLine,
+            $idSpan->startColumn,
+            $endToken->endLine,
+            $endToken->endColumn,
+        );
     }
 
     /**
@@ -257,7 +318,7 @@ final readonly class ExpressionParser
      *     ===========
      *
      * @param Peekable<Span<AnyToken>> $tokens
-     * @return list<TypeNode>
+     * @return list<Span<TypeNode>>
      */
     private static function parseTypeArgs(Peekable $tokens): array
     {
@@ -277,8 +338,9 @@ final readonly class ExpressionParser
      *     =====
      *
      * @param Peekable<Span<AnyToken>> $tokens
+     * @return Span<TypeNode> | null
      */
-    private static function parseTypeArg(Peekable $tokens): TypeNode|null
+    private static function parseTypeArg(Peekable $tokens): Span|null
     {
         $type = self::parseType($tokens);
         if ($type === null) {
@@ -293,7 +355,7 @@ final readonly class ExpressionParser
      *      ===================================================
      *
      * @param Peekable<Span<AnyToken>> $tokens
-     * @return list<Expression<mixed>>
+     * @return list<Span<Expression<mixed>>>
      */
     private static function parseArgs(Peekable $tokens, Types $types): array
     {
@@ -316,9 +378,9 @@ final readonly class ExpressionParser
      *      ==================
      *
      * @param Peekable<Span<AnyToken>> $tokens
-     * @return Expression<mixed> | null
+     * @return Span<Expression<mixed>> | null
      */
-    private static function parseArg(Peekable $tokens, Types $types): Expression|null
+    private static function parseArg(Peekable $tokens, Types $types): Span|null
     {
         $token = $tokens->peek()?->value;
         if ($token === Token::CloseParen) {
@@ -337,15 +399,20 @@ final readonly class ExpressionParser
      * =======================================
      *
      * @param Peekable<Span<AnyToken>> $tokens
-     * @return Expression<callable(Scope): mixed>
+     * @return Span<Expression<callable(Scope): mixed>>
      */
-    private static function lambda(Peekable $tokens, Types $types): Expression
+    private static function lambda(Peekable $tokens, Types $types): Span
     {
+        $startToken = $tokens->peek();
+        $startLine = $startToken?->startLine;
+        $startColumn = $startToken?->startColumn;
         self::expect($tokens, Token::Pipe);
+        assert($startLine !== null);
+        assert($startColumn !== null);
         $args = self::parseParams($tokens);
         self::expect($tokens, Token::Pipe);
         $body = self::parseExpression($tokens, $types);
-        return Expr::lambda($body, $args);
+        return new Span(Expr::lambda($body->value, $args), $startLine, $startColumn, $body->endLine, $body->endColumn);
     }
 
     /**
@@ -386,14 +453,14 @@ final readonly class ExpressionParser
 
     /**
      * @template T
-     * @param Expression<mixed> $expr
+     * @param Span<Expression<mixed>> $expr
      * @param Type<T> $type
-     * @return Expression<T>
+     * @return Span<Expression<T>>
      */
-    private static function assertExpressionType(Expression $expr, Type $type, string $errorMessage): Expression
+    private static function assertExpressionType(Span $expr, Type $type, string $errorMessage): Span
     {
         /** @psalm-suppress RedundantCondition False positive. This check is _not_ redundant. */
-        if ($expr->matchesType($type)) {
+        if ($expr->value->matchesType($type)) {
             return $expr;
         }
         throw new TypeError($errorMessage);
@@ -412,11 +479,11 @@ final readonly class ExpressionParser
      *             ================================================
      *
      * @template T
-     * @param Expression<T> $target
+     * @param Span<Expression<T>> $target
      * @param Peekable<Span<AnyToken>> $tokens
-     * @return Call<mixed>
+     * @return Span<Call<mixed>>
      */
-    private static function call(Expression $target, Peekable $tokens, Types $types): Call
+    private static function call(Span $target, Peekable $tokens, Types $types): Span
     {
         self::expect($tokens, Token::Dot);
         $name = self::expectIdentifier($tokens, 'function name');
@@ -425,14 +492,25 @@ final readonly class ExpressionParser
         if ($type === null) {
             throw new SyntaxError('Expected type after colon');
         }
-        $type = $types->resolve($type);
+        $type = $types->resolve($type->value);
         if ($type instanceof TypeError) {
             throw $type;
         }
         self::expect($tokens, Token::OpenParen);
         $args = self::parseArgs($tokens, $types);
+        $endToken = $tokens->peek();
+        $endLine = $endToken?->endLine;
+        $endColumn = $endToken?->endColumn;
         self::expect($tokens, Token::CloseParen);
-        return $target->call($name, $type, $args);
+        assert($endLine !== null);
+        assert($endColumn !== null);
+        return new Span(
+            $target->value->call($name, $type, array_map(static fn(Span $s): Expression => $s->value, $args)),
+            $target->startLine,
+            $target->startColumn,
+            $endLine,
+            $endColumn,
+        );
     }
 
     /**

@@ -170,7 +170,7 @@ final class ExpressionParserTest extends TestCase
      */
     public function testParse(string $str, Expression $expected): void
     {
-        $actual = ExpressionParser::parse($str);
+        $actual = ExpressionParser::parse($str)->value;
 
         /** @psalm-suppress ImplicitToStringCast */
         self::assertTrue($actual->equals($expected), sprintf(
@@ -225,7 +225,7 @@ final class ExpressionParserTest extends TestCase
 
     public function testParseTypedReturnsTheParsedExpressionIfItMatchesTheGivenType(): void
     {
-        $actual = ExpressionParser::parseTyped('foo:string', Type::string());
+        $actual = ExpressionParser::parseTyped('foo:string', Type::string())->value;
 
         self::assertSame('foo:string', (string)$actual);
     }
