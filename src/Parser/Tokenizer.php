@@ -20,10 +20,12 @@ final readonly class Tokenizer
 
     /**
      * @param iterable<mixed, string> $chars
-     * @return iterable<Token | string | Literal<string | int | float>>
+     * @return iterable<Span<Token | string | Literal<string | int | float>>>
      */
     public static function tokenize(iterable $chars): iterable
     {
+        $line = 0;
+        $column = 0;
         $chars = new Peekable($chars);
         while (true) {
             $char = $chars->peek();
@@ -41,47 +43,50 @@ final readonly class Tokenizer
                 default => null,
             };
             if ($singleCharToken !== null) {
-                $chars->next();
-                yield $singleCharToken;
+                self::next($chars, $line, $column);
+                yield new Span($singleCharToken, $line, $column, $line, $column);
                 continue;
             }
             if (ctype_space($char)) {
-                $chars->next();
+                self::next($chars, $line, $column);
                 continue;
             }
             if ($char === '"') {
-                $chars->next();
-                yield self::string($chars);
+                yield self::string($chars, $line, $column);
                 continue;
             }
             if ($char === '=') {
-                yield self::equals($chars);
+                yield self::equals($chars, $line, $column);
                 continue;
             }
             if ($char === '-' || is_numeric($char)) {
-                yield self::number($chars);
+                yield self::number($chars, $line, $column);
                 continue;
             }
             if ($char === '|') {
-                $chars->next();
+                self::next($chars, $line, $column);
                 $char = $chars->peek();
                 if ($char === '|') {
-                    $chars->next();
-                    yield Token::Or;
+                    self::next($chars, $line, $column);
+                    yield new Span(Token::Or, $line, $column - 1, $line, $column);
                 } else {
-                    yield Token::Pipe;
+                    yield new Span(Token::Pipe, $line, $column - 1, $line, $column);
                 }
                 continue;
             }
-            yield self::identifier($chars);
+            yield self::identifier($chars, $line, $column);
         }
     }
 
     /**
      * @param Peekable<string> $chars
+     * @return Span<string>
      */
-    private static function identifier(Peekable $chars): string
+    private static function identifier(Peekable $chars, int &$line, int &$column): Span
     {
+        $startLine = $line;
+        $startColumn = $column;
+
         $identifier = '';
 
         while (true) {
@@ -96,26 +101,27 @@ final readonly class Tokenizer
             }
 
             $identifier .= $char;
-            $chars->next();
+            self::next($chars, $line, $column);
         }
 
-        return $identifier;
+        return new Span($identifier, $startLine, $startColumn, $line, $column);
     }
 
     /**
      * @param Peekable<string> $chars
+     * @return Span<Token>
      */
-    private static function equals(Peekable $chars): Token
+    private static function equals(Peekable $chars, int &$line, int &$column): Span
     {
-        $chars->next();
-        self::expect($chars, '==');
-        return Token::TripleEquals;
+        self::next($chars, $line, $column);
+        self::expect($chars, '==', $line, $column);
+        return new Span(Token::TripleEquals, $line, $column - 2, $line, $column);
     }
 
     /**
      * @param Peekable<string> $chars
      */
-    private static function expect(Peekable $chars, string $expected): void
+    private static function expect(Peekable $chars, string $expected, int &$line, int &$column): void
     {
         $originalExpected = $expected;
         while (true) {
@@ -131,43 +137,61 @@ final readonly class Tokenizer
                         : sprintf('Expected %s, got %s', $originalExpected, $actualChar),
                 );
             }
-            $chars->next();
+            self::next($chars, $line, $column);
             $expected = substr($expected, 1);
         }
     }
 
     /**
      * @param Peekable<string> $chars
-     * @return Literal<int | float> | Token
+     * @return Span<Literal<int | float> | Token>
      */
-    private static function number(Peekable $chars): Literal|Token
+    private static function number(Peekable $chars, int &$line, int &$column): Span
     {
+        $startLine = $line;
+        $startColumn = $column;
         $number = '';
         while (true) {
             $char = $chars->peek();
             if ($number === '' && $char === '-') {
                 $number = $char;
-                $chars->next();
+                self::next($chars, $line, $column);
                 continue;
             }
             if ($char === null || !is_numeric($number . $char)) {
+                $endLine = $line;
+                $endColumn = $column;
                 break;
             }
             $number .= $char;
-            $chars->next();
+            self::next($chars, $line, $column);
         }
         if ($number === '-') {
-            return Token::Minus;
+            /**
+             * @phpstan-ignore-next-line False positive. $endLine and $endColumn are always defined.
+             * @psalm-suppress MixedArgument False positive
+             * @psalm-suppress PossiblyUndefinedVariable False positive
+             */
+            return new Span(Token::Minus, $startLine, $startColumn, $endLine, $endColumn);
         }
-        return new Literal(str_contains($number, '.') ? (float)$number : (int)$number);
+        $literal = new Literal(str_contains($number, '.') ? (float)$number : (int)$number);
+        /**
+         * @phpstan-ignore-next-line False positive. $endLine and $endColumn are always defined.
+         * @psalm-suppress MixedArgument False positive
+         * @psalm-suppress PossiblyUndefinedVariable False positive
+         */
+        return new Span($literal, $startLine, $startColumn, $endLine, $endColumn);
     }
 
     /**
      * @param Peekable<string> $chars
-     * @return Literal<string>
+     * @return Span<Literal<string>>
      */
-    private static function string(Peekable $chars): Literal
+    private static function string(Peekable $chars, int &$line, int &$column): Span
     {
+        $startLine = $line;
+        $startColumn = $column;
+        self::expect($chars, '"', $line, $column);
         $string = '';
         while (true) {
             $char = $chars->peek();
@@ -175,12 +199,33 @@ final readonly class Tokenizer
                 throw new SyntaxError('Expected closing quote');
             }
             if ($char === '"') {
-                $chars->next();
+                $endLine = $line;
+                $endColumn = $column;
+                self::next($chars, $line, $column);
                 break;
             }
             $string .= $char;
-            $chars->next();
+            self::next($chars, $line, $column);
         }
-        return new Literal($string);
+        /**
+         * @phpstan-ignore-next-line False positive. $endLine and $endColumn are always defined.
+         * @psalm-suppress MixedArgument False positive
+         * @psalm-suppress PossiblyUndefinedVariable False positive
+         */
+        return new Span(new Literal($string), $startLine, $startColumn, $endLine, $endColumn);
+    }
+
+    /**
+     * @param Peekable<string> $chars
+     */
+    private static function next(Peekable $chars, int &$line, int &$column): void
+    {
+        $char = $chars->next();
+        if ($char === "\n") {
+            $line++;
+            $column = 0;
+        } else {
+            $column++;
+        }
     }
 }

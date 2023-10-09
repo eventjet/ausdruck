@@ -52,7 +52,7 @@ final readonly class ExpressionParser
     }
 
     /**
-     * @param Peekable<AnyToken> $tokens
+     * @param Peekable<Span<AnyToken>> $tokens
      * @return Expression<mixed>
      */
     private static function parseExpression(Peekable $tokens, Types $types): Expression
@@ -67,7 +67,7 @@ final readonly class ExpressionParser
             $expr = $newExpr;
         }
         if ($expr === null) {
-            $token = $tokens->peek();
+            $token = $tokens->peek()?->value;
             throw new SyntaxError(
                 $token === null
                     ? 'Expected expression, got end of input'
@@ -79,12 +79,12 @@ final readonly class ExpressionParser
 
     /**
      * @param Expression<mixed> | null $left
-     * @param Peekable<AnyToken> $tokens
+     * @param Peekable<Span<AnyToken>> $tokens
      * @return Expression<mixed> | null
      */
     private static function parseLazy(Expression|null $left, Peekable $tokens, Types $types): Expression|null
     {
-        $token = $tokens->peek();
+        $token = $tokens->peek()?->value;
         if ($token === null) {
             return null;
         }
@@ -185,7 +185,7 @@ final readonly class ExpressionParser
      * foo:MyClass.bar:string
      * ===========
      *
-     * @param Peekable<AnyToken> $tokens
+     * @param Peekable<Span<AnyToken>> $tokens
      * @return Get<mixed>
      */
     private static function variable(string $name, Peekable $tokens, Types $types): Get
@@ -204,12 +204,12 @@ final readonly class ExpressionParser
     }
 
     /**
-     * @param Peekable<AnyToken> $tokens
+     * @param Peekable<Span<AnyToken>> $tokens
      * @param AnyToken $expected
      */
     private static function expect(Peekable $tokens, Token|string|Literal $expected): void
     {
-        $actual = $tokens->peek();
+        $actual = $tokens->peek()?->value;
         if ($actual === null) {
             throw new SyntaxError(sprintf('Expected %s, got end of input', Token::print($expected)));
         }
@@ -221,12 +221,12 @@ final readonly class ExpressionParser
     }
 
     /**
-     * @param Peekable<AnyToken> $tokens
+     * @param Peekable<Span<AnyToken>> $tokens
      * @param AnyToken $expected
      */
     private static function skip(Peekable $tokens, Token|string|Literal $expected): void
     {
-        $actual = $tokens->peek();
+        $actual = $tokens->peek()?->value;
         if ($actual !== $expected) {
             return;
         }
@@ -234,16 +234,16 @@ final readonly class ExpressionParser
     }
 
     /**
-     * @param Peekable<AnyToken> $tokens
+     * @param Peekable<Span<AnyToken>> $tokens
      */
     private static function parseType(Peekable $tokens): TypeNode|null
     {
-        $name = $tokens->peek();
+        $name = $tokens->peek()?->value;
         if (!is_string($name)) {
             return null;
         }
         $tokens->next();
-        if ($tokens->peek() !== Token::OpenAngle) {
+        if ($tokens->peek()?->value !== Token::OpenAngle) {
             return new TypeNode($name);
         }
         $tokens->next();
@@ -256,7 +256,7 @@ final readonly class ExpressionParser
      * map<int, string>
      *     ===========
      *
-     * @param Peekable<AnyToken> $tokens
+     * @param Peekable<Span<AnyToken>> $tokens
      * @return list<TypeNode>
      */
     private static function parseTypeArgs(Peekable $tokens): array
@@ -276,7 +276,7 @@ final readonly class ExpressionParser
      * map<int, string>
      *     =====
      *
-     * @param Peekable<AnyToken> $tokens
+     * @param Peekable<Span<AnyToken>> $tokens
      */
     private static function parseTypeArg(Peekable $tokens): TypeNode|null
     {
@@ -292,7 +292,7 @@ final readonly class ExpressionParser
      * some(foo:list<string>, |item| item:string === bar:string)
      *      ===================================================
      *
-     * @param Peekable<AnyToken> $tokens
+     * @param Peekable<Span<AnyToken>> $tokens
      * @return list<Expression<mixed>>
      */
     private static function parseArgs(Peekable $tokens, Types $types): array
@@ -315,17 +315,17 @@ final readonly class ExpressionParser
      * some(foo:list<string>, |item| item:string === bar:string)
      *      ==================
      *
-     * @param Peekable<AnyToken> $tokens
+     * @param Peekable<Span<AnyToken>> $tokens
      * @return Expression<mixed> | null
      */
     private static function parseArg(Peekable $tokens, Types $types): Expression|null
     {
-        $token = $tokens->peek();
+        $token = $tokens->peek()?->value;
         if ($token === Token::CloseParen) {
             return null;
         }
         $arg = self::parseExpression($tokens, $types);
-        $token = $tokens->peek();
+        $token = $tokens->peek()?->value;
         if ($token === Token::Comma) {
             $tokens->next();
         }
@@ -336,7 +336,7 @@ final readonly class ExpressionParser
      * |item| => item:string === needle:string
      * =======================================
      *
-     * @param Peekable<AnyToken> $tokens
+     * @param Peekable<Span<AnyToken>> $tokens
      * @return Expression<callable(Scope): mixed>
      */
     private static function lambda(Peekable $tokens, Types $types): Expression
@@ -351,7 +351,7 @@ final readonly class ExpressionParser
     /**
      * |one, two, three| => foo:string
      *  ===============
-     * @param Peekable<AnyToken> $tokens
+     * @param Peekable<Span<AnyToken>> $tokens
      * @return list<string>
      */
     private static function parseParams(Peekable $tokens): array
@@ -371,11 +371,11 @@ final readonly class ExpressionParser
      * |foo, bar| foo:bool === bar:bool
      *  =====
      *
-     * @param Peekable<AnyToken> $tokens
+     * @param Peekable<Span<AnyToken>> $tokens
      */
     private static function parseParam(Peekable $tokens): string|null
     {
-        $token = $tokens->peek();
+        $token = $tokens->peek()?->value;
         if (!is_string($token)) {
             return null;
         }
@@ -413,7 +413,7 @@ final readonly class ExpressionParser
      *
      * @template T
      * @param Expression<T> $target
-     * @param Peekable<AnyToken> $tokens
+     * @param Peekable<Span<AnyToken>> $tokens
      * @return Call<mixed>
      */
     private static function call(Expression $target, Peekable $tokens, Types $types): Call
@@ -436,7 +436,7 @@ final readonly class ExpressionParser
     }
 
     /**
-     * @param Peekable<AnyToken> $tokens
+     * @param Peekable<Span<AnyToken>> $tokens
      */
     private static function expectIdentifier(Peekable $tokens, string $expected = 'identifier'): string
     {
@@ -444,10 +444,10 @@ final readonly class ExpressionParser
         if ($name === null) {
             throw new SyntaxError(sprintf('Expected %s, got end of input', $expected));
         }
-        if (!is_string($name)) {
-            throw new SyntaxError(sprintf('Expected %s, got %s', $expected, Token::print($name)));
+        if (!is_string($name->value)) {
+            throw new SyntaxError(sprintf('Expected %s, got %s', $expected, Token::print($name->value)));
         }
         $tokens->next();
-        return $name;
+        return $name->value;
     }
 }
