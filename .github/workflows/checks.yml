@@ -3,11 +3,163 @@ name: Continuous Integration PHP
 on: [ pull_request ]
 
 jobs:
-  qa:
+  check-dependencies:
     strategy:
       matrix:
         php:
           - "8.2"
+        dependencies:
+          - ""
+          - "--prefer-lowest"
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: ctype
+          coverage: pcov
+
+      - name: Install dependencies
+        run: composer update --no-progress --no-interaction ${{ matrix.dependencies }}
+
+      - name: Check Dependencies
+        run: composer check-deps
+
+  code-style:
+    strategy:
+      matrix:
+        php:
+          - "8.2"
+        dependencies:
+          - ""
+          - "--prefer-lowest"
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: ctype
+
+      - name: Install dependencies
+        run: composer update --no-progress --no-interaction ${{ matrix.dependencies }}
+
+      - name: Check Code Style
+        run: composer cs-check
+
+  phpstan:
+    strategy:
+      matrix:
+        php:
+          - "8.2"
+        dependencies:
+          - ""
+          - "--prefer-lowest"
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: ctype
+
+      - name: Install dependencies
+        run: composer update --no-progress --no-interaction ${{ matrix.dependencies }}
+
+      - name: PHPStan
+        run: composer phpstan -- --no-progress
+
+  psalm:
+    strategy:
+      matrix:
+        php:
+          - "8.2"
+        dependencies:
+          - ""
+          - "--prefer-lowest"
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: ctype
+
+      - name: Install dependencies
+        run: composer update --no-progress --no-interaction ${{ matrix.dependencies }}
+
+      - name: Psalm
+        run: composer psalm
+
+  phpunit:
+    strategy:
+      matrix:
+        php:
+          - "8.2"
+        dependencies:
+          - ""
+          - "--prefer-lowest"
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: ctype
+          coverage: pcov
+
+      - name: Install dependencies
+        run: composer update --no-progress --no-interaction ${{ matrix.dependencies }}
+
+      - name: PHPUnit
+        run: |
+          vendor/bin/phpunit \
+            --coverage-xml=build/coverage/coverage-xml \
+            --log-junit=build/coverage/junit.xml \
+            --coverage-clover=build/coverage/clover.xml
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-${{ matrix.php }}
+          path: build/coverage/
+
+  infection:
+    strategy:
+      matrix:
+        php:
+          - "8.2"
+        dependencies:
+          - ""
+          - "--prefer-lowest"
 
     runs-on: ubuntu-latest
 
@@ -24,39 +176,14 @@ jobs:
           extensions: ctype
           coverage: pcov
 
-      - name: Prepare environment
-        run: echo "COMPOSER_CACHE=$(composer config cache-dir)" >> $GITHUB_ENV
-
-      - name: Composer Cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ${{ env.COMPOSER_CACHE }}
-            vendor
-          key: ${{ runner.os }}-composer
-
       - name: Install dependencies
-        run: |
-          composer update --no-progress --no-interaction > /dev/null
+        run: composer update --no-progress --no-interaction ${{ matrix.dependencies }}
 
-      - name: Check Dependencies
-        run: composer check-deps
-
-      - name: Check Code Style
-        run: composer cs-check
-
-      - name: PHPStan
-        run: composer phpstan -- --no-progress
-
-      - name: Psalm
-        run: composer psalm
-
-      - name: PHPUnit
-        run: |
-          vendor/bin/phpunit \
-            --coverage-xml=build/coverage/coverage-xml \
-            --log-junit=build/coverage/junit.xml \
-            --coverage-clover=coverage.xml
+      - name: Download coverage
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-${{ matrix.php }}
+          path: build/coverage/
 
       - name: Infection coverage of changed lines
         if: "!contains(github.event.pull_request.labels.*.name, 'skip-infection')"
@@ -79,5 +206,30 @@ jobs:
           name: infection-log-${{ matrix.php }}.txt
           path: infection-log.txt
 
+  bc-breaks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+          extensions: ctype
+
+      - name: Install dependencies
+        run: composer update --no-progress --no-interaction
+
       - name: "Check for BC breaks"
         run: vendor/bin/roave-backward-compatibility-check
+
+
+
+
+
+
+
