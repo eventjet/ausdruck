@@ -1,8 +1,8 @@
 {
     "name": "eventjet/ausdruck",
+    "description": "A small expression engine for PHP",
+    "license": "MIT",
     "type": "library",
-    "description": "",
-    "license": "proprietary",
     "require": {
         "php": ">=8.2",
         "ext-ctype": "*"
@@ -20,14 +20,7 @@
         "roave/backward-compatibility-check": "^8.3",
         "vimeo/psalm": "^5.10"
     },
-    "config": {
-        "sort-packages": true,
-        "allow-plugins": {
-            "phpstan/extension-installer": true,
-            "dealerdirect/phpcodesniffer-composer-installer": true,
-            "infection/extension-installer": true
-        }
-    },
+    "minimum-stability": "stable",
     "autoload": {
         "psr-4": {
             "Eventjet\\Ausdruck\\": "src"
@@ -38,7 +31,14 @@
             "Eventjet\\Ausdruck\\Test\\Unit\\": "tests/unit"
         }
     },
-    "minimum-stability": "stable",
+    "config": {
+        "allow-plugins": {
+            "phpstan/extension-installer": true,
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "infection/extension-installer": true
+        },
+        "sort-packages": true
+    },
     "scripts": {
         "check": [
             "@check-deps",
