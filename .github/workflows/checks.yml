@@ -170,6 +170,8 @@ jobs:
   infection:
     name: Infection (${{ matrix.php }} ${{ matrix.dependencies }})
 
+    needs: phpunit
+
     strategy:
       fail-fast: false
       matrix:
