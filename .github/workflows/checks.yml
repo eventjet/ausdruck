@@ -1,4 +1,4 @@
-name: Continuous Integration PHP
+name: QA
 
 on: [ pull_request ]
 
