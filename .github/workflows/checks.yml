@@ -248,10 +248,3 @@ jobs:
 
       - name: "Check for BC breaks"
         run: vendor/bin/roave-backward-compatibility-check
-
-
-
-
-
-
-
