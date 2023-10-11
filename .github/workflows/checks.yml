@@ -4,7 +4,7 @@ on: [ pull_request ]
 
 jobs:
   check-dependencies:
-    name: Composer Require Checker (${{ matrix.php }} ${{ matrix.dependencies }})
+    name: Composer Require Checker - ${{ matrix.php }} ${{ matrix.dependencies }}
 
     strategy:
       fail-fast: false
@@ -35,7 +35,7 @@ jobs:
         run: composer check-deps
 
   code-style:
-    name: PHP CS Fixer (${{ matrix.php }} ${{ matrix.dependencies }})
+    name: PHP CS Fixer - ${{ matrix.php }} ${{ matrix.dependencies }}
 
     strategy:
       fail-fast: false
@@ -65,7 +65,7 @@ jobs:
         run: composer cs-check
 
   phpstan:
-    name: PHPStan (${{ matrix.php }} ${{ matrix.dependencies }})
+    name: PHPStan - ${{ matrix.php }} ${{ matrix.dependencies }}
 
     strategy:
       fail-fast: false
@@ -95,7 +95,7 @@ jobs:
         run: composer phpstan -- --no-progress
 
   psalm:
-    name: Psalm (${{ matrix.php }} ${{ matrix.dependencies }})
+    name: Psalm - ${{ matrix.php }} ${{ matrix.dependencies }}
 
     strategy:
       fail-fast: false
@@ -127,7 +127,7 @@ jobs:
         run: composer psalm
 
   phpunit:
-    name: PHPUnit (${{ matrix.php }} ${{ matrix.dependencies }})
+    name: PHPUnit - ${{ matrix.php }} ${{ matrix.dependencies }}
 
     strategy:
       fail-fast: false
@@ -168,7 +168,7 @@ jobs:
           path: build/coverage/
 
   infection:
-    name: Infection (${{ matrix.php }} ${{ matrix.dependencies }})
+    name: Infection - ${{ matrix.php }} ${{ matrix.dependencies }}
 
     needs: phpunit
 
