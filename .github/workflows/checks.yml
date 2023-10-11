@@ -4,6 +4,8 @@ on: [ pull_request ]
 
 jobs:
   check-dependencies:
+    name: Composer Require Checker (${{ matrix.php }} ${{ matrix.dependencies }})
+
     strategy:
       fail-fast: false
       matrix:
@@ -33,6 +35,8 @@ jobs:
         run: composer check-deps
 
   code-style:
+    name: PHP CS Fixer (${{ matrix.php }} ${{ matrix.dependencies }})
+
     strategy:
       fail-fast: false
       matrix:
@@ -61,6 +65,8 @@ jobs:
         run: composer cs-check
 
   phpstan:
+    name: PHPStan (${{ matrix.php }} ${{ matrix.dependencies }})
+
     strategy:
       fail-fast: false
       matrix:
@@ -89,6 +95,8 @@ jobs:
         run: composer phpstan -- --no-progress
 
   psalm:
+    name: Psalm (${{ matrix.php }} ${{ matrix.dependencies }})
+
     strategy:
       fail-fast: false
       matrix:
@@ -119,6 +127,8 @@ jobs:
         run: composer psalm
 
   phpunit:
+    name: PHPUnit (${{ matrix.php }} ${{ matrix.dependencies }})
+
     strategy:
       fail-fast: false
       matrix:
@@ -158,6 +168,8 @@ jobs:
           path: build/coverage/
 
   infection:
+    name: Infection (${{ matrix.php }} ${{ matrix.dependencies }})
+
     strategy:
       fail-fast: false
       matrix:
@@ -213,6 +225,8 @@ jobs:
           path: infection-log.txt
 
   bc-breaks:
+    name: Backward Compatibility
+
     runs-on: ubuntu-latest
 
     steps:
