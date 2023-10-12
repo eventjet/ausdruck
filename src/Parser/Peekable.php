@@ -11,10 +11,10 @@ use Generator;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final readonly class Peekable
+final class Peekable
 {
     /** @var Generator<mixed, T> */
-    private iterable $items;
+    private readonly iterable $items;
 
     /**
      * @param iterable<mixed, T> $items

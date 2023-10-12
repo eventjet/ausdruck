@@ -12,12 +12,12 @@ use function sprintf;
 /**
  * @api
  */
-final readonly class Types
+final class Types
 {
     /**
      * @param array<string, Type<mixed>> $aliases
      */
-    public function __construct(private array $aliases = [])
+    public function __construct(private readonly array $aliases = [])
     {
     }
 

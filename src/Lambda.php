@@ -15,13 +15,13 @@ use function sprintf;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final readonly class Lambda extends Expression
+final class Lambda extends Expression
 {
     /**
      * @param Expression<T> $body
      * @param list<string> $parameters
      */
-    public function __construct(public Expression $body, public array $parameters = [])
+    public function __construct(public readonly Expression $body, public readonly array $parameters = [])
     {
     }
 

@@ -10,7 +10,7 @@ use Stringable;
  * @template-covariant T
  * @api
  */
-abstract readonly class Expression implements Stringable
+abstract class Expression implements Stringable
 {
     /**
      * @param self<mixed> $other

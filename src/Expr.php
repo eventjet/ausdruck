@@ -10,7 +10,7 @@ use function is_string;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final readonly class Expr
+final class Expr
 {
     /**
      * @psalm-suppress UnusedConstructor

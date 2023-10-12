@@ -20,19 +20,20 @@ use function str_split;
  * @phpstan-type AnyToken Token | string | Literal<string | int | float>
  * @api
  */
-final readonly class ExpressionParser
+final class ExpressionParser
 {
     /**
      * @return Expression<mixed>
      */
     public static function parse(string $expression, Types|null $types = null): Expression
     {
+        $chars = $expression === '' ? [] : str_split($expression);
         /**
          * @infection-ignore-all Currently, there's no difference between str_split and its multibyte version. Multibyte
          *     string literals and identifiers are just put back together. If you encounter a case where it does matter,
          *     just change it to mb_str_split and add an appropriate test case.
          */
-        return self::parseExpression(new Peekable(Tokenizer::tokenize(str_split($expression))), $types ?? new Types());
+        return self::parseExpression(new Peekable(Tokenizer::tokenize($chars)), $types ?? new Types());
     }
 
     /**

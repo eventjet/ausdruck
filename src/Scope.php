@@ -27,16 +27,16 @@ use function sprintf;
  * }
  * @api
  */
-final readonly class Scope
+final class Scope
 {
     /** @var array<string, callable> */
-    private array $funcs;
+    private readonly array $funcs;
 
     /**
      * @param array<string, mixed> $vars
      * @param array<string, callable> $funcs
      */
-    public function __construct(private array $vars = [], array $funcs = [], private Scope|null $parent = null)
+    public function __construct(private readonly array $vars = [], array $funcs = [], private readonly Scope|null $parent = null)
     {
         $predefinedFuncs = $this->parent === null ? [
             'contains' => self::contains(...),

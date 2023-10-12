@@ -14,7 +14,7 @@ use function substr;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final readonly class Tokenizer
+final class Tokenizer
 {
     public const NON_IDENTIFIER_CHARS = '.[]()"=|<>{}:, -';
 

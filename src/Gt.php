@@ -12,13 +12,13 @@ use function sprintf;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final readonly class Gt extends Expression
+final class Gt extends Expression
 {
     /**
      * @param Expression<T> $left
      * @param Expression<T> $right
      */
-    public function __construct(private Expression $left, private Expression $right)
+    public function __construct(private readonly Expression $left, private readonly Expression $right)
     {
     }
 

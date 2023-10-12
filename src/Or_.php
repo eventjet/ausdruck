@@ -11,13 +11,13 @@ use function sprintf;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final readonly class Or_ extends Expression
+final class Or_ extends Expression
 {
     /**
      * @param Expression<bool> $left
      * @param Expression<bool> $right
      */
-    public function __construct(public Expression $left, public Expression $right)
+    public function __construct(public readonly Expression $left, public readonly Expression $right)
     {
     }
 
