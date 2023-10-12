@@ -12,13 +12,13 @@ use function sprintf;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final readonly class Subtract extends Expression
+final class Subtract extends Expression
 {
     /**
      * @param Expression<T> $minuend
      * @param Expression<T> $subtrahend
      */
-    public function __construct(public Expression $minuend, public Expression $subtrahend)
+    public function __construct(public readonly Expression $minuend, public readonly Expression $subtrahend)
     {
     }
 

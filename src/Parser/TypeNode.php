@@ -13,12 +13,12 @@ use function sprintf;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final readonly class TypeNode implements Stringable
+final class TypeNode implements Stringable
 {
     /**
      * @param list<self> $args
      */
-    public function __construct(public string $name, public array $args = [])
+    public function __construct(public readonly string $name, public readonly array $args = [])
     {
     }
 

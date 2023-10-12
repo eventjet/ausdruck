@@ -15,12 +15,12 @@ use function sprintf;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final readonly class Get extends Expression
+final class Get extends Expression
 {
     /**
      * @param Type<T> $type
      */
-    public function __construct(public string $name, private Type $type)
+    public function __construct(public readonly string $name, private readonly Type $type)
     {
     }
 

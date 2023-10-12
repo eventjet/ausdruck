@@ -20,12 +20,12 @@ use function sprintf;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final readonly class Literal extends Expression
+final class Literal extends Expression
 {
     /**
      * @param T $value
      */
-    public function __construct(private mixed $value)
+    public function __construct(private readonly mixed $value)
     {
     }
 

@@ -16,7 +16,7 @@ use function sprintf;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final readonly class Call extends Expression
+final class Call extends Expression
 {
     /**
      * @param Expression<mixed> $target
@@ -24,10 +24,10 @@ final readonly class Call extends Expression
      * @param Type<T> $type
      */
     public function __construct(
-        public Expression $target,
-        public string $name,
-        public Type $type,
-        public array $arguments,
+        public readonly Expression $target,
+        public readonly string $name,
+        public readonly Type $type,
+        public readonly array $arguments,
     ) {
     }
 

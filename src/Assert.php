@@ -21,7 +21,7 @@ use function sprintf;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final readonly class Assert
+final class Assert
 {
     public static function string(mixed $value): string
     {

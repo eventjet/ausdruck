@@ -14,12 +14,12 @@ use function sprintf;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final readonly class Literal implements Stringable
+final class Literal implements Stringable
 {
     /**
      * @param T $value
      */
-    public function __construct(public string|int|float $value)
+    public function __construct(public readonly string|int|float $value)
     {
     }
 

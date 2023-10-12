@@ -21,17 +21,17 @@ use function sprintf;
  * @template-covariant T
  * @api
  */
-final readonly class Type implements Stringable
+final class Type implements Stringable
 {
     /** @var callable(mixed): T */
-    private mixed $assert;
+    private readonly mixed $assert;
 
     /**
      * @param callable(mixed): T $validate
      * @param list<self<mixed>> $args
      * @param self<T> | null $aliasFor
      */
-    private function __construct(public string $name, callable $validate, public array $args = [], public self|null $aliasFor = null)
+    private function __construct(public readonly string $name, callable $validate, public readonly array $args = [], public readonly self|null $aliasFor = null)
     {
         $this->assert = $validate;
     }
