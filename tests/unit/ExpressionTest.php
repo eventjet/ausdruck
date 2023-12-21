@@ -126,6 +126,14 @@ final class ExpressionTest extends TestCase
                 true,
             ],
             ['myMap:map<int, string>', new Scope(['myMap' => [42 => 'a', 69 => 'b']]), [42 => 'a', 69 => 'b']],
+            [
+                'items:list<string>.take:list<string>(3)',
+                new Scope(['items' => ['a', 'b', 'c', 'd', 'e']]),
+                ['a', 'b', 'c'],
+            ],
+            ['items:list<string>.take:list<string>(3)', new Scope(['items' => ['a', 'b']]), ['a', 'b']],
+            ['items:list<string>.take:list<string>(3)', new Scope(['items' => []]), []],
+            ['items:list<string>.take:list<string>(0)', new Scope(['items' => ['a', 'b', 'c', 'd', 'e']]), []],
         ];
         foreach ($cases as [$expr, $scope, $expected]) {
             $expectedStr = (string)Expr::literal($expected);
