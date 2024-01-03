@@ -11,6 +11,7 @@ use function array_intersect;
 use function array_is_list;
 use function array_keys;
 use function array_map;
+use function array_slice;
 use function array_values;
 use function count;
 use function get_debug_type;
@@ -44,6 +45,7 @@ final class Scope
             'filter' => self::filter(...),
             'some' => self::some(...),
             'substr' => substr(...),
+            'take' => self::take(...),
         ] : [];
         $shadowed = array_intersect(array_keys($predefinedFuncs), array_keys($funcs));
         if ($shadowed !== []) {
@@ -124,6 +126,16 @@ final class Scope
             $out[$key] = $item;
         }
         return array_is_list($items) ? array_values($out) : $out;
+    }
+
+    /**
+     * @template T
+     * @param list<T> $items
+     * @return list<T>
+     */
+    private static function take(array $items, int $n): array
+    {
+        return array_slice($items, 0, $n);
     }
 
     /**
