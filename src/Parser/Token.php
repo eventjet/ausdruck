@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use function strlen;
+
 /**
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -31,5 +33,10 @@ enum Token: string
     public static function print(self|string|Literal $token): string
     {
         return $token instanceof self ? $token->value : (string)$token;
+    }
+
+    public function length(): int
+    {
+        return strlen($this->value);
     }
 }

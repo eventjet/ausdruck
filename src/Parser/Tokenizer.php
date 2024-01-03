@@ -20,10 +20,12 @@ final class Tokenizer
 
     /**
      * @param iterable<mixed, string> $chars
-     * @return iterable<Token | string | Literal<string | int | float>>
+     * @return iterable<ParsedToken>
      */
     public static function tokenize(iterable $chars): iterable
     {
+        $line = 0;
+        $column = 0;
         $chars = new Peekable($chars);
         while (true) {
             $char = $chars->peek();
@@ -42,24 +44,35 @@ final class Tokenizer
             };
             if ($singleCharToken !== null) {
                 $chars->next();
-                yield $singleCharToken;
+                yield new ParsedToken($singleCharToken, $line, $column);
+                $column++;
                 continue;
             }
             if (ctype_space($char)) {
                 $chars->next();
+                if ($char === "\n") {
+                    $line++;
+                    $column = 0;
+                } else {
+                    $column++;
+                }
                 continue;
             }
             if ($char === '"') {
                 $chars->next();
-                yield self::string($chars);
+                yield new ParsedToken(self::string($chars), $line, $column);
+                $column++;
                 continue;
             }
             if ($char === '=') {
-                yield self::equals($chars);
+                $token = self::equals($chars);
+                yield new ParsedToken($token, $line, $column);
+                $column += $token->length();
                 continue;
             }
             if ($char === '-' || is_numeric($char)) {
-                yield self::number($chars);
+                $startCol = $column;
+                yield new ParsedToken(self::number($chars, $column), $line, $startCol);
                 continue;
             }
             if ($char === '|') {
@@ -67,20 +80,23 @@ final class Tokenizer
                 $char = $chars->peek();
                 if ($char === '|') {
                     $chars->next();
-                    yield Token::Or;
+                    yield new ParsedToken(Token::Or, $line, $column);
+                    $column += 2;
                 } else {
-                    yield Token::Pipe;
+                    yield new ParsedToken(Token::Pipe, $line, $column);
+                    $column++;
                 }
                 continue;
             }
-            yield self::identifier($chars);
+            $startCol = $column;
+            yield new ParsedToken(self::identifier($chars, $column), $line, $startCol);
         }
     }
 
     /**
      * @param Peekable<string> $chars
      */
-    private static function identifier(Peekable $chars): string
+    private static function identifier(Peekable $chars, int &$column): string
     {
         $identifier = '';
 
@@ -97,6 +113,7 @@ final class Tokenizer
 
             $identifier .= $char;
             $chars->next();
+            $column++;
         }
 
         return $identifier;
@@ -140,7 +157,7 @@ final class Tokenizer
      * @param Peekable<string> $chars
      * @return Literal<int | float> | Token
      */
-    private static function number(Peekable $chars): Literal|Token
+    private static function number(Peekable $chars, int &$column): Literal|Token
     {
         $number = '';
         while (true) {
@@ -148,6 +165,7 @@ final class Tokenizer
             if ($number === '' && $char === '-') {
                 $number = $char;
                 $chars->next();
+                $column++;
                 continue;
             }
             if ($char === null || !is_numeric($number . $char)) {
@@ -155,6 +173,7 @@ final class Tokenizer
             }
             $number .= $char;
             $chars->next();
+            $column++;
         }
         if ($number === '-') {
             return Token::Minus;
