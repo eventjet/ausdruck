@@ -73,6 +73,7 @@ final class ExpressionParser
                 $token === null
                     ? 'Expected expression, got end of input'
                     : sprintf('Expected expression, got %s', Token::print($token)),
+                self::nextSpan($tokens),
             );
         }
         return $expr;
@@ -85,19 +86,23 @@ final class ExpressionParser
      */
     private static function parseLazy(Expression|null $left, Peekable $tokens, Types $types): Expression|null
     {
-        $token = $tokens->peek()?->token;
-        if ($token === null) {
+        $parsedToken = $tokens->peek();
+        if ($parsedToken === null) {
             return null;
         }
+        $token = $parsedToken->token;
         if ($token === Token::Dot) {
             if ($left === null) {
-                self::unexpectedToken($token);
+                self::unexpectedToken($parsedToken);
             }
             return self::call($left, $tokens, $types);
         }
         if (is_string($token)) {
             if ($left !== null) {
-                throw new SyntaxError(sprintf('Unexpected identifier %s', $token));
+                throw new SyntaxError(
+                    sprintf('Unexpected identifier %s', $token),
+                    Span::char($parsedToken->line, $parsedToken->column),
+                );
             }
             return self::variable($token, $tokens, $types);
         }
@@ -108,7 +113,7 @@ final class ExpressionParser
         if ($token === Token::TripleEquals) {
             $tokens->next();
             if ($left === null) {
-                self::unexpectedToken($token);
+                self::unexpectedToken($parsedToken);
             }
             $right = self::parseExpression($tokens, $types);
             /** @psalm-suppress ImplicitToStringCast */
@@ -122,7 +127,7 @@ final class ExpressionParser
         if ($token === Token::Or) {
             $tokens->next();
             if ($left === null) {
-                self::unexpectedToken($token);
+                self::unexpectedToken($parsedToken);
             }
             /** @psalm-suppress ImplicitToStringCast */
             $left = self::assertExpressionType($left, Type::bool(), sprintf(
@@ -144,26 +149,33 @@ final class ExpressionParser
         }
         if ($token === Token::Minus) {
             $tokens->next();
-            assert($left !== null, 'If an expression starts with a minus, it was handled by the int literal case');
-            $subtrahend = self::parseLazy(null, $tokens, $types);
-            if ($subtrahend === null) {
-                throw new SyntaxError('Expected expression after minus');
+            $right = self::parseLazy(null, $tokens, $types);
+            if ($right === null) {
+                throw new SyntaxError('Unexpected end of input', Span::char($parsedToken->line, $parsedToken->column + 1));
             }
             /** @phpstan-ignore-next-line False positive */
-            if (!$subtrahend->matchesType(Type::int()) && !$subtrahend->matchesType(Type::float())) {
+            if (!$right->matchesType(Type::int()) && !$right->matchesType(Type::float())) {
                 /** @psalm-suppress ImplicitToStringCast */
-                throw new TypeError(sprintf('Can\'t subtract %s from %s', $subtrahend->getType(), $left->getType()));
+                throw new TypeError(
+                    $left === null
+                        ? sprintf('Can\'t negate %s', $right->getType())
+                        : sprintf('Can\'t subtract %s from %s', $right->getType(), $left->getType()),
+                );
             }
-            if (!$left->getType()->equals($subtrahend->getType())) {
+            if ($left === null) {
+                /** @phpstan-ignore-next-line False positive */
+                return Expr::negative($right);
+            }
+            if (!$left->getType()->equals($right->getType())) {
                 /** @psalm-suppress ImplicitToStringCast */
-                throw new TypeError(sprintf('Can\'t subtract %s from %s', $subtrahend->getType(), $left->getType()));
+                throw new TypeError(sprintf('Can\'t subtract %s from %s', $right->getType(), $left->getType()));
             }
             /** @phpstan-ignore-next-line False positive */
-            return $left->subtract($subtrahend);
+            return $left->subtract($right);
         }
         if ($token === Token::CloseAngle) {
             if ($left === null) {
-                self::unexpectedToken($token);
+                self::unexpectedToken($parsedToken);
             }
             $tokens->next();
             $right = self::parseExpression($tokens, $types);
@@ -195,7 +207,7 @@ final class ExpressionParser
         self::expect($tokens, Token::Colon);
         $typeNode = self::parseType($tokens);
         if ($typeNode === null) {
-            throw new SyntaxError('Expected type after colon');
+            throw new SyntaxError('Expected type after colon', self::nextSpan($tokens));
         }
         $type = $types->resolve($typeNode);
         if ($type instanceof TypeError) {
@@ -208,30 +220,23 @@ final class ExpressionParser
      * @param Peekable<ParsedToken> $tokens
      * @param AnyToken $expected
      */
-    private static function expect(Peekable $tokens, Token|string|Literal $expected): void
+    private static function expect(Peekable $tokens, Token|string|Literal $expected): ParsedToken
     {
-        $actual = $tokens->peek()?->token;
+        $actual = $tokens->peek();
         if ($actual === null) {
-            throw new SyntaxError(sprintf('Expected %s, got end of input', Token::print($expected)));
+            $previousToken = $tokens->previous();
+            assert($previousToken !== null);
+            $span = Span::char($previousToken->line, $previousToken->column + 1);
+            throw new SyntaxError(sprintf('Expected %s, got end of input', Token::print($expected)), $span);
         }
-        if ($actual === $expected) {
+        if ($actual->token === $expected) {
             $tokens->next();
-            return;
+            return $actual;
         }
-        throw new SyntaxError(sprintf('Expected %s, got %s', Token::print($expected), Token::print($actual)));
-    }
-
-    /**
-     * @param Peekable<ParsedToken> $tokens
-     * @param AnyToken $expected
-     */
-    private static function skip(Peekable $tokens, Token|string|Literal $expected): void
-    {
-        $actual = $tokens->peek()?->token;
-        if ($actual !== $expected) {
-            return;
-        }
-        $tokens->next();
+        throw new SyntaxError(
+            sprintf('Expected %s, got %s', Token::print($expected), Token::print($actual->token)),
+            $actual->span(),
+        );
     }
 
     /**
@@ -285,7 +290,12 @@ final class ExpressionParser
         if ($type === null) {
             return null;
         }
-        self::skip($tokens, Token::Comma);
+        $nextToken = $tokens->peek();
+        assert($nextToken !== null);
+        if ($nextToken->token === Token::CloseAngle) {
+            return $type;
+        }
+        self::expect($tokens, Token::Comma);
         return $type;
     }
 
@@ -305,9 +315,6 @@ final class ExpressionParser
                 break;
             }
             $args[] = $arg;
-            if ($tokens->peek() === null) {
-                break;
-            }
         }
         return $args;
     }
@@ -325,7 +332,10 @@ final class ExpressionParser
         if ($token === Token::CloseParen) {
             return null;
         }
-        $arg = self::parseExpression($tokens, $types);
+        $arg = self::parseLazy(null, $tokens, $types);
+        if ($arg === null) {
+            return null;
+        }
         $token = $tokens->peek()?->token;
         if ($token === Token::Comma) {
             $tokens->next();
@@ -350,8 +360,8 @@ final class ExpressionParser
     }
 
     /**
-     * |one, two, three| => foo:string
-     *  ===============
+     * |one, two, three, | => foo:string
+     *  =================
      * @param Peekable<ParsedToken> $tokens
      * @return list<string>
      */
@@ -381,7 +391,9 @@ final class ExpressionParser
             return null;
         }
         $tokens->next();
-        self::skip($tokens, Token::Comma);
+        if ($tokens->peek()?->token !== Token::Pipe) {
+            self::expect($tokens, Token::Comma);
+        }
         return $token;
     }
 
@@ -400,12 +412,9 @@ final class ExpressionParser
         throw new TypeError($errorMessage);
     }
 
-    /**
-     * @param AnyToken $token
-     */
-    private static function unexpectedToken(Token|string|Literal $token): never
+    private static function unexpectedToken(ParsedToken $token): never
     {
-        throw new SyntaxError(sprintf('Unexpected %s', Token::print($token)));
+        throw new SyntaxError(sprintf('Unexpected %s', Token::print($token->token)), $token->span());
     }
 
     /**
@@ -419,12 +428,12 @@ final class ExpressionParser
      */
     private static function call(Expression $target, Peekable $tokens, Types $types): Call
     {
-        self::expect($tokens, Token::Dot);
-        $name = self::expectIdentifier($tokens, 'function name');
+        $dot = self::expect($tokens, Token::Dot);
+        $name = self::expectIdentifier($tokens, $dot, 'function name');
         self::expect($tokens, Token::Colon);
         $type = self::parseType($tokens);
         if ($type === null) {
-            throw new SyntaxError('Expected type after colon');
+            throw new SyntaxError('Expected type after colon', self::nextSpan($tokens));
         }
         $type = $types->resolve($type);
         if ($type instanceof TypeError) {
@@ -439,16 +448,38 @@ final class ExpressionParser
     /**
      * @param Peekable<ParsedToken> $tokens
      */
-    private static function expectIdentifier(Peekable $tokens, string $expected = 'identifier'): string
-    {
-        $name = $tokens->peek()?->token;
+    private static function expectIdentifier(
+        Peekable $tokens,
+        ParsedToken $lastToken,
+        string $expected = 'identifier',
+    ): string {
+        $name = $tokens->peek();
         if ($name === null) {
-            throw new SyntaxError(sprintf('Expected %s, got end of input', $expected));
+            throw new SyntaxError(
+                sprintf('Expected %s, got end of input', $expected),
+                Span::char($lastToken->line, $lastToken->column + 1),
+            );
         }
-        if (!is_string($name)) {
-            throw new SyntaxError(sprintf('Expected %s, got %s', $expected, Token::print($name)));
+        if (!is_string($name->token)) {
+            throw new SyntaxError(
+                sprintf('Expected %s, got %s', $expected, Token::print($name->token)),
+                Span::char($name->line, $name->column),
+            );
         }
         $tokens->next();
-        return $name;
+        return $name->token;
+    }
+
+    /**
+     * @param Peekable<ParsedToken> $tokens
+     */
+    private static function nextSpan(Peekable $tokens): Span
+    {
+        $token = $tokens->peek();
+        if ($token !== null) {
+            return Span::char($token->line, $token->column);
+        }
+        $previous = $tokens->previous();
+        return $previous === null ? Span::char(1, 1) : Span::char($previous->line, $previous->column + 1);
     }
 }

@@ -7,12 +7,15 @@ namespace Eventjet\Ausdruck\Test\Unit\Parser;
 use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
+use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\TestCase;
 
+use function preg_match;
 use function sprintf;
+use function strlen;
 
 final class ExpressionParserTest extends TestCase
 {
@@ -140,11 +143,11 @@ final class ExpressionParserTest extends TestCase
         yield 'or with string on the left' => ['foo:string || bar:bool'];
         yield 'or with string on the right' => ['foo:bool || bar:string'];
         yield 'equals: different operand types' => ['foo:string === bar:int'];
-        yield 'subtract int from float' => ['foo:float - bar:int'];
-        yield 'subtract float from int' => ['foo:int - bar:float'];
-        yield 'subtract string from string' => ['foo:string - bar:string'];
-        yield 'subtract string from int' => ['foo:int - bar:string'];
-        yield 'subtract int from string' => ['foo:string - bar:int'];
+        yield 'subtract int from float' => ['foo:float - bar:int', 'Can\'t subtract int from float'];
+        yield 'subtract float from int' => ['foo:int - bar:float', 'Can\'t subtract float from int'];
+        yield 'subtract string from string' => ['foo:string - bar:string', 'Can\'t subtract string from string'];
+        yield 'subtract string from int' => ['foo:int - bar:string', 'Can\'t subtract string from int'];
+        yield 'subtract int from string' => ['foo:string - bar:int', 'Can\'t subtract int from string'];
         yield 'int > float' => ['foo:int > bar:float'];
         yield 'float > int' => ['foo:float > bar:int'];
         yield 'string > string' => ['foo:string > bar:string'];
@@ -161,6 +164,121 @@ final class ExpressionParserTest extends TestCase
         yield 'list with two type arguments' => ['foo:list<string, string>', 'Invalid type "list<string, string>"'];
         yield 'list with an unknown type argument' => ['foo:list<Foo>'];
         yield 'function call with unknown type' => ['foo:string.substr:Foo(0, 3)'];
+        yield 'negating a string literal' => ['-"foo"', 'Can\'t negate string'];
+        yield 'negating a string variable' => ['-foo:string', 'Can\'t negate string'];
+    }
+
+    /**
+     * @return iterable<array-key, array{string, Span}>
+     */
+    public static function syntaxErrorLocationCases(): iterable
+    {
+        $cases = [
+            [
+                '--',
+                '  =',
+            ],
+            [
+                'x:list<int>.take(5)',
+                '                =  ',
+            ],
+            [
+                'x:list<int>.take:(5)',
+                '                 =  ',
+            ],
+            [
+                'x:list<int>.take:<int>(5)',
+                '                 =       ',
+            ],
+            [
+                'x:.take:list<int>(5)',
+                '  =                 ',
+            ],
+            [
+                'x:<int>.take:list<int>(5)',
+                '  =                      ',
+            ],
+            [
+                'x.take:list<int>(5)',
+                ' =                 ',
+            ],
+            [
+                '|x x:string',
+                '   =       ',
+            ],
+            [
+                '|x, x:string',
+                '     =      ',
+            ],
+            [
+                '|x y| x:int + y:int',
+                '   =               ',
+            ],
+            [
+                '"foo" === :string',
+                '          =      ',
+            ],
+            [
+                '-42 === :int',
+                '        =   ',
+            ],
+            [
+                'x:bool || :bool',
+                '          =    ',
+            ],
+            [
+                'x:list<int>.',
+                '            =',
+            ],
+            [
+                'x:list<int>.take:',
+                '                 =',
+            ],
+            [
+                'x:list<int>.take: <int>(5)',
+                '                  =       ',
+            ],
+            [
+                'x:list<int>.take:list<int>(',
+                '                           =',
+            ],
+            [
+                'x:list<',
+                '       =',
+            ],
+            [
+                '',
+                '=',
+            ],
+            [
+                'x:list<int>.take:list<int>(===)',
+                '                           === ',
+            ],
+            [
+                '|x, "test"| x:string',
+                '    ======          ',
+            ],
+        ];
+        foreach ($cases as [$expression, $location]) {
+            preg_match('/^(?<spaces> *)(?<underline>=+)/', $location, $matches);
+            $startColumn = strlen($matches['spaces'] ?? '') + 1;
+            $endColumn = $startColumn + strlen($matches['underline'] ?? '') - 1;
+            yield $expression => [$expression, new Span(1, $startColumn, 1, $endColumn)];
+        }
+        yield [
+            <<<'EXPR'
+
+              :list<int>
+            EXPR,
+            Span::char(2, 3),
+        ];
+        yield [
+            <<<'EXPR'
+              foo:string
+                === :string
+            EXPR,
+            Span::char(2, 9),
+        ];
     }
 
     /**
@@ -228,5 +346,32 @@ final class ExpressionParserTest extends TestCase
         $actual = ExpressionParser::parseTyped('foo:string', Type::string());
 
         self::assertSame('foo:string', (string)$actual);
+    }
+
+    /**
+     * @dataProvider syntaxErrorLocationCases
+     */
+    public function testSyntaxErrorLocation(string $expression, Span $expected): void
+    {
+        try {
+            ExpressionParser::parse($expression);
+        } catch (SyntaxError $e) {
+            self::assertSame(
+                [$expected->startLine, $expected->startColumn, $expected->endLine, $expected->endColumn],
+                [$e->location->startLine, $e->location->startColumn, $e->location->endLine, $e->location->endColumn],
+                sprintf(
+                    'Expected the error to span %d:%d-%d:%d, got %d:%d-%d:%d',
+                    $expected->startLine,
+                    $expected->startColumn,
+                    $expected->endLine,
+                    $expected->endColumn,
+                    $e->location->startLine,
+                    $e->location->startColumn,
+                    $e->location->endLine,
+                    $e->location->endColumn,
+                ),
+            );
+
+        }
     }
 }

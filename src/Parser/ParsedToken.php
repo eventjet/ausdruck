@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use function strlen;
+
 final class ParsedToken
 {
     /**
@@ -14,5 +16,11 @@ final class ParsedToken
         public readonly int $line,
         public readonly int $column,
     ) {
+    }
+
+    public function span(): Span
+    {
+        $str = $this->token instanceof Token ? $this->token->value : (string)$this->token;
+        return new Span($this->line, $this->column, $this->line, $this->column + strlen($str) - 1);
     }
 }

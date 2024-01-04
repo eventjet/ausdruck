@@ -15,6 +15,8 @@ final class Peekable
 {
     /** @var Generator<mixed, T> */
     private readonly iterable $items;
+    /** @var T | null */
+    private mixed $previous = null;
 
     /**
      * @param iterable<mixed, T> $items
@@ -50,7 +52,16 @@ final class Peekable
     public function next(): mixed
     {
         $value = $this->items->current();
+        $this->previous = $value;
         $this->items->next();
         return $value;
+    }
+
+    /**
+     * @return T | null
+     */
+    public function previous(): mixed
+    {
+        return $this->previous;
     }
 }

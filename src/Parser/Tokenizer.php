@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use function assert;
 use function ctype_space;
 use function is_numeric;
 use function sprintf;
@@ -24,8 +25,8 @@ final class Tokenizer
      */
     public static function tokenize(iterable $chars): iterable
     {
-        $line = 0;
-        $column = 0;
+        $line = 1;
+        $column = 1;
         $chars = new Peekable($chars);
         while (true) {
             $char = $chars->peek();
@@ -52,22 +53,23 @@ final class Tokenizer
                 $chars->next();
                 if ($char === "\n") {
                     $line++;
-                    $column = 0;
+                    $column = 1;
                 } else {
                     $column++;
                 }
                 continue;
             }
             if ($char === '"') {
+                $startLine = $line;
+                $startCol = $column;
                 $chars->next();
-                yield new ParsedToken(self::string($chars), $line, $column);
                 $column++;
+                yield new ParsedToken(self::string($chars, $line, $column), $startLine, $startCol);
                 continue;
             }
             if ($char === '=') {
-                $token = self::equals($chars);
-                yield new ParsedToken($token, $line, $column);
-                $column += $token->length();
+                $token = self::equals($chars, $line, $column);
+                yield new ParsedToken($token, $line, $column - 3);
                 continue;
             }
             if ($char === '-' || is_numeric($char)) {
@@ -122,17 +124,18 @@ final class Tokenizer
     /**
      * @param Peekable<string> $chars
      */
-    private static function equals(Peekable $chars): Token
+    private static function equals(Peekable $chars, int &$line, int &$column): Token
     {
         $chars->next();
-        self::expect($chars, '==');
+        $column++;
+        self::expect($chars, '==', $line, $column);
         return Token::TripleEquals;
     }
 
     /**
      * @param Peekable<string> $chars
      */
-    private static function expect(Peekable $chars, string $expected): void
+    private static function expect(Peekable $chars, string $expected, int &$line, int &$column): void
     {
         $originalExpected = $expected;
         while (true) {
@@ -146,9 +149,12 @@ final class Tokenizer
                     $actualChar === null
                         ? sprintf('Expected %s, got end of input', $originalExpected)
                         : sprintf('Expected %s, got %s', $originalExpected, $actualChar),
+                    Span::char($line, $column),
                 );
             }
             $chars->next();
+            assert($actualChar !== "\n", 'We\'r never expecting newlines');
+            $column++;
             $expected = substr($expected, 1);
         }
     }
@@ -185,20 +191,22 @@ final class Tokenizer
      * @param Peekable<string> $chars
      * @return Literal<string>
      */
-    private static function string(Peekable $chars): Literal
+    private static function string(Peekable $chars, int &$line, int &$column): Literal
     {
         $string = '';
         while (true) {
             $char = $chars->peek();
             if ($char === null) {
-                throw new SyntaxError('Expected closing quote');
+                throw new SyntaxError('Expected closing quote', Span::char($line, $column));
             }
             if ($char === '"') {
                 $chars->next();
+                $column++;
                 break;
             }
             $string .= $char;
             $chars->next();
+            $column++;
         }
         return new Literal($string);
     }

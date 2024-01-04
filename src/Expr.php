@@ -103,4 +103,14 @@ final class Expr
     {
         return new Gt($left, $right);
     }
+
+    /**
+     * @template T of int | float
+     * @param Expression<T> $expression
+     * @return Negative<T>
+     */
+    public static function negative(Expression $expression): Negative
+    {
+        return new Negative($expression);
+    }
 }
