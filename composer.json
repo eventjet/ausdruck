@@ -18,7 +18,7 @@
         "phpunit/phpunit": "^10.2",
         "psalm/plugin-phpunit": "^0.18.4",
         "roave/backward-compatibility-check": "^8.3",
-        "vimeo/psalm": "^5.10"
+        "vimeo/psalm": "^5.16"
     },
     "minimum-stability": "stable",
     "autoload": {
