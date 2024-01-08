@@ -8,7 +8,7 @@ use RuntimeException;
 
 final class SyntaxError extends RuntimeException
 {
-    public function __construct(string $message, public readonly Span $location)
+    public function __construct(string $message = '', public readonly Span|null $location = null)
     {
         parent::__construct($message);
     }

@@ -416,6 +416,7 @@ final class ExpressionParserTest extends TestCase
             ExpressionParser::parse($expression);
             self::fail('Expected a TypeError');
         } catch (TypeError $e) {
+            self::assertNotNull($e->location);
             self::assertSame(
                 [$expected->startLine, $expected->startColumn, $expected->endLine, $expected->endColumn],
                 [$e->location->startLine, $e->location->startColumn, $e->location->endLine, $e->location->endColumn],
@@ -450,6 +451,7 @@ final class ExpressionParserTest extends TestCase
         try {
             ExpressionParser::parse($expression);
         } catch (SyntaxError $e) {
+            self::assertNotNull($e->location);
             self::assertSame(
                 [$expected->startLine, $expected->startColumn, $expected->endLine, $expected->endColumn],
                 [$e->location->startLine, $e->location->startColumn, $e->location->endLine, $e->location->endColumn],
