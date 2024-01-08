@@ -31,8 +31,15 @@ final class Types
         if ($node->args === []) {
             return $type;
         }
+        $location = $node->args[0]->location->to($node->args[count($node->args) - 1]->location);
         /** @psalm-suppress ImplicitToStringCast */
-        return new TypeError(sprintf('Invalid type "%s": %s does not accept arguments', $node, $type));
+        return new TypeError(sprintf('Invalid type "%s": %s does not accept arguments', $node, $type), $location);
+    }
+
+    private static function dummySpan(): Span
+    {
+        /** @infection-ignore-all These dummy spans are just there to fill parameter lists */
+        return Span::char(1, 1);
     }
 
     /**
@@ -46,27 +53,35 @@ final class Types
             'float' => self::noArgs(Type::float(), $node),
             'bool' => self::noArgs(Type::bool(), $node),
             'any' => self::noArgs(Type::any(), $node),
-            'map' => $this->resolveMap($node->args),
-            'list' => $this->resolveList($node->args),
-            default => $this->resolveAlias($node->name) ?? new TypeError(sprintf('Unknown type %s', $node->name)),
+            'map' => $this->resolveMap($node),
+            'list' => $this->resolveList($node),
+            default => $this->resolveAlias($node->name) ?? new TypeError(
+                sprintf('Unknown type %s', $node->name),
+                $node->location,
+            ),
         };
     }
 
     /**
-     * @param list<TypeNode> $args
      * @return Type<list<mixed>> | TypeError
      */
-    private function resolveList(array $args): Type|TypeError
+    private function resolveList(TypeNode $node): Type|TypeError
     {
+        $args = $node->args;
+        if ($args === []) {
+            return new TypeError('The list type requires one argument, none given', $node->location);
+        }
         $nArgs = count($args);
-        if ($nArgs !== 1) {
+        if ($nArgs > 1) {
+            $location = $args[0]->location->to($args[count($args) - 1]->location);
             /** @psalm-suppress ImplicitToStringCast */
             return new TypeError(
                 sprintf(
                     'Invalid type "%s": list expects exactly one argument, got %d',
-                    new TypeNode('list', $args),
+                    new TypeNode('list', $args, self::dummySpan()),
                     $nArgs,
                 ),
+                $location,
             );
         }
         $valueType = $this->resolve($args[0]);
@@ -77,20 +92,26 @@ final class Types
     }
 
     /**
-     * @param list<TypeNode> $args
      * @return Type<array<array-key, mixed>> | TypeError
      */
-    private function resolveMap(array $args): Type|TypeError
+    private function resolveMap(TypeNode $node): Type|TypeError
     {
+        $args = $node->args;
+        if ($args === []) {
+            return new TypeError('The map type requires two arguments, none given', $node->location);
+        }
         $nArgs = count($args);
         if ($nArgs !== 2) {
+            /** @psalm-suppress TypeDoesNotContainNull False positive */
+            $location = $args[0]->location->to($args[count($args) - 1]->location);
             /** @psalm-suppress ImplicitToStringCast */
             return new TypeError(
                 sprintf(
                     'Invalid type "%s": map expects exactly two arguments, got %d',
-                    new TypeNode('map', $args),
+                    new TypeNode('map', $args, self::dummySpan()),
                     $nArgs,
                 ),
+                $location,
             );
         }
         $keyType = $this->resolve($args[0]);
@@ -103,9 +124,10 @@ final class Types
             return new TypeError(
                 sprintf(
                     'Invalid type "%s": map expects the key type to be int or string, got %s',
-                    new TypeNode('map', $args),
+                    new TypeNode('map', $args, self::dummySpan()),
                     $keyType,
                 ),
+                $args[0]->location,
             );
         }
         $valueType = $this->resolve($args[1]);

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Parser\Span;
+
 use function is_string;
 
 /**
@@ -34,10 +36,10 @@ final class Expr
      * @param Type<T> | class-string<T> $type
      * @return Get<T>
      */
-    public static function get(string $name, Type|string $type): Get
+    public static function get(string $name, Type|string $type, Span|null $location = null): Get
     {
         /** @phpstan-ignore-next-line False positive */
-        return new Get($name, is_string($type) ? Type::object($type) : $type);
+        return new Get($name, is_string($type) ? Type::object($type) : $type, $location ?? self::dummySpan());
     }
 
     /**
@@ -45,9 +47,9 @@ final class Expr
      * @param T $value
      * @return Literal<T>
      */
-    public static function literal(mixed $value): Literal
+    public static function literal(mixed $value, Span|null $location = null): Literal
     {
-        return new Literal($value);
+        return new Literal($value, $location ?? self::dummySpan());
     }
 
     /**
@@ -57,9 +59,9 @@ final class Expr
      * @param Type<T> $type
      * @return Call<T>
      */
-    public static function call(Expression $target, string $name, Type $type, array $arguments): Call
+    public static function call(Expression $target, string $name, Type $type, array $arguments, Span|null $location = null): Call
     {
-        return new Call($target, $name, $type, $arguments);
+        return new Call($target, $name, $type, $arguments, $location ?? self::dummySpan());
     }
 
     /**
@@ -77,9 +79,11 @@ final class Expr
      * @param list<string> $parameters
      * @return Expression<callable(Scope): T>
      */
-    public static function lambda(Expression $body, array $parameters = []): Expression
+    public static function lambda(Expression $body, array $parameters = [], Span|null $location = null): Expression
     {
-        return new Lambda($body, $parameters);
+        /** @infection-ignore-all We currently don't have a way to test this */
+        $location ??= self::dummySpan();
+        return new Lambda($body, $parameters, $location);
     }
 
     /**
@@ -109,8 +113,14 @@ final class Expr
      * @param Expression<T> $expression
      * @return Negative<T>
      */
-    public static function negative(Expression $expression): Negative
+    public static function negative(Expression $expression, Span|null $location = null): Negative
     {
-        return new Negative($expression);
+        return new Negative($expression, $location ?? self::dummySpan());
+    }
+
+    private static function dummySpan(): Span
+    {
+        /** @infection-ignore-all These dummy spans are just there to fill parameter lists */
+        return Span::char(1, 1);
     }
 }

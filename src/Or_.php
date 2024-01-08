@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Parser\Span;
+
 use function sprintf;
 
 /**
@@ -42,5 +44,10 @@ final class Or_ extends Expression
     public function getType(): Type
     {
         return Type::bool();
+    }
+
+    public function location(): Span
+    {
+        return $this->left->location()->to($this->right->location());
     }
 }

@@ -25,7 +25,9 @@ final class Tokenizer
      */
     public static function tokenize(iterable $chars): iterable
     {
+        /** @var positive-int $line */
         $line = 1;
+        /** @var positive-int $column */
         $column = 1;
         $chars = new Peekable($chars);
         while (true) {
@@ -68,8 +70,9 @@ final class Tokenizer
                 continue;
             }
             if ($char === '=') {
+                $startCol = $column;
                 $token = self::equals($chars, $line, $column);
-                yield new ParsedToken($token, $line, $column - 3);
+                yield new ParsedToken($token, $line, $startCol);
                 continue;
             }
             if ($char === '-' || is_numeric($char)) {
@@ -90,15 +93,21 @@ final class Tokenizer
                 }
                 continue;
             }
-            $startCol = $column;
-            yield new ParsedToken(self::identifier($chars, $column), $line, $startCol);
+            if (!str_contains(self::NON_IDENTIFIER_CHARS, $char)) {
+                $startCol = $column;
+                yield new ParsedToken(self::identifier($chars, $line, $column), $line, $startCol);
+                continue;
+            }
+            throw new SyntaxError(sprintf('Unexpected character %s', $char), Span::char($line, $column));
         }
     }
 
     /**
      * @param Peekable<string> $chars
+     * @param positive-int $line
+     * @param positive-int $column
      */
-    private static function identifier(Peekable $chars, int &$column): string
+    private static function identifier(Peekable $chars, int $line, int &$column): string
     {
         $identifier = '';
 
@@ -123,8 +132,10 @@ final class Tokenizer
 
     /**
      * @param Peekable<string> $chars
+     * @param positive-int $line
+     * @param positive-int $column
      */
-    private static function equals(Peekable $chars, int &$line, int &$column): Token
+    private static function equals(Peekable $chars, int $line, int &$column): Token
     {
         $chars->next();
         $column++;
@@ -134,8 +145,10 @@ final class Tokenizer
 
     /**
      * @param Peekable<string> $chars
+     * @param positive-int $line
+     * @param positive-int $column
      */
-    private static function expect(Peekable $chars, string $expected, int &$line, int &$column): void
+    private static function expect(Peekable $chars, string $expected, int $line, int &$column): void
     {
         $originalExpected = $expected;
         while (true) {
@@ -161,6 +174,7 @@ final class Tokenizer
 
     /**
      * @param Peekable<string> $chars
+     * @param positive-int $column
      * @return Literal<int | float> | Token
      */
     private static function number(Peekable $chars, int &$column): Literal|Token
@@ -189,9 +203,11 @@ final class Tokenizer
 
     /**
      * @param Peekable<string> $chars
+     * @param positive-int $line
+     * @param positive-int $column
      * @return Literal<string>
      */
-    private static function string(Peekable $chars, int &$line, int &$column): Literal
+    private static function string(Peekable $chars, int $line, int &$column): Literal
     {
         $string = '';
         while (true) {

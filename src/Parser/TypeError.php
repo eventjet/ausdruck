@@ -8,4 +8,8 @@ use RuntimeException;
 
 final class TypeError extends RuntimeException
 {
+    public function __construct(string $message, public readonly Span $location)
+    {
+        parent::__construct($message);
+    }
 }

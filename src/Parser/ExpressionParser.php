@@ -108,7 +108,7 @@ final class ExpressionParser
         }
         if ($token instanceof Literal) {
             $tokens->next();
-            return Expr::literal($token->value);
+            return Expr::literal($token->value, $parsedToken->location());
         }
         if ($token === Token::TripleEquals) {
             $tokens->next();
@@ -160,15 +160,19 @@ final class ExpressionParser
                     $left === null
                         ? sprintf('Can\'t negate %s', $right->getType())
                         : sprintf('Can\'t subtract %s from %s', $right->getType(), $left->getType()),
+                    $right->location(),
                 );
             }
             if ($left === null) {
                 /** @phpstan-ignore-next-line False positive */
-                return Expr::negative($right);
+                return Expr::negative($right, $parsedToken->location()->to($right->location()));
             }
             if (!$left->getType()->equals($right->getType())) {
                 /** @psalm-suppress ImplicitToStringCast */
-                throw new TypeError(sprintf('Can\'t subtract %s from %s', $right->getType(), $left->getType()));
+                throw new TypeError(
+                    sprintf('Can\'t subtract %s from %s', $right->getType(), $left->getType()),
+                    $left->location(),
+                );
             }
             /** @phpstan-ignore-next-line False positive */
             return $left->subtract($right);
@@ -182,11 +186,11 @@ final class ExpressionParser
             /** @phpstan-ignore-next-line False positive */
             if (!$right->matchesType(Type::int()) && !$right->matchesType(Type::float())) {
                 /** @psalm-suppress ImplicitToStringCast */
-                throw new TypeError(sprintf('Can\'t compare %s to %s', $right->getType(), $left->getType()));
+                throw new TypeError(sprintf('Can\'t compare %s to %s', $right->getType(), $left->getType()), $right->location());
             }
             if (!$left->matchesType($right->getType())) {
                 /** @psalm-suppress ImplicitToStringCast */
-                throw new TypeError(sprintf('Can\'t compare %s to %s', $left->getType(), $right->getType()));
+                throw new TypeError(sprintf('Can\'t compare %s to %s', $left->getType(), $right->getType()), $left->location()->to($right->location()));
             }
             /** @phpstan-ignore-next-line False positive */
             return $left->gt($right);
@@ -203,7 +207,7 @@ final class ExpressionParser
      */
     private static function variable(string $name, Peekable $tokens, Types $types): Get
     {
-        self::expect($tokens, $name);
+        $start = self::expect($tokens, $name);
         self::expect($tokens, Token::Colon);
         $typeNode = self::parseType($tokens);
         if ($typeNode === null) {
@@ -213,7 +217,7 @@ final class ExpressionParser
         if ($type instanceof TypeError) {
             throw $type;
         }
-        return Expr::get($name, $type);
+        return Expr::get($name, $type, $start->location()->to($typeNode->location));
     }
 
     /**
@@ -235,7 +239,7 @@ final class ExpressionParser
         }
         throw new SyntaxError(
             sprintf('Expected %s, got %s', Token::print($expected), Token::print($actual->token)),
-            $actual->span(),
+            $actual->location(),
         );
     }
 
@@ -244,18 +248,22 @@ final class ExpressionParser
      */
     private static function parseType(Peekable $tokens): TypeNode|null
     {
-        $name = $tokens->peek()?->token;
+        $parsedToken = $tokens->peek();
+        if ($parsedToken === null) {
+            return null;
+        }
+        $name = $parsedToken->token;
         if (!is_string($name)) {
             return null;
         }
         $tokens->next();
         if ($tokens->peek()?->token !== Token::OpenAngle) {
-            return new TypeNode($name);
+            return new TypeNode($name, [], $parsedToken->location());
         }
         $tokens->next();
         $args = self::parseTypeArgs($tokens);
-        self::expect($tokens, Token::CloseAngle);
-        return new TypeNode($name, $args);
+        $closeAngle = self::expect($tokens, Token::CloseAngle);
+        return new TypeNode($name, $args, $parsedToken->location()->to($closeAngle->location()));
     }
 
     /**
@@ -352,11 +360,11 @@ final class ExpressionParser
      */
     private static function lambda(Peekable $tokens, Types $types): Expression
     {
-        self::expect($tokens, Token::Pipe);
+        $start = self::expect($tokens, Token::Pipe);
         $args = self::parseParams($tokens);
         self::expect($tokens, Token::Pipe);
         $body = self::parseExpression($tokens, $types);
-        return Expr::lambda($body, $args);
+        return Expr::lambda($body, $args, $start->location()->to($body->location()));
     }
 
     /**
@@ -409,12 +417,16 @@ final class ExpressionParser
         if ($expr->matchesType($type)) {
             return $expr;
         }
-        throw new TypeError($errorMessage);
+        /**
+         * @psalm-suppress MixedArgument False positive
+         * @psalm-suppress MixedMethodCall False positive
+         */
+        throw new TypeError($errorMessage, $expr->location());
     }
 
     private static function unexpectedToken(ParsedToken $token): never
     {
-        throw new SyntaxError(sprintf('Unexpected %s', Token::print($token->token)), $token->span());
+        throw new SyntaxError(sprintf('Unexpected %s', Token::print($token->token)), $token->location());
     }
 
     /**
@@ -441,8 +453,8 @@ final class ExpressionParser
         }
         self::expect($tokens, Token::OpenParen);
         $args = self::parseArgs($tokens, $types);
-        self::expect($tokens, Token::CloseParen);
-        return $target->call($name, $type, $args);
+        $closeParen = self::expect($tokens, Token::CloseParen);
+        return $target->call($name, $type, $args, $target->location()->to($closeParen->location()));
     }
 
     /**

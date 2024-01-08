@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Parser\Span;
+
 use function array_is_list;
 use function array_map;
 use function implode;
@@ -22,11 +24,14 @@ use function sprintf;
  */
 final class Literal extends Expression
 {
+    use LocationTrait;
+
     /**
      * @param T $value
      */
-    public function __construct(private readonly mixed $value)
+    public function __construct(private readonly mixed $value, Span $location)
     {
+        $this->location = $location;
     }
 
     /**

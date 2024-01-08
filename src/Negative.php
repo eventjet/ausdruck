@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Parser\Span;
+
 use function sprintf;
 
 /**
@@ -12,12 +14,14 @@ use function sprintf;
  */
 final class Negative extends Expression
 {
+    use LocationTrait;
+
     /**
      * @param Expression<T> $expression
      */
-    public function __construct(
-        public readonly Expression $expression,
-    ) {
+    public function __construct(public readonly Expression $expression, Span $location)
+    {
+        $this->location = $location;
     }
 
     public function __toString(): string

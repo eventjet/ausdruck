@@ -13,6 +13,7 @@ use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\TestCase;
 
+use function assert;
 use function preg_match;
 use function sprintf;
 use function strlen;
@@ -58,7 +59,7 @@ final class ExpressionParserTest extends TestCase
                 ),
             ],
             ['"💩"', Expr::literal('💩')],
-            ['myMap:map<string, int>', Expr::get('myMap', Type::mapOf(Type::string(), Type::int()))],
+            ['foo:map<string, int>', Expr::get('foo', Type::mapOf(Type::string(), Type::int()))],
         ];
         foreach ($cases as $case) {
             yield $case[0] => $case;
@@ -155,12 +156,12 @@ final class ExpressionParserTest extends TestCase
         yield 'int > string' => ['foo:int > bar:string'];
         yield 'generic syntax on string' => ['foo:string<int>'];
         yield 'unknown variable type' => ['foo:notavalidtype'];
-        yield 'map with no type arguments' => ['foo:map', 'Invalid type "map"'];
+        yield 'map with no type arguments' => ['foo:map', 'The map type requires two arguments, none given'];
         yield 'map with one type argument' => ['foo:map<string>', 'Invalid type "map<string>"'];
         yield 'map with three type arguments' => ['foo:map<string, string, string>'];
         yield 'map with an unknown key type' => ['foo:map<Foo, string>'];
         yield 'map with an unknown value type' => ['foo:map<string, Foo>'];
-        yield 'list with no type arguments' => ['foo:list', 'Invalid type "list"'];
+        yield 'list with no type arguments' => ['foo:list', 'The list type requires one argument, none given'];
         yield 'list with two type arguments' => ['foo:list<string, string>', 'Invalid type "list<string, string>"'];
         yield 'list with an unknown type argument' => ['foo:list<Foo>'];
         yield 'function call with unknown type' => ['foo:string.substr:Foo(0, 3)'];
@@ -263,6 +264,7 @@ final class ExpressionParserTest extends TestCase
             preg_match('/^(?<spaces> *)(?<underline>=+)/', $location, $matches);
             $startColumn = strlen($matches['spaces'] ?? '') + 1;
             $endColumn = $startColumn + strlen($matches['underline'] ?? '') - 1;
+            assert($endColumn > 0);
             yield $expression => [$expression, new Span(1, $startColumn, 1, $endColumn)];
         }
         yield [
@@ -279,6 +281,70 @@ final class ExpressionParserTest extends TestCase
             EXPR,
             Span::char(2, 9),
         ];
+    }
+
+    /**
+     * @return iterable<array-key, array{string, Span}>
+     */
+    public static function typeErrorLocationCases(): iterable
+    {
+        $cases = [
+            [
+                '42 > "foo"',
+                '     =====',
+            ],
+            [
+                'x:list<string, int>',
+                '       =========== ',
+            ],
+            [
+                'x:int<string>',
+                '      ====== ',
+            ],
+            [
+                '"foo" === 42',
+                '          ==',
+            ],
+            [
+                'a:int || b:bool',
+                '=====          ',
+            ],
+            [
+                'a:bool || b:int',
+                '          =====',
+            ],
+            [
+                '42 - "foo"',
+                '     =====',
+            ],
+            [
+                '"foo" - 42',
+                '=====     ',
+            ],
+            [
+                '"foo" === 72 - 23',
+                '          =======',
+            ],
+            [
+                'foo:map<bool, string>',
+                '        ====         ',
+            ],
+            [
+                'foo:string === -bar:int',
+                '               ========',
+            ],
+            [
+                'foo:string === bar:list<string>.count:int()',
+                '               ============================',
+            ],
+        ];
+        foreach ($cases as [$expression, $location]) {
+            preg_match('/^(?<spaces> *)(?<underline>=+)/', $location, $matches);
+            $startColumn = strlen($matches['spaces'] ?? '') + 1;
+            $endColumn = $startColumn + strlen($matches['underline'] ?? '') - 1;
+            assert($endColumn > 0);
+            yield $expression => [$expression, new Span(1, $startColumn, 1, $endColumn)];
+        }
     }
 
     /**
@@ -339,6 +405,34 @@ final class ExpressionParserTest extends TestCase
         $this->expectExceptionMessage('Expected parsed expression to be of type string, got list<string>');
 
         ExpressionParser::parseTyped('foo:list<string>', Type::string());
+    }
+
+    /**
+     * @dataProvider typeErrorLocationCases
+     */
+    public function testTypeErrorLocation(string $expression, Span $expected): void
+    {
+        try {
+            ExpressionParser::parse($expression);
+            self::fail('Expected a TypeError');
+        } catch (TypeError $e) {
+            self::assertSame(
+                [$expected->startLine, $expected->startColumn, $expected->endLine, $expected->endColumn],
+                [$e->location->startLine, $e->location->startColumn, $e->location->endLine, $e->location->endColumn],
+                sprintf(
+                    'Expected the error to span %d:%d-%d:%d, got %d:%d-%d:%d',
+                    $expected->startLine,
+                    $expected->startColumn,
+                    $expected->endLine,
+                    $expected->endColumn,
+                    $e->location->startLine,
+                    $e->location->startColumn,
+                    $e->location->endLine,
+                    $e->location->endColumn,
+                ),
+            );
+
+        }
     }
 
     public function testParseTypedReturnsTheParsedExpressionIfItMatchesTheGivenType(): void
