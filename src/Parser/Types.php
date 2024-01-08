@@ -33,7 +33,7 @@ final class Types
         }
         $location = $node->args[0]->location->to($node->args[count($node->args) - 1]->location);
         /** @psalm-suppress ImplicitToStringCast */
-        return new TypeError(sprintf('Invalid type "%s": %s does not accept arguments', $node, $type), $location);
+        return TypeError::create(sprintf('Invalid type "%s": %s does not accept arguments', $node, $type), $location);
     }
 
     private static function dummySpan(): Span
@@ -55,7 +55,7 @@ final class Types
             'any' => self::noArgs(Type::any(), $node),
             'map' => $this->resolveMap($node),
             'list' => $this->resolveList($node),
-            default => $this->resolveAlias($node->name) ?? new TypeError(
+            default => $this->resolveAlias($node->name) ?? TypeError::create(
                 sprintf('Unknown type %s', $node->name),
                 $node->location,
             ),
@@ -69,13 +69,13 @@ final class Types
     {
         $args = $node->args;
         if ($args === []) {
-            return new TypeError('The list type requires one argument, none given', $node->location);
+            return TypeError::create('The list type requires one argument, none given', $node->location);
         }
         $nArgs = count($args);
         if ($nArgs > 1) {
             $location = $args[0]->location->to($args[count($args) - 1]->location);
             /** @psalm-suppress ImplicitToStringCast */
-            return new TypeError(
+            return TypeError::create(
                 sprintf(
                     'Invalid type "%s": list expects exactly one argument, got %d',
                     new TypeNode('list', $args, self::dummySpan()),
@@ -98,14 +98,14 @@ final class Types
     {
         $args = $node->args;
         if ($args === []) {
-            return new TypeError('The map type requires two arguments, none given', $node->location);
+            return TypeError::create('The map type requires two arguments, none given', $node->location);
         }
         $nArgs = count($args);
         if ($nArgs !== 2) {
             /** @psalm-suppress TypeDoesNotContainNull False positive */
             $location = $args[0]->location->to($args[count($args) - 1]->location);
             /** @psalm-suppress ImplicitToStringCast */
-            return new TypeError(
+            return TypeError::create(
                 sprintf(
                     'Invalid type "%s": map expects exactly two arguments, got %d',
                     new TypeNode('map', $args, self::dummySpan()),
@@ -121,7 +121,7 @@ final class Types
         /** @phpstan-ignore-next-line False positive */
         if (!$keyType->equals(Type::int()) && !$keyType->equals(Type::string())) {
             /** @psalm-suppress ImplicitToStringCast */
-            return new TypeError(
+            return TypeError::create(
                 sprintf(
                     'Invalid type "%s": map expects the key type to be int or string, got %s',
                     new TypeNode('map', $args, self::dummySpan()),

@@ -98,7 +98,7 @@ final class Tokenizer
                 yield new ParsedToken(self::identifier($chars, $line, $column), $line, $startCol);
                 continue;
             }
-            throw new SyntaxError(sprintf('Unexpected character %s', $char), Span::char($line, $column));
+            throw SyntaxError::create(sprintf('Unexpected character %s', $char), Span::char($line, $column));
         }
     }
 
@@ -158,7 +158,7 @@ final class Tokenizer
             $actualChar = $chars->peek();
             $expectedChar = $expected[0];
             if ($actualChar !== $expectedChar) {
-                throw new SyntaxError(
+                throw SyntaxError::create(
                     $actualChar === null
                         ? sprintf('Expected %s, got end of input', $originalExpected)
                         : sprintf('Expected %s, got %s', $originalExpected, $actualChar),
@@ -213,7 +213,7 @@ final class Tokenizer
         while (true) {
             $char = $chars->peek();
             if ($char === null) {
-                throw new SyntaxError('Expected closing quote', Span::char($line, $column));
+                throw SyntaxError::create('Expected closing quote', Span::char($line, $column));
             }
             if ($char === '"') {
                 $chars->next();

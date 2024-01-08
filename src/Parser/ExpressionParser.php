@@ -69,7 +69,7 @@ final class ExpressionParser
         }
         if ($expr === null) {
             $token = $tokens->peek()?->token;
-            throw new SyntaxError(
+            throw SyntaxError::create(
                 $token === null
                     ? 'Expected expression, got end of input'
                     : sprintf('Expected expression, got %s', Token::print($token)),
@@ -99,7 +99,7 @@ final class ExpressionParser
         }
         if (is_string($token)) {
             if ($left !== null) {
-                throw new SyntaxError(
+                throw SyntaxError::create(
                     sprintf('Unexpected identifier %s', $token),
                     Span::char($parsedToken->line, $parsedToken->column),
                 );
@@ -151,12 +151,12 @@ final class ExpressionParser
             $tokens->next();
             $right = self::parseLazy(null, $tokens, $types);
             if ($right === null) {
-                throw new SyntaxError('Unexpected end of input', Span::char($parsedToken->line, $parsedToken->column + 1));
+                throw SyntaxError::create('Unexpected end of input', Span::char($parsedToken->line, $parsedToken->column + 1));
             }
             /** @phpstan-ignore-next-line False positive */
             if (!$right->matchesType(Type::int()) && !$right->matchesType(Type::float())) {
                 /** @psalm-suppress ImplicitToStringCast */
-                throw new TypeError(
+                throw TypeError::create(
                     $left === null
                         ? sprintf('Can\'t negate %s', $right->getType())
                         : sprintf('Can\'t subtract %s from %s', $right->getType(), $left->getType()),
@@ -169,7 +169,7 @@ final class ExpressionParser
             }
             if (!$left->getType()->equals($right->getType())) {
                 /** @psalm-suppress ImplicitToStringCast */
-                throw new TypeError(
+                throw TypeError::create(
                     sprintf('Can\'t subtract %s from %s', $right->getType(), $left->getType()),
                     $left->location(),
                 );
@@ -186,11 +186,11 @@ final class ExpressionParser
             /** @phpstan-ignore-next-line False positive */
             if (!$right->matchesType(Type::int()) && !$right->matchesType(Type::float())) {
                 /** @psalm-suppress ImplicitToStringCast */
-                throw new TypeError(sprintf('Can\'t compare %s to %s', $right->getType(), $left->getType()), $right->location());
+                throw TypeError::create(sprintf('Can\'t compare %s to %s', $right->getType(), $left->getType()), $right->location());
             }
             if (!$left->matchesType($right->getType())) {
                 /** @psalm-suppress ImplicitToStringCast */
-                throw new TypeError(sprintf('Can\'t compare %s to %s', $left->getType(), $right->getType()), $left->location()->to($right->location()));
+                throw TypeError::create(sprintf('Can\'t compare %s to %s', $left->getType(), $right->getType()), $left->location()->to($right->location()));
             }
             /** @phpstan-ignore-next-line False positive */
             return $left->gt($right);
@@ -211,7 +211,7 @@ final class ExpressionParser
         self::expect($tokens, Token::Colon);
         $typeNode = self::parseType($tokens);
         if ($typeNode === null) {
-            throw new SyntaxError('Expected type after colon', self::nextSpan($tokens));
+            throw SyntaxError::create('Expected type after colon', self::nextSpan($tokens));
         }
         $type = $types->resolve($typeNode);
         if ($type instanceof TypeError) {
@@ -231,13 +231,13 @@ final class ExpressionParser
             $previousToken = $tokens->previous();
             assert($previousToken !== null);
             $span = Span::char($previousToken->line, $previousToken->column + 1);
-            throw new SyntaxError(sprintf('Expected %s, got end of input', Token::print($expected)), $span);
+            throw SyntaxError::create(sprintf('Expected %s, got end of input', Token::print($expected)), $span);
         }
         if ($actual->token === $expected) {
             $tokens->next();
             return $actual;
         }
-        throw new SyntaxError(
+        throw SyntaxError::create(
             sprintf('Expected %s, got %s', Token::print($expected), Token::print($actual->token)),
             $actual->location(),
         );
@@ -421,12 +421,12 @@ final class ExpressionParser
          * @psalm-suppress MixedArgument False positive
          * @psalm-suppress MixedMethodCall False positive
          */
-        throw new TypeError($errorMessage, $expr->location());
+        throw TypeError::create($errorMessage, $expr->location());
     }
 
     private static function unexpectedToken(ParsedToken $token): never
     {
-        throw new SyntaxError(sprintf('Unexpected %s', Token::print($token->token)), $token->location());
+        throw SyntaxError::create(sprintf('Unexpected %s', Token::print($token->token)), $token->location());
     }
 
     /**
@@ -445,7 +445,7 @@ final class ExpressionParser
         self::expect($tokens, Token::Colon);
         $type = self::parseType($tokens);
         if ($type === null) {
-            throw new SyntaxError('Expected type after colon', self::nextSpan($tokens));
+            throw SyntaxError::create('Expected type after colon', self::nextSpan($tokens));
         }
         $type = $types->resolve($type);
         if ($type instanceof TypeError) {
@@ -467,13 +467,13 @@ final class ExpressionParser
     ): string {
         $name = $tokens->peek();
         if ($name === null) {
-            throw new SyntaxError(
+            throw SyntaxError::create(
                 sprintf('Expected %s, got end of input', $expected),
                 Span::char($lastToken->line, $lastToken->column + 1),
             );
         }
         if (!is_string($name->token)) {
-            throw new SyntaxError(
+            throw SyntaxError::create(
                 sprintf('Expected %s, got %s', $expected, Token::print($name->token)),
                 Span::char($name->line, $name->column),
             );
