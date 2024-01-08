@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Parser\Span;
 use LogicException;
 
 use function implode;
@@ -17,12 +18,15 @@ use function sprintf;
  */
 final class Lambda extends Expression
 {
+    use LocationTrait;
+
     /**
      * @param Expression<T> $body
      * @param list<string> $parameters
      */
-    public function __construct(public readonly Expression $body, public readonly array $parameters = [])
+    public function __construct(public readonly Expression $body, public readonly array $parameters, Span $location)
     {
+        $this->location = $location;
     }
 
     public function __toString(): string

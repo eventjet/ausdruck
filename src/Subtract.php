@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Parser\Span;
+
 use function sprintf;
 
 /**
@@ -50,5 +52,10 @@ final class Subtract extends Expression
     public function getType(): Type
     {
         return $this->minuend->getType();
+    }
+
+    public function location(): Span
+    {
+        return $this->minuend->location()->to($this->subtrahend->location());
     }
 }

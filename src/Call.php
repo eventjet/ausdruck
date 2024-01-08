@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Parser\Span;
+
 use function array_map;
 use function array_unshift;
 use function count;
@@ -18,6 +20,8 @@ use function sprintf;
  */
 final class Call extends Expression
 {
+    use LocationTrait;
+
     /**
      * @param Expression<mixed> $target
      * @param list<Expression<mixed>> $arguments
@@ -28,7 +32,9 @@ final class Call extends Expression
         public readonly string $name,
         public readonly Type $type,
         public readonly array $arguments,
+        Span $location,
     ) {
+        $this->location = $location;
     }
 
     /**

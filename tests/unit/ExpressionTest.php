@@ -134,6 +134,7 @@ final class ExpressionTest extends TestCase
             ['items:list<string>.take:list<string>(3)', new Scope(['items' => ['a', 'b']]), ['a', 'b']],
             ['items:list<string>.take:list<string>(3)', new Scope(['items' => []]), []],
             ['items:list<string>.take:list<string>(0)', new Scope(['items' => ['a', 'b', 'c', 'd', 'e']]), []],
+            ['-myval:int', new Scope(['myval' => 42]), -42],
         ];
         foreach ($cases as [$expr, $scope, $expected]) {
             $expectedStr = (string)Expr::literal($expected);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Parser\Span;
 use TypeError;
 
 use function get_debug_type;
@@ -17,11 +18,14 @@ use function sprintf;
  */
 final class Get extends Expression
 {
+    use LocationTrait;
+
     /**
      * @param Type<T> $type
      */
-    public function __construct(public readonly string $name, private readonly Type $type)
+    public function __construct(public readonly string $name, private readonly Type $type, Span $location)
     {
+        $this->location = $location;
     }
 
     public function __toString(): string

@@ -12,6 +12,7 @@ use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Gt;
 use Eventjet\Ausdruck\Lambda;
 use Eventjet\Ausdruck\Literal;
+use Eventjet\Ausdruck\Negative;
 use Eventjet\Ausdruck\Or_;
 use Eventjet\Ausdruck\Subtract;
 use Eventjet\Ausdruck\Type;
@@ -47,6 +48,10 @@ final class ExpressionComparisonTest extends TestCase
         yield [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
             Expr::gt(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield [
+            Expr::negative(Expr::literal(1)),
+            Expr::negative(Expr::literal(1)),
         ];
     }
 
@@ -174,6 +179,14 @@ final class ExpressionComparisonTest extends TestCase
         yield Gt::class . ': different type' => [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
             Expr::eq(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield Negative::class . ': different type' => [
+            Expr::negative(Expr::literal(1)),
+            Expr::literal(1),
+        ];
+        yield Negative::class . ': different expression' => [
+            Expr::negative(Expr::literal(1)),
+            Expr::negative(Expr::literal(2)),
         ];
     }
 

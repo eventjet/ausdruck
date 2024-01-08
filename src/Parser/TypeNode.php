@@ -18,8 +18,11 @@ final class TypeNode implements Stringable
     /**
      * @param list<self> $args
      */
-    public function __construct(public readonly string $name, public readonly array $args = [])
-    {
+    public function __construct(
+        public readonly string $name,
+        public readonly array $args,
+        public readonly Span $location,
+    ) {
     }
 
     public function __toString(): string

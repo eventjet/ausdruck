@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Parser\Span;
 use Stringable;
 
 /**
@@ -60,9 +61,9 @@ abstract class Expression implements Stringable
      * @param Type<U> $type
      * @return Call<U>
      */
-    public function call(string $name, Type $type, array $arguments): Call
+    public function call(string $name, Type $type, array $arguments, Span|null $location = null): Call
     {
-        return Expr::call($this, $name, $type, $arguments);
+        return Expr::call($this, $name, $type, $arguments, $location);
     }
 
     /**
@@ -75,6 +76,8 @@ abstract class Expression implements Stringable
     {
         return $this->getType()->equals($type);
     }
+
+    abstract public function location(): Span;
 
     /**
      * @return T
