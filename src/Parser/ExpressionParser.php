@@ -10,7 +10,7 @@ use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Scope;
 use Eventjet\Ausdruck\Type;
-
+use function array_key_exists;
 use function assert;
 use function is_string;
 use function sprintf;
@@ -18,6 +18,7 @@ use function str_split;
 
 /**
  * @phpstan-type AnyToken Token | string | Literal<string | int | float>
+ * @phpstan-type Declarations array<string, Declaration>
  * @api
  */
 final class ExpressionParser
@@ -58,12 +59,23 @@ final class ExpressionParser
      */
     private static function parseExpression(Peekable $tokens, Types $types): Expression
     {
+        $declarations = [];
         /** @var Expression<mixed> | null $expr */
         $expr = null;
         while (true) {
-            $newExpr = self::parseLazy($expr, $tokens, $types);
+            $newExpr = self::parseLazy($expr, $tokens, $types, $declarations);
             if ($newExpr === null) {
                 break;
+            }
+            if ($newExpr instanceof Declaration) {
+                if (array_key_exists($newExpr->name, $declarations)) {
+                    throw SyntaxError::create(
+                        sprintf('Variable %s is already declared', $newExpr->name),
+                        $newExpr->location,
+                    );
+                }
+                $declarations[$newExpr->name] = $newExpr->type;
+                continue;
             }
             $expr = $newExpr;
         }
@@ -82,9 +94,10 @@ final class ExpressionParser
     /**
      * @param Expression<mixed> | null $left
      * @param Peekable<ParsedToken> $tokens
+     * @param Declarations $declarations
      * @return Expression<mixed> | null
      */
-    private static function parseLazy(Expression|null $left, Peekable $tokens, Types $types): Expression|null
+    private static function parseLazy(Expression|null $left, Peekable $tokens, Types $types, array $declarations): Expression|Declaration|null
     {
         $parsedToken = $tokens->peek();
         if ($parsedToken === null) {
@@ -95,7 +108,11 @@ final class ExpressionParser
             if ($left === null) {
                 self::unexpectedToken($parsedToken);
             }
-            return self::call($left, $tokens, $types);
+            return self::call($left, $tokens, $types, $declarations);
+        }
+        if ($token === 'declare') {
+            $tokens->next();
+            return self::declaration($parsedToken, $tokens, $types);
         }
         if (is_string($token)) {
             if ($left !== null) {
@@ -104,7 +121,7 @@ final class ExpressionParser
                     Span::char($parsedToken->line, $parsedToken->column),
                 );
             }
-            return self::variable($token, $tokens, $types);
+            return self::variable($token, $tokens, $types, $declarations);
         }
         if ($token instanceof Literal) {
             $tokens->next();
@@ -149,7 +166,7 @@ final class ExpressionParser
         }
         if ($token === Token::Minus) {
             $tokens->next();
-            $right = self::parseLazy(null, $tokens, $types);
+            $right = self::parseLazy(null, $tokens, $types, $declarations);
             if ($right === null) {
                 throw SyntaxError::create('Unexpected end of input', Span::char($parsedToken->line, $parsedToken->column + 1));
             }
@@ -203,11 +220,22 @@ final class ExpressionParser
      * ===========
      *
      * @param Peekable<ParsedToken> $tokens
+     * @param Declarations $declarations
      * @return Get<mixed>
      */
-    private static function variable(string $name, Peekable $tokens, Types $types): Get
+    private static function variable(string $name, Peekable $tokens, Types $types, array $declarations): Get
     {
         $start = self::expect($tokens, $name);
+        $declaration = $declarations[$name] ?? null;
+        if ($tokens->peek()?->token !== Token::Colon) {
+            if ($declaration !== null) {
+                return Expr::get($name, $declaration->type, $start->location());
+            }
+            throw SyntaxError::create(
+                sprintf('Variable %s is not declared and has no type', $name),
+                $start->location(),
+            );
+        }
         self::expect($tokens, Token::Colon);
         $typeNode = self::parseType($tokens);
         if ($typeNode === null) {
@@ -216,6 +244,18 @@ final class ExpressionParser
         $type = $types->resolve($typeNode);
         if ($type instanceof TypeError) {
             throw $type;
+        }
+        if ($declaration !== null && !$declaration->type->equals($type)) {
+            throw TypeError::create(
+                sprintf(
+                    'Variable %s is declared as %s at %s, but used as %s',
+                    $name,
+                    $declaration->type,
+                    $declaration->location,
+                    $type,
+                ),
+                $start->location()->to($typeNode->location),
+            );
         }
         return Expr::get($name, $type, $start->location()->to($typeNode->location));
     }
@@ -312,13 +352,14 @@ final class ExpressionParser
      *      ===================================================
      *
      * @param Peekable<ParsedToken> $tokens
+     * @param Declarations $declarations
      * @return list<Expression<mixed>>
      */
-    private static function parseArgs(Peekable $tokens, Types $types): array
+    private static function parseArgs(Peekable $tokens, Types $types, array $declarations): array
     {
         $args = [];
         while (true) {
-            $arg = self::parseArg($tokens, $types);
+            $arg = self::parseArg($tokens, $types, $declarations);
             if ($arg === null) {
                 break;
             }
@@ -332,15 +373,16 @@ final class ExpressionParser
      *      ==================
      *
      * @param Peekable<ParsedToken> $tokens
+     * @param Declarations $declarations
      * @return Expression<mixed> | null
      */
-    private static function parseArg(Peekable $tokens, Types $types): Expression|null
+    private static function parseArg(Peekable $tokens, Types $types, array $declarations): Expression|null
     {
         $token = $tokens->peek()?->token;
         if ($token === Token::CloseParen) {
             return null;
         }
-        $arg = self::parseLazy(null, $tokens, $types);
+        $arg = self::parseLazy(null, $tokens, $types, $declarations);
         if ($arg === null) {
             return null;
         }
@@ -436,9 +478,10 @@ final class ExpressionParser
      * @template T
      * @param Expression<T> $target
      * @param Peekable<ParsedToken> $tokens
+     * @param Declarations $declarations
      * @return Call<mixed>
      */
-    private static function call(Expression $target, Peekable $tokens, Types $types): Call
+    private static function call(Expression $target, Peekable $tokens, Types $types, array $declarations): Call
     {
         $dot = self::expect($tokens, Token::Dot);
         $name = self::expectIdentifier($tokens, $dot, 'function name');
@@ -452,7 +495,7 @@ final class ExpressionParser
             throw $type;
         }
         self::expect($tokens, Token::OpenParen);
-        $args = self::parseArgs($tokens, $types);
+        $args = self::parseArgs($tokens, $types, $declarations);
         $closeParen = self::expect($tokens, Token::CloseParen);
         return $target->call($name, $type, $args, $target->location()->to($closeParen->location()));
     }
@@ -464,7 +507,8 @@ final class ExpressionParser
         Peekable $tokens,
         ParsedToken $lastToken,
         string $expected = 'identifier',
-    ): string {
+    ): string
+    {
         $name = $tokens->peek();
         if ($name === null) {
             throw SyntaxError::create(
@@ -493,5 +537,20 @@ final class ExpressionParser
         }
         $previous = $tokens->previous();
         return $previous === null ? Span::char(1, 1) : Span::char($previous->line, $previous->column + 1);
+    }
+
+    private static function declaration(ParsedToken $declareKeyword, Peekable $tokens, Types $types): Declaration
+    {
+        $name = self::expectIdentifier($tokens, $declareKeyword, 'variable name');
+        self::expect($tokens, Token::Colon);
+        $typeNode = self::parseType($tokens);
+        if ($typeNode === null) {
+            throw SyntaxError::create('Expected type after colon', self::nextSpan($tokens));
+        }
+        $type = $types->resolve($typeNode);
+        if ($type instanceof TypeError) {
+            throw $type;
+        }
+        return new Declaration($name, $type, $declareKeyword->location()->to($typeNode->location));
     }
 }

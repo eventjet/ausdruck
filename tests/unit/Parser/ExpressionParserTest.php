@@ -12,7 +12,6 @@ use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\TestCase;
-
 use function assert;
 use function preg_match;
 use function sprintf;
@@ -115,7 +114,7 @@ final class ExpressionParserTest extends TestCase
         yield 'triple equals without left hand side' => ['=== foo:string'];
         yield 'offset without a target' => ['["foo"]'];
         yield 'missing variable type' => ['foo'];
-        yield 'missing variable type in sub-expression' => ['foo === bar:true', 'Expected :, got ==='];
+        yield 'missing variable type in sub-expression' => ['foo === bar:true', 'Variable foo is not declared and has no type'];
         yield 'end of string after lambda argument' => ['|one, two'];
         yield 'two commas in lambda arguments' => ['|one,, two| one:bool || two:bool'];
         yield 'standalone pipe' => ['|'];
@@ -201,7 +200,7 @@ final class ExpressionParserTest extends TestCase
             ],
             [
                 'x.take:list<int>(5)',
-                ' =                 ',
+                '=                  ',
             ],
             [
                 '|x x:string',

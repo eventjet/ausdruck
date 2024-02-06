@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
-final class Span
+use Stringable;
+
+final class Span implements Stringable
 {
     /**
      * @param positive-int $startLine
@@ -37,5 +39,10 @@ final class Span
             $end->endLine,
             $end->endColumn,
         );
+    }
+
+    public function __toString(): string
+    {
+        return "{$this->startLine}:{$this->startColumn}-{$this->endLine}:{$this->endColumn}";
     }
 }
