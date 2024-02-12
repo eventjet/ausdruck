@@ -32,7 +32,20 @@ assert($name === 'Joe');
 
 ### Accessing scope variables
 
-Syntax: `varName:type`
+Scope variables should be defined upfront using the variable declaration syntax:
+
+```ausdruck
+declare foo: list<string>
+
+foo.take:list<string>(5).count:int()
+```
+
+Variable declarations should probably be prepended to all expressions by your application, so expression writers can
+just use the variables. Alternatively, you kan skip declarations and declare the type inline:
+
+```ausdruck
+foo:list<string>.take:list<string>(5).count:int()
+```
 
 Scope variables are passed from PHP when it calls `evaluate()` on the expression:
 
