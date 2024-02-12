@@ -12,6 +12,7 @@ use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\TestCase;
+
 use function assert;
 use function preg_match;
 use function sprintf;
@@ -132,6 +133,24 @@ final class ExpressionParserTest extends TestCase
         yield 'end of string after function call and colon' => ['foo:string.substr:'];
         yield 'end of string after function dot' => ['foo:string.'];
         yield 'missing function name' => ['foo:string.:string()'];
+        yield 'end of string after declaration colon' => ['declare foo:'];
+        yield 'declaration in argument position' => ['x:list<string>.take:list<string>(declare foo: string)'];
+        yield 'declaration after minus' => ['foo:int - declare bar: int'];
+        yield 'negated declaration' => ['-declare foo: int'];
+        yield 'duplicate declaration with different types' => [
+            <<<AUSDRUCK
+            declare foo: string
+            declare foo: int
+            AUSDRUCK,
+            'Variable foo is already declared at 1:1-1:19',
+        ];
+        yield 'duplicate declaration with same type' => [
+            <<<AUSDRUCK
+            declare foo: string
+            declare foo: string
+            AUSDRUCK,
+            'Variable foo is already declared at 1:1-1:19',
+        ];
     }
 
     /**
@@ -166,6 +185,22 @@ final class ExpressionParserTest extends TestCase
         yield 'function call with unknown type' => ['foo:string.substr:Foo(0, 3)'];
         yield 'negating a string literal' => ['-"foo"', 'Can\'t negate string'];
         yield 'negating a string variable' => ['-foo:string', 'Can\'t negate string'];
+        yield 'declaration referencing an unknown type' => [
+            <<<AUSDRUCK
+            declare foo: Foo
+            
+            foo
+            AUSDRUCK,
+            'Unknown type Foo',
+        ];
+        yield 'used type different from declared type' => [
+            <<<AUSDRUCK
+            declare foo: string
+            
+            foo:int
+            AUSDRUCK,
+            'Variable foo is declared as string at 1:1-1:19, but used as int',
+        ];
     }
 
     /**

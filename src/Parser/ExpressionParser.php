@@ -10,6 +10,7 @@ use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Scope;
 use Eventjet\Ausdruck\Type;
+
 use function array_key_exists;
 use function assert;
 use function is_string;
@@ -70,11 +71,15 @@ final class ExpressionParser
             if ($newExpr instanceof Declaration) {
                 if (array_key_exists($newExpr->name, $declarations)) {
                     throw SyntaxError::create(
-                        sprintf('Variable %s is already declared', $newExpr->name),
+                        sprintf(
+                            'Variable %s is already declared at %s',
+                            $newExpr->name,
+                            $declarations[$newExpr->name]->location,
+                        ),
                         $newExpr->location,
                     );
                 }
-                $declarations[$newExpr->name] = $newExpr->type;
+                $declarations[$newExpr->name] = $newExpr;
                 continue;
             }
             $expr = $newExpr;
@@ -95,7 +100,7 @@ final class ExpressionParser
      * @param Expression<mixed> | null $left
      * @param Peekable<ParsedToken> $tokens
      * @param Declarations $declarations
-     * @return Expression<mixed> | null
+     * @return Expression<mixed> | Declaration | null
      */
     private static function parseLazy(Expression|null $left, Peekable $tokens, Types $types, array $declarations): Expression|Declaration|null
     {
@@ -169,6 +174,9 @@ final class ExpressionParser
             $right = self::parseLazy(null, $tokens, $types, $declarations);
             if ($right === null) {
                 throw SyntaxError::create('Unexpected end of input', Span::char($parsedToken->line, $parsedToken->column + 1));
+            }
+            if ($right instanceof Declaration) {
+                throw SyntaxError::create('Unexpected declaration', $right->location);
             }
             /** @phpstan-ignore-next-line False positive */
             if (!$right->matchesType(Type::int()) && !$right->matchesType(Type::float())) {
@@ -386,6 +394,9 @@ final class ExpressionParser
         if ($arg === null) {
             return null;
         }
+        if ($arg instanceof Declaration) {
+            throw SyntaxError::create('Unexpected declaration', $arg->location);
+        }
         $token = $tokens->peek()?->token;
         if ($token === Token::Comma) {
             $tokens->next();
@@ -507,8 +518,7 @@ final class ExpressionParser
         Peekable $tokens,
         ParsedToken $lastToken,
         string $expected = 'identifier',
-    ): string
-    {
+    ): string {
         $name = $tokens->peek();
         if ($name === null) {
             throw SyntaxError::create(
@@ -539,6 +549,9 @@ final class ExpressionParser
         return $previous === null ? Span::char(1, 1) : Span::char($previous->line, $previous->column + 1);
     }
 
+    /**
+     * @param Peekable<ParsedToken> $tokens
+     */
     private static function declaration(ParsedToken $declareKeyword, Peekable $tokens, Types $types): Declaration
     {
         $name = self::expectIdentifier($tokens, $declareKeyword, 'variable name');

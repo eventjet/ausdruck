@@ -31,6 +31,11 @@ final class Span implements Stringable
         return new self($line, $column, $line, $column);
     }
 
+    public function __toString(): string
+    {
+        return "{$this->startLine}:{$this->startColumn}-{$this->endLine}:{$this->endColumn}";
+    }
+
     public function to(self $end): self
     {
         return new self(
@@ -39,10 +44,5 @@ final class Span implements Stringable
             $end->endLine,
             $end->endColumn,
         );
-    }
-
-    public function __toString(): string
-    {
-        return "{$this->startLine}:{$this->startColumn}-{$this->endLine}:{$this->endColumn}";
     }
 }
