@@ -158,6 +158,16 @@ final class Type implements Stringable
     }
 
     /**
+     * @template U
+     * @param Type<U> $some
+     * @return self<U | null>
+     */
+    public static function option(self $some): self
+    {
+        return new self('Option', Assert::option($some), [$some]);
+    }
+
+    /**
      * @template K of array-key
      * @param non-empty-array<K, mixed> $value
      * @return self<K>
@@ -204,5 +214,10 @@ final class Type implements Stringable
     public function equals(self $type): bool
     {
         return ($this->aliasFor ?? $this)->name === ($type->aliasFor ?? $type)->name;
+    }
+
+    public function isOption(): bool
+    {
+        return $this->name === 'Option';
     }
 }

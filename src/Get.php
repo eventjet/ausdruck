@@ -41,7 +41,7 @@ final class Get extends Expression
     {
         /** @psalm-suppress MixedAssignment */
         $value = $scope->get($this->name);
-        if ($value === null) {
+        if ($value === null && !$this->type->isOption()) {
             throw new EvaluationError(sprintf('Unknown variable "%s"', $this->name));
         }
         try {
