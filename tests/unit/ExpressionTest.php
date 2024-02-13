@@ -15,6 +15,7 @@ use Eventjet\Ausdruck\Test\Unit\Fixtures\SomeObject;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\TestCase;
 use stdClass;
+
 use function is_callable;
 use function is_string;
 use function sprintf;
