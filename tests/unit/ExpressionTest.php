@@ -141,6 +141,10 @@ final class ExpressionTest extends TestCase
                 [false, true, false],
             ],
             ['ints:list<int>.map:list<int>(|i| i:int -2)', new Scope(['ints' => []]), []],
+            ['maybe:Option<string>', new Scope(['maybe' => 'foo']), 'foo'],
+            ['maybe:Option<string>', new Scope(['maybe' => null]), null],
+            ['maybe:Option<int>.isSome:bool()', new Scope(['maybe' => 23]), true],
+            ['maybe:Option<int>.isSome:bool()', new Scope(['maybe' => null]), false],
         ];
         foreach ($cases as [$expr, $scope, $expected]) {
             $expectedStr = (string)Expr::literal($expected);
@@ -151,7 +155,7 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{Expression<mixed>, string}>
+     * @return iterable<string, array{Expression<mixed> | string, string}>
      */
     public static function toStringCases(): iterable
     {
@@ -161,6 +165,7 @@ final class ExpressionTest extends TestCase
         yield Literal::class . ': true' => [Expr::literal(true), 'true'];
         yield Literal::class . ': false' => [Expr::literal(false), 'false'];
         yield Literal::class . ': null' => [Expr::literal(null), 'null'];
+        yield 'Option type' => ['myint:Option<int>', 'myint:Option<int>'];
     }
 
     /**
@@ -313,11 +318,15 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> $expr
+     * @param Expression<mixed> | string $expr
      * @dataProvider toStringCases
      */
-    public function testToString(Expression $expr, string $expected): void
+    public function testToString(Expression|string $expr, string $expected): void
     {
+        if (is_string($expr)) {
+            $expr = ExpressionParser::parse($expr);
+        }
+
         self::assertSame($expected, (string)$expr);
     }
 
