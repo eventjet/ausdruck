@@ -44,6 +44,7 @@ final class Scope
             'count' => self::count(...),
             'filter' => self::filter(...),
             'isSome' => self::isSome(...),
+            'map' => self::map(...),
             'some' => self::some(...),
             'substr' => substr(...),
             'take' => self::take(...),
@@ -68,6 +69,19 @@ final class Scope
             }
             throw new LogicException(sprintf('Can\'t shadow function "%s" in ancestor scope', $name));
         }
+    }
+
+    /**
+     * @template K of array-key
+     * @template From
+     * @template To
+     * @param array<K, From> $items
+     * @param callable(From): To $f
+     * @return array<K, To>
+     */
+    private static function map(array $items, callable $f): array
+    {
+        return array_map($f, $items);
     }
 
     /**

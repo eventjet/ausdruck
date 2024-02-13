@@ -105,6 +105,7 @@ The target can be any expression. It will be passed as the first argument to the
 | `count`    | Returns the number of elements in a list                               | `foo:list<string>.count:int()`                   |
 | `contains` | Returns whether a list contains a value                                | `foo:list<string>.contains:bool("bar")`          |
 | `isSome`   | Takes an Option and returns whether it is `Some`                       | `foo:Option<int>.isSome:bool()`                  |
+| `map`      | Returns a new list with the results of applying a [function](#lambdas) | `foo:list<int>.map:list<int>(\|i\| i:int - 2)`   |
 | `some`     | Returns whether any element matches a [predicate](#lambdas)            | `foo:list<int>.some:bool(\|item\| item:int > 5)` |
 | `substr`   | Returns a substring of a string                                        | `foo:string.substr:string(0, 5)`                 |
 | `take`     | Returns the first n elements of a list                                 | `foo:list<string>.take:list<string>(5)`          |

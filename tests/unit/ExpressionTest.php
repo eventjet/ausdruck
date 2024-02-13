@@ -135,6 +135,12 @@ final class ExpressionTest extends TestCase
             ['items:list<string>.take:list<string>(3)', new Scope(['items' => []]), []],
             ['items:list<string>.take:list<string>(0)', new Scope(['items' => ['a', 'b', 'c', 'd', 'e']]), []],
             ['-myval:int', new Scope(['myval' => 42]), -42],
+            [
+                'names:list<string>.map:list<bool>(|name| name:string === "bar")',
+                new Scope(['names' => ['foo', 'bar', 'baz']]),
+                [false, true, false],
+            ],
+            ['ints:list<int>.map:list<int>(|i| i:int -2)', new Scope(['ints' => []]), []],
             ['maybe:Option<string>', new Scope(['maybe' => 'foo']), 'foo'],
             ['maybe:Option<string>', new Scope(['maybe' => null]), null],
             ['maybe:Option<int>.isSome:bool()', new Scope(['maybe' => 23]), true],
