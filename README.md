@@ -107,6 +107,7 @@ The target can be any expression. It will be passed as the first argument to the
 | `some`     | Returns whether any element matches a [predicate](#lambdas) | `foo:list<int>.some:bool(\|item\| item:int > 5)` |
 | `substr`   | Returns a substring of a string                             | `foo:string.substr:string(0, 5)`                 |
 | `take`     | Returns the first n elements of a list                      | `foo:list<string>.take:list<string>(5)`          |
+| `unique`   | Returns a list with duplicate elements removed              | `foo:list<string>.unique:list<string>()`         |
 
 #### Custom Functions
 
