@@ -128,4 +128,18 @@ final class Assert
         };
         return $assert;
     }
+
+    /**
+     * @template U
+     * @param Type<U> $some
+     * @return callable(mixed): (U | null)
+     */
+    public static function option(Type $some): callable
+    {
+        /**
+         * @return U | null
+         */
+        $assert = static fn(mixed $value): mixed => $value === null ? null : $some->assert($value);
+        return $assert;
+    }
 }

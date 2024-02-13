@@ -167,6 +167,12 @@ final class ExpressionParserTest extends TestCase
         yield 'function call with unknown type' => ['foo:string.substr:Foo(0, 3)'];
         yield 'negating a string literal' => ['-"foo"', 'Can\'t negate string'];
         yield 'negating a string variable' => ['-foo:string', 'Can\'t negate string'];
+        yield 'option without type argument' => ['foo:Option', 'The Option type requires one argument, none given'];
+        yield 'option with two type arguments' => [
+            'foo:Option<string, string>',
+            'Invalid type "Option<string, string>": Option expects exactly one argument, got 2',
+        ];
+        yield 'option with invalid type argument' => ['foo:Option<Foo>', 'Unknown type Foo'];
     }
 
     /**
@@ -336,6 +342,18 @@ final class ExpressionParserTest extends TestCase
             [
                 'foo:string === bar:list<string>.count:int()',
                 '               ============================',
+            ],
+            [
+                'foo:Option',
+                '    ======',
+            ],
+            [
+                'foo:Option<>',
+                '    ========',
+            ],
+            [
+                'foo:Option<string, int, bool>',
+                '                   ========= ',
             ],
         ];
         foreach ($cases as [$expression, $location]) {

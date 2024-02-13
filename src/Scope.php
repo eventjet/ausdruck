@@ -43,6 +43,7 @@ final class Scope
             'contains' => self::contains(...),
             'count' => self::count(...),
             'filter' => self::filter(...),
+            'isSome' => self::isSome(...),
             'some' => self::some(...),
             'substr' => substr(...),
             'take' => self::take(...),
@@ -126,6 +127,16 @@ final class Scope
             $out[$key] = $item;
         }
         return array_is_list($items) ? array_values($out) : $out;
+    }
+
+    /**
+     * @template U
+     * @param U | null $option
+     * @return ($option is null ? false : true)
+     */
+    private static function isSome(mixed $option): bool
+    {
+        return $option !== null;
     }
 
     /**

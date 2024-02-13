@@ -6,6 +6,7 @@ namespace Eventjet\Ausdruck\Parser;
 
 use Eventjet\Ausdruck\Type;
 
+use function array_key_last;
 use function count;
 use function sprintf;
 
@@ -55,6 +56,7 @@ final class Types
             'any' => self::noArgs(Type::any(), $node),
             'map' => $this->resolveMap($node),
             'list' => $this->resolveList($node),
+            'Option' => $this->resolveOption($node),
             default => $this->resolveAlias($node->name) ?? TypeError::create(
                 sprintf('Unknown type %s', $node->name),
                 $node->location,
@@ -148,5 +150,26 @@ final class Types
             return null;
         }
         return Type::alias($name, $type);
+    }
+
+    /**
+    * @return Type<mixed> | TypeError
+     */
+    private function resolveOption(TypeNode $node): Type|TypeError
+    {
+        if ($node->args === []) {
+            return TypeError::create('The Option type requires one argument, none given', $node->location);
+        }
+        if (count($node->args) > 1) {
+            return TypeError::create(
+                sprintf('Invalid type "%s": Option expects exactly one argument, got %d', $node, count($node->args)),
+                $node->args[1]->location->to($node->args[array_key_last($node->args)]->location),
+            );
+        }
+        $someType = $this->resolve($node->args[0]);
+        if ($someType instanceof TypeError) {
+            return $someType;
+        }
+        return Type::option($someType);
     }
 }
