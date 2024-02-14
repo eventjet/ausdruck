@@ -148,6 +148,8 @@ final class ExpressionTest extends TestCase
             ['maybe:Option<string>', new Scope(['maybe' => null]), null],
             ['maybe:Option<int>.isSome:bool()', new Scope(['maybe' => 23]), true],
             ['maybe:Option<int>.isSome:bool()', new Scope(['maybe' => null]), false],
+            ['ints:list<int>.unique:list<int>()', new Scope(['ints' => [23, 10, 23, 42, 420, 420]]), [23, 10, 42, 420]],
+            ['ints:list<int>.unique:list<int>()', new Scope(['ints' => []]), []],
             ['foo', new Scope(['foo' => 'test']), 'test', new Declarations(variables: ['foo' => Type::string()])],
         ];
         /**
