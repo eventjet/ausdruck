@@ -6,13 +6,13 @@ namespace Eventjet\Ausdruck\Test\Unit\Parser;
 
 use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
+use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\TestCase;
-
 use function assert;
 use function preg_match;
 use function sprintf;
@@ -115,7 +115,10 @@ final class ExpressionParserTest extends TestCase
         yield 'triple equals without left hand side' => ['=== foo:string'];
         yield 'offset without a target' => ['["foo"]'];
         yield 'missing variable type' => ['foo'];
-        yield 'missing variable type in sub-expression' => ['foo === bar:true', 'Expected :, got ==='];
+        yield 'missing variable type in sub-expression' => [
+            'foo === bar:true',
+            'Variable foo must either be declared or have an inline type',
+        ];
         yield 'end of string after lambda argument' => ['|one, two'];
         yield 'two commas in lambda arguments' => ['|one,, two| one:bool || two:bool'];
         yield 'standalone pipe' => ['|'];
@@ -136,7 +139,7 @@ final class ExpressionParserTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{0: string, 1?: string}>
+     * @return iterable<string, array{0: string, 1?: string, 2?: Declarations}>
      */
     public static function invalidExpressions(): iterable
     {
@@ -173,6 +176,11 @@ final class ExpressionParserTest extends TestCase
             'Invalid type "Option<string, string>": Option expects exactly one argument, got 2',
         ];
         yield 'option with invalid type argument' => ['foo:Option<Foo>', 'Unknown type Foo'];
+        yield 'inline variable type does not match declared' => [
+            'foo:string',
+            'Variable foo is declared as int, but used as string',
+            new Declarations(variables: ['foo' => Type::int()]),
+        ];
     }
 
     /**
@@ -207,7 +215,7 @@ final class ExpressionParserTest extends TestCase
             ],
             [
                 'x.take:list<int>(5)',
-                ' =                 ',
+                '=                  ',
             ],
             [
                 '|x x:string',
@@ -407,14 +415,14 @@ final class ExpressionParserTest extends TestCase
     /**
      * @dataProvider invalidExpressions
      */
-    public function testTypeError(string $expression, string|null $expectedMessage = null): void
+    public function testTypeError(string $expression, string|null $expectedMessage = null, Declarations|null $declarations = null): void
     {
         $this->expectException(TypeError::class);
         if ($expectedMessage !== null) {
             $this->expectExceptionMessage($expectedMessage);
         }
 
-        ExpressionParser::parse($expression);
+        ExpressionParser::parse($expression, $declarations);
     }
 
     public function testParseTypedThrowsIfTheExpressionDoesNotMatchTheGivenType(): void

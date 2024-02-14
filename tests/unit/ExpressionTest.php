@@ -8,6 +8,7 @@ use Eventjet\Ausdruck\EvaluationError;
 use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\Literal;
+use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Scope;
@@ -26,6 +27,7 @@ final class ExpressionTest extends TestCase
      * @return iterable<string, array{
      *     string | Expression<mixed> | callable(): Expression<mixed>,
      *     Scope,
+     *     Declarations | null,
      *     mixed,
      * }>
      */
@@ -124,6 +126,7 @@ final class ExpressionTest extends TestCase
                 'obj:MyCustomObject.matches:bool()',
                 new Scope(['obj' => new SomeObject()], ['matches' => static fn(mixed $value): bool => $value instanceof SomeObject]),
                 true,
+                new Declarations(types: new Types(['MyCustomObject' => Type::object(SomeObject::class)])),
             ],
             ['myMap:map<int, string>', new Scope(['myMap' => [42 => 'a', 69 => 'b']]), [42 => 'a', 69 => 'b']],
             [
@@ -145,12 +148,18 @@ final class ExpressionTest extends TestCase
             ['maybe:Option<string>', new Scope(['maybe' => null]), null],
             ['maybe:Option<int>.isSome:bool()', new Scope(['maybe' => 23]), true],
             ['maybe:Option<int>.isSome:bool()', new Scope(['maybe' => null]), false],
+            ['foo', new Scope(['foo' => 'test']), 'test', new Declarations(variables: ['foo' => Type::string()])],
         ];
-        foreach ($cases as [$expr, $scope, $expected]) {
+        /**
+         * @psalm-suppress PossiblyUndefinedArrayOffset The runtime behavior is well-defined: `$declarations` is just null
+         */
+        foreach ($cases as $tuple) {
+            [$expr, $scope, $expected] = $tuple;
+            $declarations = $tuple[3] ?? null;
             $expectedStr = (string)Expr::literal($expected);
             $exprStr = is_callable($expr) ? $expr() : $expr;
             $name = sprintf('%s equals %s with %s', (string)$exprStr, $expectedStr, $scope->debug());
-            yield $name => [$expr, $scope, $expected];
+            yield $name => [$expr, $scope, $declarations, $expected];
         }
     }
 
@@ -305,13 +314,12 @@ final class ExpressionTest extends TestCase
      * @param Expression<mixed> | string | callable(): Expression<mixed> $expression
      * @dataProvider evaluateCases
      */
-    public function testEvaluate(Expression|string|callable $expression, Scope $scope, mixed $expected): void
+    public function testEvaluate(Expression|string|callable $expression, Scope $scope, Declarations|null $declarations, mixed $expected): void
     {
         if (is_callable($expression)) {
             $expression = $expression();
         } elseif (is_string($expression)) {
-            $types = new Types(['MyCustomObject' => Type::object(SomeObject::class)]);
-            $expression = ExpressionParser::parse($expression, $types);
+            $expression = ExpressionParser::parse($expression, $declarations);
         }
 
         self::assertSame($expected, $expression->evaluate($scope));
