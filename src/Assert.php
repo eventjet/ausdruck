@@ -147,7 +147,7 @@ final class Assert
     /**
      * @template U
      * @param Type<U> $returnType
-     * @return callable(mixed...): (callable(): U)
+     * @return callable(mixed): (callable(mixed...): U)
      */
     public static function func(Type $returnType): callable
     {

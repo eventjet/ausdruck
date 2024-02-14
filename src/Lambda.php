@@ -58,10 +58,10 @@ final class Lambda extends Expression
     }
 
     /**
-     * @return Type<callable(): T>
+     * @return Type<callable(mixed...): T>
      */
     public function getType(): Type
     {
-        return Type::func($this->body->getType(), array_map(static fn() => Type::any(), $this->parameters));
+        return Type::func($this->body->getType(), array_map(static fn(string $_name) => Type::any(), $this->parameters));
     }
 }

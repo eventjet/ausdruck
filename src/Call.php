@@ -73,7 +73,7 @@ final class Call extends Expression
         try {
             return $this->type->assert($func(...$args));
         } catch (Throwable $error) {
-            throw new EvaluationError($error->getMessage(), $error->getCode(), $error);
+            throw new EvaluationError($error->getMessage(), previous: $error);
         }
     }
 
