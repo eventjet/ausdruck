@@ -13,6 +13,7 @@ use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\TestCase;
+
 use function assert;
 use function preg_match;
 use function sprintf;
@@ -136,6 +137,7 @@ final class ExpressionParserTest extends TestCase
         yield 'end of string after function call and colon' => ['foo:string.substr:'];
         yield 'end of string after function dot' => ['foo:string.'];
         yield 'missing function name' => ['foo:string.:string()'];
+        yield 'end of string after function name' => ['foo:string.substr'];
     }
 
     /**
@@ -181,6 +183,39 @@ final class ExpressionParserTest extends TestCase
             'Variable foo is declared as int, but used as string',
             new Declarations(variables: ['foo' => Type::int()]),
         ];
+        yield 'inline function return type does not match declared' => [
+            'foo:string.substr:int(0, 3)',
+            'Inline return type int of function substr does not match declared return type string',
+        ];
+        yield 'calling a function on the wrong type' => [
+            'foo:int.substr(0, 3)',
+            'substr must be called on an expression of type string, but foo:int is of type int',
+        ];
+        yield 'calling a function that doesn\'t take any arguments' => [
+            'foo:string.myCustomFn()',
+            'myCustomFn can\'t be used as a receiver function because it doesn\'t accept any arguments',
+            new Declarations(functions: ['myCustomFn' => Type::func(Type::string())]),
+        ];
+        yield 'too few function arguments' => [
+            'foo:string.substr(0)',
+            'substr expects 2 arguments, got 1',
+        ];
+        yield 'wrong argument type' => [
+            'foo:string.substr(0, "3")',
+            'Argument 2 of substr must be of type int, got string',
+        ];
+        yield 'lambda returning the wrong type' => [
+            'x:list<string>.some(|i| i:string)',
+            'Argument 1 of some must be of type func(mixed): bool, got func(mixed): string',
+        ];
+        yield 'passing a string to a function expecting a lambda' => [
+            'x:list<string>.some("foo")',
+            'Argument 1 of some must be of type func(mixed): bool, got string',
+        ];
+        yield 'passing a lambda to a function expecting an int' => [
+            'x:string.substr(|i| i:int, 3)',
+            'Argument 1 of substr must be of type int, got func(mixed): int',
+        ];
     }
 
     /**
@@ -192,10 +227,6 @@ final class ExpressionParserTest extends TestCase
             [
                 '--',
                 '  =',
-            ],
-            [
-                'x:list<int>.take(5)',
-                '                =  ',
             ],
             [
                 'x:list<int>.take:(5)',
@@ -476,6 +507,7 @@ final class ExpressionParserTest extends TestCase
     {
         try {
             ExpressionParser::parse($expression);
+            self::fail('Expected a SyntaxError');
         } catch (SyntaxError $e) {
             self::assertNotNull($e->location);
             self::assertSame(

@@ -10,8 +10,11 @@ use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Scope;
 use Eventjet\Ausdruck\Type;
+use Eventjet\Ausdruck\Type\AbstractType;
 
+use function array_shift;
 use function assert;
+use function count;
 use function is_string;
 use function sprintf;
 use function str_split;
@@ -436,10 +439,10 @@ final class ExpressionParser
     /**
      * @template T
      * @param Expression<mixed> $expr
-     * @param Type<T> $type
+     * @param AbstractType<T> $type
      * @return Expression<T>
      */
-    private static function assertExpressionType(Expression $expr, Type $type, string $errorMessage): Expression
+    private static function assertExpressionType(Expression $expr, AbstractType $type, string $errorMessage): Expression
     {
         /** @psalm-suppress RedundantCondition False positive. This check is _not_ redundant. */
         if ($expr->matchesType($type)) {
@@ -469,30 +472,95 @@ final class ExpressionParser
     private static function call(Expression $target, Peekable $tokens, Declarations $declarations): Call
     {
         $dot = self::expect($tokens, Token::Dot);
-        $name = self::expectIdentifier($tokens, $dot, 'function name');
-        self::expect($tokens, Token::Colon);
-        $type = self::parseType($tokens);
-        if ($type === null) {
-            throw SyntaxError::create('Expected type after colon', self::nextSpan($tokens));
+        [$name, $nameLocation] = self::expectIdentifier($tokens, $dot, 'function name');
+        $fnType = $declarations->functions[$name] ?? null;
+        if ($tokens->peek()?->token === Token::Colon) {
+            $tokens->next();
+            $typeNode = self::parseType($tokens);
+            if ($typeNode === null) {
+                throw SyntaxError::create('Expected type after colon', self::nextSpan($tokens));
+            }
+            $returnType = $declarations->types->resolve($typeNode);
+            if ($returnType instanceof TypeError) {
+                throw $returnType;
+            }
+            if ($fnType !== null && !$returnType->equals($fnType->returnType)) {
+                throw TypeError::create(
+                    sprintf(
+                        'Inline return type %s of function %s does not match declared return type %s',
+                        $returnType,
+                        $name,
+                        $fnType->returnType,
+                    ),
+                    $typeNode->location,
+                );
+            }
+        } else {
+            if ($fnType === null) {
+                throw SyntaxError::create(
+                    sprintf('Function call %s must either be declared or have an inline return type', $name),
+                    $nameLocation,
+                );
+            }
+            $returnType = $fnType->returnType;
         }
-        $type = $declarations->types->resolve($type);
-        if ($type instanceof TypeError) {
-            throw $type;
+        if ($fnType !== null) {
+            $targetType = $fnType->parameterTypes[0] ?? null;
+            if ($targetType === null) {
+                throw new TypeError(
+                    sprintf('%s can\'t be used as a receiver function because it doesn\'t accept any arguments', $name),
+                );
+            }
+            if (!$target->matchesType($targetType)) {
+                throw new TypeError(
+                    sprintf(
+                        '%s must be called on an expression of type %s, but %s is of type %s',
+                        $name,
+                        $targetType,
+                        $target,
+                        $target->getType(),
+                    ),
+                );
+            }
         }
         self::expect($tokens, Token::OpenParen);
         $args = self::parseArgs($tokens, $declarations);
         $closeParen = self::expect($tokens, Token::CloseParen);
-        return $target->call($name, $type, $args, $target->location()->to($closeParen->location()));
+        if ($fnType !== null) {
+            $parameterTypes = $fnType->parameterTypes;
+            array_shift($parameterTypes);
+            foreach ($parameterTypes as $index => $parameterType) {
+                $argument = $args[$index] ?? null;
+                if ($argument === null) {
+                    throw new TypeError(
+                        sprintf('%s expects %d arguments, got %d', $name, count($parameterTypes), count($args)),
+                    );
+                }
+                if (!$argument->matchesType($parameterType)) {
+                    throw new TypeError(
+                        sprintf(
+                            'Argument %d of %s must be of type %s, got %s',
+                            $index + 1,
+                            $name,
+                            $parameterType,
+                            $argument->getType(),
+                        ),
+                    );
+                }
+            }
+        }
+        return $target->call($name, $returnType, $args, $target->location()->to($closeParen->location()));
     }
 
     /**
      * @param Peekable<ParsedToken> $tokens
+     * @return array{string, Span}
      */
     private static function expectIdentifier(
         Peekable $tokens,
         ParsedToken $lastToken,
         string $expected = 'identifier',
-    ): string {
+    ): array {
         $name = $tokens->peek();
         if ($name === null) {
             throw SyntaxError::create(
@@ -507,7 +575,7 @@ final class ExpressionParser
             );
         }
         $tokens->next();
-        return $name->token;
+        return [$name->token, $name->location()];
     }
 
     /**

@@ -17,8 +17,10 @@ use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\TestCase;
 use stdClass;
 
+use function is_array;
 use function is_callable;
 use function is_string;
+use function md5;
 use function sprintf;
 
 final class ExpressionTest extends TestCase
@@ -151,6 +153,16 @@ final class ExpressionTest extends TestCase
             ['ints:list<int>.unique:list<int>()', new Scope(['ints' => [23, 10, 23, 42, 420, 420]]), [23, 10, 42, 420]],
             ['ints:list<int>.unique:list<int>()', new Scope(['ints' => []]), []],
             ['foo', new Scope(['foo' => 'test']), 'test', new Declarations(variables: ['foo' => Type::string()])],
+            ['foo:string.substr(0, 3)', new Scope(['foo' => 'test']), 'tes'],
+            [
+                'foo.customHash("test")',
+                new Scope(['foo' => 'mystr'], ['customHash' => static fn(string $text, string $salt): string => md5($text.$salt)]),
+                md5('mystrtest'),
+                new Declarations(
+                    variables: ['foo' => Type::string()],
+                    functions: ['customHash' => Type::func(Type::string(), [Type::string()])],
+                ),
+            ],
         ];
         /**
          * @psalm-suppress PossiblyUndefinedArrayOffset The runtime behavior is well-defined: `$declarations` is just null
@@ -180,7 +192,7 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{0: Expression<mixed>, 1: Scope, 2?: string}>
+     * @return iterable<string, array{0: Expression<mixed> | array{0: string, 1?: Declarations}, 1: Scope, 2?: string}>
      */
     public static function evaluationErrorsCases(): iterable
     {
@@ -240,6 +252,11 @@ final class ExpressionTest extends TestCase
             Expr::literal('foo')->call('unknown', Type::string(), []),
             new Scope(['item' => 'foo']),
             'Unknown function',
+        ];
+        yield 'Declared function return type is different from actual return type' => [
+            ['foo:string.chars()', new Declarations(functions: ['chars' => Type::func(Type::int(), [Type::string()])])],
+            new Scope(['foo' => 'test'], ['chars' => static fn(string $text): string => $text]),
+            'Expected int, got string',
         ];
     }
 
@@ -341,11 +358,15 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> $expression
+     * @param Expression<mixed> | array{0: string, 1?: Declarations} $expression
      * @dataProvider evaluationErrorsCases
      */
-    public function testEvaluationErrors(Expression $expression, Scope $scope, string|null $message = null): void
+    public function testEvaluationErrors(Expression|array $expression, Scope $scope, string|null $message = null): void
     {
+        if (is_array($expression)) {
+            $declarations = $expression[1] ?? null;
+            $expression = ExpressionParser::parse($expression[0], $declarations);
+        }
         $this->expectException(EvaluationError::class);
         if ($message !== null) {
             $this->expectExceptionMessage($message);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Eventjet\Ausdruck\Type\AbstractType;
 use TypeError;
 
 use function get_debug_type;
@@ -21,9 +22,9 @@ final class Get extends Expression
     use LocationTrait;
 
     /**
-     * @param Type<T> $type
+     * @param AbstractType<T> $type
      */
-    public function __construct(public readonly string $name, private readonly Type $type, Span $location)
+    public function __construct(public readonly string $name, private readonly AbstractType $type, Span $location)
     {
         $this->location = $location;
     }
@@ -41,7 +42,7 @@ final class Get extends Expression
     {
         /** @psalm-suppress MixedAssignment */
         $value = $scope->get($this->name);
-        if ($value === null && !$this->type->isOption()) {
+        if ($value === null && (!$this->type instanceof Type || !$this->type->isOption())) {
             throw new EvaluationError(sprintf('Unknown variable "%s"', $this->name));
         }
         try {
@@ -68,7 +69,7 @@ final class Get extends Expression
             && $this->type->equals($other->type);
     }
 
-    public function getType(): Type
+    public function getType(): AbstractType
     {
         return $this->type;
     }

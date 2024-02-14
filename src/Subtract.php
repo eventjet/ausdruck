@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Eventjet\Ausdruck\Type\AbstractType;
 
 use function sprintf;
 
@@ -49,7 +50,7 @@ final class Subtract extends Expression
             && $this->subtrahend->equals($other->subtrahend);
     }
 
-    public function getType(): Type
+    public function getType(): AbstractType
     {
         return $this->minuend->getType();
     }

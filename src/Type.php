@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Type\AbstractType;
+use Eventjet\Ausdruck\Type\FunctionType;
 use InvalidArgumentException;
 use LogicException;
-use Stringable;
 use TypeError;
 
 use function array_is_list;
@@ -19,16 +20,17 @@ use function sprintf;
 
 /**
  * @template-covariant T
+ * @extends AbstractType<T>
  * @api
  */
-final class Type implements Stringable
+final class Type extends AbstractType
 {
     /** @var callable(mixed): T */
     private readonly mixed $assert;
 
     /**
      * @param callable(mixed): T $validate
-     * @param list<self<mixed>> $args
+     * @param list<AbstractType<mixed>> $args
      * @param self<T> | null $aliasFor
      */
     private function __construct(public readonly string $name, callable $validate, public readonly array $args = [], public readonly self|null $aliasFor = null)
@@ -70,10 +72,10 @@ final class Type implements Stringable
 
     /**
      * @template U
-     * @param Type<U> $item
+     * @param AbstractType<U> $item
      * @return self<list<U>>
      */
-    public static function listOf(self $item): self
+    public static function listOf(AbstractType $item): self
     {
         /** @psalm-suppress ImplicitToStringCast */
         return new self('list', Assert::listOf($item), [$item]);
@@ -82,11 +84,11 @@ final class Type implements Stringable
     /**
      * @template K of array-key
      * @template V
-     * @param Type<K> $keys
-     * @param Type<V> $values
+     * @param AbstractType<K> $keys
+     * @param AbstractType<V> $values
      * @return self<array<K, V>>
      */
-    public static function mapOf(self $keys, self $values): self
+    public static function mapOf(AbstractType $keys, AbstractType $values): self
     {
         /** @psalm-suppress ImplicitToStringCast */
         return new self('map', Assert::mapOf($keys, $values), [$keys, $values]);
@@ -118,6 +120,15 @@ final class Type implements Stringable
     public static function any(): self
     {
         return new self('mixed', Assert::mixed(...));
+    }
+
+    /**
+     * @param AbstractType<mixed> $return
+     * @param list<AbstractType<mixed>> $parameters
+     */
+    public static function func(AbstractType $return, array $parameters = []): FunctionType
+    {
+        return new FunctionType($return, $parameters);
     }
 
     /**
@@ -159,10 +170,10 @@ final class Type implements Stringable
 
     /**
      * @template U
-     * @param Type<U> $some
+     * @param AbstractType<U> $some
      * @return self<U | null>
      */
-    public static function option(self $some): self
+    public static function option(AbstractType $some): self
     {
         return new self('Option', Assert::option($some), [$some]);
     }
@@ -207,12 +218,15 @@ final class Type implements Stringable
     }
 
     /**
-     * @template O
-     * @param Type<O> $type
-     * @psalm-assert-if-true self<O> $this
+     * @template O of AbstractType
+     * @param O $type
+     * @psalm-assert-if-true O $this
      */
-    public function equals(self $type): bool
+    public function equals(AbstractType $type): bool
     {
+        if (!$type instanceof self) {
+            return false;
+        }
         return ($this->aliasFor ?? $this)->name === ($type->aliasFor ?? $type)->name;
     }
 

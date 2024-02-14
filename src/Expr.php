@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Eventjet\Ausdruck\Type\AbstractType;
 
 use function is_string;
 
@@ -33,10 +34,10 @@ final class Expr
 
     /**
      * @template T
-     * @param Type<T> | class-string<T> $type
+     * @param AbstractType<T> | class-string<T> $type
      * @return Get<T>
      */
-    public static function get(string $name, Type|string $type, Span|null $location = null): Get
+    public static function get(string $name, AbstractType|string $type, Span|null $location = null): Get
     {
         /** @phpstan-ignore-next-line False positive */
         return new Get($name, is_string($type) ? Type::object($type) : $type, $location ?? self::dummySpan());
@@ -56,10 +57,10 @@ final class Expr
      * @template T
      * @param Expression<mixed> $target
      * @param list<Expression<mixed>> $arguments
-     * @param Type<T> $type
+     * @param AbstractType<T> $type
      * @return Call<T>
      */
-    public static function call(Expression $target, string $name, Type $type, array $arguments, Span|null $location = null): Call
+    public static function call(Expression $target, string $name, AbstractType $type, array $arguments, Span|null $location = null): Call
     {
         return new Call($target, $name, $type, $arguments, $location ?? self::dummySpan());
     }

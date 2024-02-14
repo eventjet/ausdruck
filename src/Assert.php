@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Type\AbstractType;
 use TypeError;
 
 use function array_is_list;
@@ -79,10 +80,10 @@ final class Assert
     /**
      * @psalm-suppress InvalidReturnType False positive
      * @template U
-     * @param Type<U> $type
+     * @param AbstractType<U> $type
      * @return callable(mixed): list<U>
      */
-    public static function listOf(Type $type): callable
+    public static function listOf(AbstractType $type): callable
     {
         /**
          * @return list<U>
@@ -103,11 +104,11 @@ final class Assert
     /**
      * @template K of array-key
      * @template V
-     * @param Type<K> $keys
-     * @param Type<V> $values
+     * @param AbstractType<K> $keys
+     * @param AbstractType<V> $values
      * @return callable(mixed): array<K, V>
      */
-    public static function mapOf(Type $keys, Type $values): callable
+    public static function mapOf(AbstractType $keys, AbstractType $values): callable
     {
         /**
          * @return array<K, V>
@@ -131,10 +132,10 @@ final class Assert
 
     /**
      * @template U
-     * @param Type<U> $some
+     * @param AbstractType<U> $some
      * @return callable(mixed): (U | null)
      */
-    public static function option(Type $some): callable
+    public static function option(AbstractType $some): callable
     {
         /**
          * @return U | null
