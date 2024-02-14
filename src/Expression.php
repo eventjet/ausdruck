@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
-use Eventjet\Ausdruck\Type\AbstractType;
 use Stringable;
 
 /**
@@ -59,21 +58,21 @@ abstract class Expression implements Stringable
     /**
      * @template U
      * @param list<Expression<mixed>> $arguments
-     * @param AbstractType<U> $type
+     * @param Type<U> $type
      * @return Call<U>
      */
-    public function call(string $name, AbstractType $type, array $arguments, Span|null $location = null): Call
+    public function call(string $name, Type $type, array $arguments, Span|null $location = null): Call
     {
         return Expr::call($this, $name, $type, $arguments, $location);
     }
 
     /**
      * @template U
-     * @param AbstractType<U> $type
+     * @param Type<U> $type
      * @psalm-assert-if-true self<U> $this
      * @phpstan-assert-if-true self<U> $this
      */
-    public function matchesType(AbstractType $type): bool
+    public function matchesType(Type $type): bool
     {
         return $this->getType()->equals($type);
     }
@@ -92,7 +91,7 @@ abstract class Expression implements Stringable
     abstract public function equals(self $other): bool;
 
     /**
-     * @return AbstractType<T>
+     * @return Type<T>
      */
-    abstract public function getType(): AbstractType;
+    abstract public function getType(): Type;
 }

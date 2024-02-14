@@ -10,7 +10,6 @@ use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Scope;
 use Eventjet\Ausdruck\Type;
-use Eventjet\Ausdruck\Type\AbstractType;
 
 use function array_shift;
 use function assert;
@@ -439,10 +438,10 @@ final class ExpressionParser
     /**
      * @template T
      * @param Expression<mixed> $expr
-     * @param AbstractType<T> $type
+     * @param Type<T> $type
      * @return Expression<T>
      */
-    private static function assertExpressionType(Expression $expr, AbstractType $type, string $errorMessage): Expression
+    private static function assertExpressionType(Expression $expr, Type $type, string $errorMessage): Expression
     {
         /** @psalm-suppress RedundantCondition False positive. This check is _not_ redundant. */
         if ($expr->matchesType($type)) {
@@ -484,13 +483,13 @@ final class ExpressionParser
             if ($returnType instanceof TypeError) {
                 throw $returnType;
             }
-            if ($fnType !== null && !$returnType->equals($fnType->returnType)) {
+            if ($fnType !== null && !$returnType->equals($fnType->args[0])) {
                 throw TypeError::create(
                     sprintf(
                         'Inline return type %s of function %s does not match declared return type %s',
                         $returnType,
                         $name,
-                        $fnType->returnType,
+                        $fnType->args[0],
                     ),
                     $typeNode->location,
                 );
@@ -502,10 +501,10 @@ final class ExpressionParser
                     $nameLocation,
                 );
             }
-            $returnType = $fnType->returnType;
+            $returnType = $fnType->args[0];
         }
         if ($fnType !== null) {
-            $targetType = $fnType->parameterTypes[0] ?? null;
+            $targetType = $fnType->args[1] ?? null;
             if ($targetType === null) {
                 throw new TypeError(
                     sprintf('%s can\'t be used as a receiver function because it doesn\'t accept any arguments', $name),
@@ -527,8 +526,9 @@ final class ExpressionParser
         $args = self::parseArgs($tokens, $declarations);
         $closeParen = self::expect($tokens, Token::CloseParen);
         if ($fnType !== null) {
-            $parameterTypes = $fnType->parameterTypes;
-            array_shift($parameterTypes);
+            $parameterTypes = $fnType->args;
+            array_shift($parameterTypes); // Remove return type
+            array_shift($parameterTypes); // Remove receiver type
             foreach ($parameterTypes as $index => $parameterType) {
                 $argument = $args[$index] ?? null;
                 if ($argument === null) {

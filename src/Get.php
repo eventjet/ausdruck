@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
-use Eventjet\Ausdruck\Type\AbstractType;
 use TypeError;
 
 use function get_debug_type;
@@ -22,9 +21,9 @@ final class Get extends Expression
     use LocationTrait;
 
     /**
-     * @param AbstractType<T> $type
+     * @param Type<T> $type
      */
-    public function __construct(public readonly string $name, private readonly AbstractType $type, Span $location)
+    public function __construct(public readonly string $name, private readonly Type $type, Span $location)
     {
         $this->location = $location;
     }
@@ -69,7 +68,7 @@ final class Get extends Expression
             && $this->type->equals($other->type);
     }
 
-    public function getType(): AbstractType
+    public function getType(): Type
     {
         return $this->type;
     }

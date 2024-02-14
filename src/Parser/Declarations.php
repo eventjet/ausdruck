@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Parser;
 
 use Eventjet\Ausdruck\Type;
-use Eventjet\Ausdruck\Type\FunctionType;
 use SebastianBergmann\Diff\InvalidArgumentException;
 
 use function array_key_exists;
@@ -13,12 +12,12 @@ use function sprintf;
 
 final class Declarations
 {
-    /** @var array<string, FunctionType> */
+    /** @var array<string, Type> */
     public readonly array $functions;
 
     /**
      * @param array<string, Type<mixed>> $variables
-     * @param array<string, FunctionType> $functions
+     * @param array<string, Type> $functions
      */
     public function __construct(
         public readonly Types $types = new Types(),

@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use Eventjet\Ausdruck\Type\AbstractType;
-use Eventjet\Ausdruck\Type\FunctionType;
 use InvalidArgumentException;
 use LogicException;
+use Stringable;
 use TypeError;
 
 use function array_is_list;
 use function array_key_first;
+use function array_shift;
 use function gettype;
 use function implode;
 use function is_array;
@@ -20,17 +20,16 @@ use function sprintf;
 
 /**
  * @template-covariant T
- * @extends AbstractType<T>
  * @api
  */
-final class Type extends AbstractType
+final class Type implements Stringable
 {
     /** @var callable(mixed): T */
     private readonly mixed $assert;
 
     /**
      * @param callable(mixed): T $validate
-     * @param list<AbstractType<mixed>> $args
+     * @param list<Type<mixed>> $args
      * @param self<T> | null $aliasFor
      */
     private function __construct(public readonly string $name, callable $validate, public readonly array $args = [], public readonly self|null $aliasFor = null)
@@ -72,10 +71,10 @@ final class Type extends AbstractType
 
     /**
      * @template U
-     * @param AbstractType<U> $item
+     * @param Type<U> $item
      * @return self<list<U>>
      */
-    public static function listOf(AbstractType $item): self
+    public static function listOf(self $item): self
     {
         /** @psalm-suppress ImplicitToStringCast */
         return new self('list', Assert::listOf($item), [$item]);
@@ -84,11 +83,11 @@ final class Type extends AbstractType
     /**
      * @template K of array-key
      * @template V
-     * @param AbstractType<K> $keys
-     * @param AbstractType<V> $values
+     * @param Type<K> $keys
+     * @param Type<V> $values
      * @return self<array<K, V>>
      */
-    public static function mapOf(AbstractType $keys, AbstractType $values): self
+    public static function mapOf(self $keys, self $values): self
     {
         /** @psalm-suppress ImplicitToStringCast */
         return new self('map', Assert::mapOf($keys, $values), [$keys, $values]);
@@ -123,12 +122,14 @@ final class Type extends AbstractType
     }
 
     /**
-     * @param AbstractType<mixed> $return
-     * @param list<AbstractType<mixed>> $parameters
+     * @template U
+     * @param Type<U> $return
+     * @param list<Type<mixed>> $parameters
+     * @return self<callable(mixed...): U>
      */
-    public static function func(AbstractType $return, array $parameters = []): FunctionType
+    public static function func(self $return, array $parameters = []): self
     {
-        return new FunctionType($return, $parameters);
+        return new self('Func', Assert::func($return), [$return, ...$parameters]);
     }
 
     /**
@@ -170,10 +171,10 @@ final class Type extends AbstractType
 
     /**
      * @template U
-     * @param AbstractType<U> $some
+     * @param Type<U> $some
      * @return self<U | null>
      */
-    public static function option(AbstractType $some): self
+    public static function option(self $some): self
     {
         return new self('Option', Assert::option($some), [$some]);
     }
@@ -205,6 +206,11 @@ final class Type extends AbstractType
 
     public function __toString(): string
     {
+        if ($this->name === 'Func') {
+            $args = $this->args;
+            $returnType = array_shift($args);
+            return sprintf('func(%s): %s', implode(', ', $args), $returnType);
+        }
         return $this->name . ($this->args === [] ? '' : sprintf('<%s>', implode(', ', $this->args)));
     }
 
@@ -218,16 +224,25 @@ final class Type extends AbstractType
     }
 
     /**
-     * @template O of AbstractType
+     * @template O of Type
      * @param O $type
      * @psalm-assert-if-true O $this
      */
-    public function equals(AbstractType $type): bool
+    public function equals(self $type): bool
     {
-        if (!$type instanceof self) {
+        if (($this->aliasFor ?? $this)->name !== ($type->aliasFor ?? $type)->name) {
             return false;
         }
-        return ($this->aliasFor ?? $this)->name === ($type->aliasFor ?? $type)->name;
+        if ($this->name !== 'Func') {
+            return true;
+        }
+        foreach ($this->args as $i => $arg) {
+            if ($arg->equals($type->args[$i])) {
+                continue;
+            }
+            return false;
+        }
+        return true;
     }
 
     public function isOption(): bool

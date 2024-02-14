@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use Eventjet\Ausdruck\Type\AbstractType;
 use TypeError;
 
 use function array_is_list;
@@ -12,6 +11,7 @@ use function array_map;
 use function get_debug_type;
 use function is_array;
 use function is_bool;
+use function is_callable;
 use function is_float;
 use function is_int;
 use function is_string;
@@ -80,10 +80,10 @@ final class Assert
     /**
      * @psalm-suppress InvalidReturnType False positive
      * @template U
-     * @param AbstractType<U> $type
+     * @param Type<U> $type
      * @return callable(mixed): list<U>
      */
-    public static function listOf(AbstractType $type): callable
+    public static function listOf(Type $type): callable
     {
         /**
          * @return list<U>
@@ -104,11 +104,11 @@ final class Assert
     /**
      * @template K of array-key
      * @template V
-     * @param AbstractType<K> $keys
-     * @param AbstractType<V> $values
+     * @param Type<K> $keys
+     * @param Type<V> $values
      * @return callable(mixed): array<K, V>
      */
-    public static function mapOf(AbstractType $keys, AbstractType $values): callable
+    public static function mapOf(Type $keys, Type $values): callable
     {
         /**
          * @return array<K, V>
@@ -132,15 +132,41 @@ final class Assert
 
     /**
      * @template U
-     * @param AbstractType<U> $some
+     * @param Type<U> $some
      * @return callable(mixed): (U | null)
      */
-    public static function option(AbstractType $some): callable
+    public static function option(Type $some): callable
     {
         /**
          * @return U | null
          */
         $assert = static fn(mixed $value): mixed => $value === null ? null : $some->assert($value);
+        return $assert;
+    }
+
+    /**
+     * @template U
+     * @param Type<U> $returnType
+     * @return callable(mixed...): (callable(): U)
+     */
+    public static function func(Type $returnType): callable
+    {
+        /**
+         * @return callable(): U
+         */
+        $assert = static function (mixed $value) use ($returnType): callable {
+            if (!is_callable($value)) {
+                throw new Parser\TypeError('Value is not callable');
+            }
+            /**
+             * @param mixed ...$params
+             * @return U
+             */
+            $fn = static function (mixed ...$params) use ($returnType, $value): mixed {
+                return $returnType->assert($value(...$params));
+            };
+            return $fn;
+        };
         return $assert;
     }
 }

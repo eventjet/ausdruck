@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Parser;
 
 use Eventjet\Ausdruck\Type;
-use Eventjet\Ausdruck\Type\AbstractType;
 
 use function array_key_last;
 use function count;
@@ -45,9 +44,9 @@ final class Types
     }
 
     /**
-     * @return AbstractType<mixed> | TypeError
+     * @return Type<mixed> | TypeError
      */
-    public function resolve(TypeNode $node): AbstractType|TypeError
+    public function resolve(TypeNode $node): Type|TypeError
     {
         return match ($node->name) {
             'string' => self::noArgs(Type::string(), $node),

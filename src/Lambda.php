@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
-use Eventjet\Ausdruck\Type\FunctionType;
 
 use function array_map;
 use function implode;
@@ -59,9 +58,9 @@ final class Lambda extends Expression
     }
 
     /**
-     * @return FunctionType<T>
+     * @return Type<callable(): T>
      */
-    public function getType(): FunctionType
+    public function getType(): Type
     {
         return Type::func($this->body->getType(), array_map(static fn() => Type::any(), $this->parameters));
     }

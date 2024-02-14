@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
-use Eventjet\Ausdruck\Type\AbstractType;
 
 use function sprintf;
 
@@ -43,7 +42,7 @@ final class Gt extends Expression
             && $this->right->equals($other->right);
     }
 
-    public function getType(): AbstractType
+    public function getType(): Type
     {
         return Type::bool();
     }

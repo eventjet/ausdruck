@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
-use Eventjet\Ausdruck\Type\AbstractType;
 use Throwable;
 
 use function array_map;
@@ -27,12 +26,12 @@ final class Call extends Expression
     /**
      * @param Expression<mixed> $target
      * @param list<Expression<mixed>> $arguments
-     * @param AbstractType<T> $type
+     * @param Type<T> $type
      */
     public function __construct(
         public readonly Expression $target,
         public readonly string $name,
-        public readonly AbstractType $type,
+        public readonly Type $type,
         public readonly array $arguments,
         Span $location,
     ) {
@@ -88,7 +87,7 @@ final class Call extends Expression
             && self::compareArguments($this->arguments, $other->arguments);
     }
 
-    public function getType(): AbstractType
+    public function getType(): Type
     {
         return $this->type;
     }
