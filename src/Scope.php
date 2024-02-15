@@ -6,7 +6,6 @@ namespace Eventjet\Ausdruck;
 
 use Countable;
 use LogicException;
-
 use function array_intersect;
 use function array_is_list;
 use function array_keys;
@@ -50,6 +49,7 @@ final class Scope
             'substr' => substr(...),
             'take' => self::take(...),
             'unique' => self::unique(...),
+            'unwrap' => self::identity(...),
         ] : [];
         $shadowed = array_intersect(array_keys($predefinedFuncs), array_keys($funcs));
         if ($shadowed !== []) {
@@ -180,6 +180,16 @@ final class Scope
             $unique[] = $item;
         }
         return $unique;
+    }
+
+    /**
+     * @template T
+     * @param T $value
+     * @return T
+     */
+    private static function identity(mixed $value): mixed
+    {
+        return $value;
     }
 
     /**

@@ -36,6 +36,8 @@ final class Declarations
             'substr' => Type::func(Type::string(), [Type::string(), Type::int(), Type::int()]),
             'take' => Type::func(Type::listOf(Type::any()), [Type::listOf(Type::any()), Type::int()]),
             'unique' => Type::func(Type::listOf(Type::any()), [Type::listOf(Type::any())]),
+            // Can't declare unwrap until we have generics
+            // 'unwrap' => Type::func(Type::some(Type::any()), [Type::option(Type::any())]),
         ];
         foreach ($functions as $name => $type) {
             if (array_key_exists($name, $fns)) {
