@@ -12,6 +12,8 @@ use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Scope;
+use Eventjet\Ausdruck\Test\Unit\Fixtures\Bag;
+use Eventjet\Ausdruck\Test\Unit\Fixtures\Item;
 use Eventjet\Ausdruck\Test\Unit\Fixtures\SomeObject;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\TestCase;
@@ -161,6 +163,25 @@ final class ExpressionTest extends TestCase
                 new Declarations(
                     variables: ['foo' => Type::string()],
                     functions: ['customHash' => Type::func(Type::string(), [Type::string()])],
+                ),
+            ],
+            [
+                'bag.items().map:list<string>(|i| i:Item.name())',
+                new Scope(
+                    ['bag' => new Bag([new Item('a'), new Item('b')])],
+                    [
+                        'items' => static fn(Bag $bag): array => $bag->items,
+                        'name' => static fn(Item $item): string => $item->name,
+                    ],
+                ),
+                ['a', 'b'],
+                new Declarations(
+                    types: new Types(['Bag' => Type::object(Bag::class), 'Item' => Type::object(Item::class)]),
+                    variables: ['bag' => Type::object(Bag::class)],
+                    functions: [
+                        'items' => Type::func(Type::listOf(Type::object(Item::class)), [Type::object(Bag::class)]),
+                        'name' => Type::func(Type::string(), [Type::object(Item::class)]),
+                    ],
                 ),
             ],
         ];

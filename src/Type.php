@@ -260,20 +260,22 @@ final class Type implements Stringable
      */
     public function isSubtypeOf(self $other): bool
     {
+        $self = $this->canonical();
+        $other = $other->canonical();
         if ($other->name === 'mixed') {
             return true;
         }
-        if ($this->name === 'mixed') {
+        if ($self->name === 'mixed') {
             return false;
         }
-        if ($this->name !== $other->name) {
+        if ($self->name !== $other->name) {
             return false;
         }
-        if ($this->name === 'Func') {
-            if (!$this->returnType()->isSubtypeOf($other->returnType())) {
+        if ($self->name === 'Func') {
+            if (!$self->returnType()->isSubtypeOf($other->returnType())) {
                 return false;
             }
-            $params = $this->parameterTypes();
+            $params = $self->parameterTypes();
             $otherParams = $other->parameterTypes();
             foreach ($params as $i => $param) {
                 $otherParam = $otherParams[$i] ?? null;
@@ -306,5 +308,13 @@ final class Type implements Stringable
     private function parameterTypes(): array
     {
         return array_slice($this->args, 1);
+    }
+
+    /**
+     * @return self<T>
+     */
+    private function canonical(): self
+    {
+        return $this->aliasFor ?? $this;
     }
 }
