@@ -50,7 +50,7 @@ final class ExpressionParser
      * @param Type<T> $type
      * @return Expression<T>
      */
-    public static function parseTyped(string $expression, Type $type, Types|null $types = null): Expression
+    public static function parseTyped(string $expression, Type $type, Declarations|Types|null $types = null): Expression
     {
         $expr = self::parse($expression, $types);
         /** @psalm-suppress ImplicitToStringCast */
