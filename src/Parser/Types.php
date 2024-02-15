@@ -7,6 +7,7 @@ namespace Eventjet\Ausdruck\Parser;
 use Eventjet\Ausdruck\Type;
 
 use function array_key_last;
+use function array_pop;
 use function count;
 use function sprintf;
 
@@ -49,6 +50,7 @@ final class Types
     public function resolve(TypeNode $node): Type|TypeError
     {
         return match ($node->name) {
+            'fn' => $this->resolveFunction($node),
             'string' => self::noArgs(Type::string(), $node),
             'int' => self::noArgs(Type::int(), $node),
             'float' => self::noArgs(Type::float(), $node),
@@ -170,5 +172,30 @@ final class Types
             return $someType;
         }
         return Type::option($someType);
+    }
+
+    /**
+     * @return Type<mixed> | TypeError
+     */
+    private function resolveFunction(TypeNode $node): Type|TypeError
+    {
+        $args = $node->args;
+        if ($args === []) {
+            return TypeError::create('The func type requires at least one argument, none given', $node->location);
+        }
+        $returnType = array_pop($args);
+        $argTypes = [];
+        foreach ($args as $arg) {
+            $argType = $this->resolve($arg);
+            if ($argType instanceof TypeError) {
+                return $argType;
+            }
+            $argTypes[] = $argType;
+        }
+        $returnType = $this->resolve($returnType);
+        if ($returnType instanceof TypeError) {
+            return $returnType;
+        }
+        return Type::func($returnType, $argTypes);
     }
 }

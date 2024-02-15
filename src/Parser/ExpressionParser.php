@@ -228,9 +228,15 @@ final class ExpressionParser
             );
         }
         self::expect($tokens, Token::Colon);
-        $typeNode = self::parseType($tokens);
+        $typeNode = TypeParser::parse($tokens);
         if ($typeNode === null) {
-            throw SyntaxError::create('Expected type after colon', self::nextSpan($tokens));
+            throw SyntaxError::create('Expected type, got end of string', self::nextSpan($tokens));
+        }
+        if ($typeNode instanceof ParsedToken) {
+            throw SyntaxError::create(
+                sprintf('Expected type, got %s', Token::print($typeNode->token)),
+                $typeNode->location(),
+            );
         }
         $type = $declarations->types->resolve($typeNode);
         if ($type instanceof TypeError) {
@@ -271,70 +277,6 @@ final class ExpressionParser
             sprintf('Expected %s, got %s', Token::print($expected), Token::print($actual->token)),
             $actual->location(),
         );
-    }
-
-    /**
-     * @param Peekable<ParsedToken> $tokens
-     */
-    private static function parseType(Peekable $tokens): TypeNode|null
-    {
-        $parsedToken = $tokens->peek();
-        if ($parsedToken === null) {
-            return null;
-        }
-        $name = $parsedToken->token;
-        if (!is_string($name)) {
-            return null;
-        }
-        $tokens->next();
-        if ($tokens->peek()?->token !== Token::OpenAngle) {
-            return new TypeNode($name, [], $parsedToken->location());
-        }
-        $tokens->next();
-        $args = self::parseTypeArgs($tokens);
-        $closeAngle = self::expect($tokens, Token::CloseAngle);
-        return new TypeNode($name, $args, $parsedToken->location()->to($closeAngle->location()));
-    }
-
-    /**
-     * map<int, string>
-     *     ===========
-     *
-     * @param Peekable<ParsedToken> $tokens
-     * @return list<TypeNode>
-     */
-    private static function parseTypeArgs(Peekable $tokens): array
-    {
-        $args = [];
-        while (true) {
-            $arg = self::parseTypeArg($tokens);
-            if ($arg === null) {
-                break;
-            }
-            $args[] = $arg;
-        }
-        return $args;
-    }
-
-    /**
-     * map<int, string>
-     *     =====
-     *
-     * @param Peekable<ParsedToken> $tokens
-     */
-    private static function parseTypeArg(Peekable $tokens): TypeNode|null
-    {
-        $type = self::parseType($tokens);
-        if ($type === null) {
-            return null;
-        }
-        $nextToken = $tokens->peek();
-        assert($nextToken !== null);
-        if ($nextToken->token === Token::CloseAngle) {
-            return $type;
-        }
-        self::expect($tokens, Token::Comma);
-        return $type;
     }
 
     /**
@@ -475,29 +417,35 @@ final class ExpressionParser
         $fnType = $declarations->functions[$name] ?? null;
         if ($tokens->peek()?->token === Token::Colon) {
             $tokens->next();
-            $typeNode = self::parseType($tokens);
+            $typeNode = TypeParser::parse($tokens);
             if ($typeNode === null) {
                 throw SyntaxError::create('Expected type after colon', self::nextSpan($tokens));
+            }
+            if ($typeNode instanceof ParsedToken) {
+                throw SyntaxError::create(
+                    sprintf('Expected type after colon, got %s', Token::print($typeNode->token)),
+                    $typeNode->location(),
+                );
             }
             $returnType = $declarations->types->resolve($typeNode);
             if ($returnType instanceof TypeError) {
                 throw $returnType;
             }
-            if ($fnType !== null && !$returnType->equals($fnType->args[0])) {
+            if ($fnType !== null && !$fnType->args[0]->isSubtypeOf($returnType)) {
                 throw TypeError::create(
                     sprintf(
                         'Inline return type %s of function %s does not match declared return type %s',
                         $returnType,
                         $name,
-                        $fnType->args[0],
+                        $fnType->returnType(),
                     ),
                     $typeNode->location,
                 );
             }
         } else {
             if ($fnType === null) {
-                throw SyntaxError::create(
-                    sprintf('Function call %s must either be declared or have an inline return type', $name),
+                throw TypeError::create(
+                    sprintf('Function %s is not declared and has no inline type', $name),
                     $nameLocation,
                 );
             }
@@ -510,7 +458,7 @@ final class ExpressionParser
                     sprintf('%s can\'t be used as a receiver function because it doesn\'t accept any arguments', $name),
                 );
             }
-            if (!$target->matchesType($targetType)) {
+            if (!$target->isSubtypeOf($targetType)) {
                 throw new TypeError(
                     sprintf(
                         '%s must be called on an expression of type %s, but %s is of type %s',

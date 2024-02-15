@@ -216,6 +216,14 @@ final class ExpressionParserTest extends TestCase
             'x:string.substr(|i| i:int, 3)',
             'Argument 1 of substr must be of type int, got func(mixed): int',
         ];
+        yield 'calling contains on an int' => [
+            'x:int.contains(42)',
+            'contains must be called on an expression of type list<mixed>, but x:int is of type int',
+        ];
+        yield 'call to undeclared function without an inline type' => [
+            'x:string.foo()',
+            'Function foo is not declared and has no inline type',
+        ];
     }
 
     /**

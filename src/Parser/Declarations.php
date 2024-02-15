@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Parser;
 
 use Eventjet\Ausdruck\Type;
-use SebastianBergmann\Diff\InvalidArgumentException;
+use InvalidArgumentException;
 
 use function array_key_exists;
 use function sprintf;

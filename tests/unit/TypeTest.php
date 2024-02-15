@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
+use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Test\Unit\Fixtures\SomeObject;
 use Eventjet\Ausdruck\Type;
 use LogicException;
@@ -19,6 +20,18 @@ final class TypeTest extends TestCase
     public static function invalidValues(): iterable
     {
         yield 'resource' => [fopen('php://memory', 'r')];
+    }
+
+    /**
+     * @return iterable<string, array{Type<mixed>, mixed, string}>
+     */
+    public static function failingAssertCases(): iterable
+    {
+        yield 'Function is not callable' => [
+            Type::func(Type::string()),
+            'not a function',
+            'Expected callable, got string',
+        ];
     }
 
     /**
@@ -73,5 +86,17 @@ final class TypeTest extends TestCase
         self::assertTrue($foo->equals($bar));
         /** @psalm-suppress RedundantCondition */
         self::assertTrue($bar->equals($foo));
+    }
+
+    /**
+     * @param Type<mixed> $type
+     * @dataProvider failingAssertCases
+     */
+    public function testFailingAssert(Type $type, mixed $value, string $expectedMessage): void
+    {
+        $this->expectException(TypeError::class);
+        $this->expectExceptionMessage($expectedMessage);
+
+        $type->assert($value);
     }
 }

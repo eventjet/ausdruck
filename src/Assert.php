@@ -156,7 +156,7 @@ final class Assert
          */
         $assert = static function (mixed $value) use ($returnType): callable {
             if (!is_callable($value)) {
-                throw new Parser\TypeError('Value is not callable');
+                throw new Parser\TypeError('Expected callable, got ' . get_debug_type($value));
             }
             /**
              * @param mixed ...$params

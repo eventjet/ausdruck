@@ -12,6 +12,7 @@ use TypeError;
 use function array_is_list;
 use function array_key_first;
 use function array_shift;
+use function array_slice;
 use function gettype;
 use function implode;
 use function is_array;
@@ -237,6 +238,10 @@ final class Type implements Stringable
             return true;
         }
         foreach ($this->args as $i => $arg) {
+            /**
+             * @psalm-suppress RedundantCondition I think it's complaining about Type<mixed> being equal to Type<mixed>,
+             *     but I don't know how to fix it.
+             */
             if ($arg->equals($type->args[$i])) {
                 continue;
             }
@@ -248,5 +253,58 @@ final class Type implements Stringable
     public function isOption(): bool
     {
         return $this->name === 'Option';
+    }
+
+    /**
+     * @param Type<mixed> $other
+     */
+    public function isSubtypeOf(self $other): bool
+    {
+        if ($other->name === 'mixed') {
+            return true;
+        }
+        if ($this->name === 'mixed') {
+            return false;
+        }
+        if ($this->name !== $other->name) {
+            return false;
+        }
+        if ($this->name === 'Func') {
+            if (!$this->returnType()->isSubtypeOf($other->returnType())) {
+                return false;
+            }
+            $params = $this->parameterTypes();
+            $otherParams = $other->parameterTypes();
+            foreach ($params as $i => $param) {
+                $otherParam = $otherParams[$i] ?? null;
+                if ($otherParam === null) {
+                    return false;
+                }
+                if (!$otherParam->isSubtypeOf($param)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Returns the return type of a function type.
+     *
+     * This should only be called on function types. The behavior is undefined for other types.
+     *
+     * @return self<mixed>
+     */
+    public function returnType(): self
+    {
+        return $this->args[0];
+    }
+
+    /**
+     * @return list<self<mixed>>
+     */
+    private function parameterTypes(): array
+    {
+        return array_slice($this->args, 1);
     }
 }
