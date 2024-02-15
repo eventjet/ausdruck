@@ -58,12 +58,38 @@ final class Types
             'any' => self::noArgs(Type::any(), $node),
             'map' => $this->resolveMap($node),
             'list' => $this->resolveList($node),
-            'Option' => $this->resolveOption($node),
+            'Option' => $this->resolveOption($this->exactlyOneTypeArg($node)),
+            'Some' => $this->resolveSome($this->exactlyOneTypeArg($node)),
             default => $this->resolveAlias($node->name) ?? TypeError::create(
                 sprintf('Unknown type %s', $node->name),
                 $node->location,
             ),
         };
+    }
+
+    /**
+     * @return Type<mixed> | TypeError
+     */
+    private function exactlyOneTypeArg(TypeNode $node): Type|TypeError
+    {
+        if ($node->args === []) {
+            return TypeError::create(
+                sprintf('The %s type requires one argument, none given', $node->name),
+                $node->location,
+            );
+        }
+        if (count($node->args) > 1) {
+            return TypeError::create(
+                sprintf(
+                    'Invalid type "%s": %s expects exactly one argument, got %d',
+                    $node,
+                    $node->name,
+                    count($node->args),
+                ),
+                $node->args[1]->location->to($node->args[array_key_last($node->args)]->location),
+            );
+        }
+        return $this->resolve($node->args[0]);
     }
 
     /**
@@ -154,24 +180,21 @@ final class Types
     }
 
     /**
-    * @return Type<mixed> | TypeError
+     * @param Type<mixed> | TypeError $arg
+     * @return Type<mixed> | TypeError
      */
-    private function resolveOption(TypeNode $node): Type|TypeError
+    private function resolveOption(Type|TypeError $arg): Type|TypeError
     {
-        if ($node->args === []) {
-            return TypeError::create('The Option type requires one argument, none given', $node->location);
-        }
-        if (count($node->args) > 1) {
-            return TypeError::create(
-                sprintf('Invalid type "%s": Option expects exactly one argument, got %d', $node, count($node->args)),
-                $node->args[1]->location->to($node->args[array_key_last($node->args)]->location),
-            );
-        }
-        $someType = $this->resolve($node->args[0]);
-        if ($someType instanceof TypeError) {
-            return $someType;
-        }
-        return Type::option($someType);
+        return $arg instanceof TypeError ? $arg : Type::option($arg);
+    }
+
+    /**
+     * @param Type<mixed> | TypeError $arg
+     * @return Type<mixed> | TypeError
+     */
+    private function resolveSome(Type|TypeError $arg): Type|TypeError
+    {
+        return $arg instanceof TypeError ? $arg : Type::some($arg);
     }
 
     /**

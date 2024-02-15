@@ -8,13 +8,13 @@ use InvalidArgumentException;
 use LogicException;
 use Stringable;
 use TypeError;
-
 use function array_is_list;
 use function array_key_first;
 use function array_shift;
 use function array_slice;
 use function gettype;
 use function implode;
+use function in_array;
 use function is_array;
 use function is_object;
 use function sprintf;
@@ -181,6 +181,16 @@ final class Type implements Stringable
     }
 
     /**
+     * @template U
+     * @param Type<U> $some
+     * @return self<U>
+     */
+    public static function some(self $some): self
+    {
+        return new self('Some', $some->assert, [$some]);
+    }
+
+    /**
      * @template K of array-key
      * @param non-empty-array<K, mixed> $value
      * @return self<K>
@@ -267,6 +277,12 @@ final class Type implements Stringable
         }
         if ($self->name === 'mixed') {
             return false;
+        }
+        if ($self->name === 'Option') {
+            return $other->name === 'Option' && $self->args[0]->isSubtypeOf($other->args[0]);
+        }
+        if ($self->name === 'Some') {
+            return in_array($other->name, ['Option', 'Some'], true) && $self->args[0]->isSubtypeOf($other->args[0]);
         }
         if ($self->name !== $other->name) {
             return false;
