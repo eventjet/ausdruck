@@ -6,6 +6,7 @@ namespace Eventjet\Ausdruck;
 
 use Countable;
 use LogicException;
+
 use function array_intersect;
 use function array_is_list;
 use function array_keys;

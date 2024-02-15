@@ -6,6 +6,7 @@ namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
 
+use function is_array;
 use function is_string;
 
 /**
@@ -33,13 +34,20 @@ final class Expr
 
     /**
      * @template T
-     * @param Type<T> | class-string<T> $type
+     * @param Type<T> | class-string<T> | array{Type<T>} | array{class-string<T>} $type
      * @return Get<T>
      */
-    public static function get(string $name, Type|string $type, Span|null $location = null): Get
+    public static function get(string $name, Type|string|array $type, Span|null $location = null): Get
     {
+        $typeIsImplicit = false;
+        if (is_array($type)) {
+            $type = $type[0];
+            $typeIsImplicit = true;
+        }
+        /** @phpstan-ignore-next-line Must be a PHPStan bug */
+        $type = is_string($type) ? Type::object($type) : $type;
         /** @phpstan-ignore-next-line False positive */
-        return new Get($name, is_string($type) ? Type::object($type) : $type, $location ?? self::dummySpan());
+        return new Get($name, $typeIsImplicit ? [$type] : $type, $location ?? self::dummySpan());
     }
 
     /**

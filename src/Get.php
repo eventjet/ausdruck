@@ -8,6 +8,7 @@ use Eventjet\Ausdruck\Parser\Span;
 use TypeError;
 
 use function get_debug_type;
+use function is_array;
 use function sprintf;
 
 /**
@@ -20,16 +21,25 @@ final class Get extends Expression
 {
     use LocationTrait;
 
+    /** @var Type<T> */
+    private readonly Type $type;
+    private bool $typeIsImplicit;
+
     /**
-     * @param Type<T> $type
+     * @param Type<T> | array{Type<T>} $type
      */
-    public function __construct(public readonly string $name, private readonly Type $type, Span $location)
+    public function __construct(public readonly string $name, Type|array $type, Span $location)
     {
         $this->location = $location;
+        $this->type = $type instanceof Type ? $type : $type[0];
+        $this->typeIsImplicit = is_array($type);
     }
 
     public function __toString(): string
     {
+        if ($this->typeIsImplicit) {
+            return $this->name;
+        }
         /** @psalm-suppress ImplicitToStringCast */
         return sprintf('%s:%s', $this->name, $this->type);
     }

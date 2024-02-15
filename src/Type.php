@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use LogicException;
 use Stringable;
 use TypeError;
+
 use function array_is_list;
 use function array_key_first;
 use function array_shift;
