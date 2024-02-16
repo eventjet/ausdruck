@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Throwable;
 
 use function array_map;
 use function array_unshift;
@@ -69,7 +70,11 @@ final class Call extends Expression
         }
         $args = array_map(static fn(Expression $arg): mixed => $arg->evaluate($scope), $this->arguments);
         array_unshift($args, $this->target->evaluate($scope));
-        return $this->type->assert($func(...$args));
+        try {
+            return $this->type->assert($func(...$args));
+        } catch (Throwable $error) {
+            throw new EvaluationError($error->getMessage(), previous: $error);
+        }
     }
 
     public function equals(Expression $other): bool

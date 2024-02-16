@@ -8,16 +8,21 @@ use Eventjet\Ausdruck\EvaluationError;
 use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\Literal;
+use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Scope;
+use Eventjet\Ausdruck\Test\Unit\Fixtures\Bag;
+use Eventjet\Ausdruck\Test\Unit\Fixtures\Item;
 use Eventjet\Ausdruck\Test\Unit\Fixtures\SomeObject;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\TestCase;
 use stdClass;
 
+use function is_array;
 use function is_callable;
 use function is_string;
+use function md5;
 use function sprintf;
 
 final class ExpressionTest extends TestCase
@@ -26,6 +31,7 @@ final class ExpressionTest extends TestCase
      * @return iterable<string, array{
      *     string | Expression<mixed> | callable(): Expression<mixed>,
      *     Scope,
+     *     Declarations | null,
      *     mixed,
      * }>
      */
@@ -124,6 +130,7 @@ final class ExpressionTest extends TestCase
                 'obj:MyCustomObject.matches:bool()',
                 new Scope(['obj' => new SomeObject()], ['matches' => static fn(mixed $value): bool => $value instanceof SomeObject]),
                 true,
+                new Declarations(types: new Types(['MyCustomObject' => Type::object(SomeObject::class)])),
             ],
             ['myMap:map<int, string>', new Scope(['myMap' => [42 => 'a', 69 => 'b']]), [42 => 'a', 69 => 'b']],
             [
@@ -145,17 +152,54 @@ final class ExpressionTest extends TestCase
             ['maybe:Option<string>', new Scope(['maybe' => null]), null],
             ['maybe:Option<int>.isSome:bool()', new Scope(['maybe' => 23]), true],
             ['maybe:Option<int>.isSome:bool()', new Scope(['maybe' => null]), false],
+            ['ints:list<int>.unique:list<int>()', new Scope(['ints' => [23, 10, 23, 42, 420, 420]]), [23, 10, 42, 420]],
+            ['ints:list<int>.unique:list<int>()', new Scope(['ints' => []]), []],
+            ['foo', new Scope(['foo' => 'test']), 'test', new Declarations(variables: ['foo' => Type::string()])],
+            ['foo:string.substr(0, 3)', new Scope(['foo' => 'test']), 'tes'],
+            [
+                'foo.customHash("test")',
+                new Scope(['foo' => 'mystr'], ['customHash' => static fn(string $text, string $salt): string => md5($text.$salt)]),
+                md5('mystrtest'),
+                new Declarations(
+                    variables: ['foo' => Type::string()],
+                    functions: ['customHash' => Type::func(Type::string(), [Type::string()])],
+                ),
+            ],
+            [
+                'bag.items().map:list<string>(|i| i:Item.name())',
+                new Scope(
+                    ['bag' => new Bag([new Item('a'), new Item('b')])],
+                    [
+                        'items' => static fn(Bag $bag): array => $bag->items,
+                        'name' => static fn(Item $item): string => $item->name,
+                    ],
+                ),
+                ['a', 'b'],
+                new Declarations(
+                    types: new Types(['Bag' => Type::object(Bag::class), 'Item' => Type::object(Item::class)]),
+                    variables: ['bag' => Type::object(Bag::class)],
+                    functions: [
+                        'items' => Type::func(Type::listOf(Type::object(Item::class)), [Type::object(Bag::class)]),
+                        'name' => Type::func(Type::string(), [Type::object(Item::class)]),
+                    ],
+                ),
+            ],
         ];
-        foreach ($cases as [$expr, $scope, $expected]) {
+        /**
+         * @psalm-suppress PossiblyUndefinedArrayOffset The runtime behavior is well-defined: `$declarations` is just null
+         */
+        foreach ($cases as $tuple) {
+            [$expr, $scope, $expected] = $tuple;
+            $declarations = $tuple[3] ?? null;
             $expectedStr = (string)Expr::literal($expected);
             $exprStr = is_callable($expr) ? $expr() : $expr;
             $name = sprintf('%s equals %s with %s', (string)$exprStr, $expectedStr, $scope->debug());
-            yield $name => [$expr, $scope, $expected];
+            yield $name => [$expr, $scope, $declarations, $expected];
         }
     }
 
     /**
-     * @return iterable<string, array{Expression<mixed> | string, string}>
+     * @return iterable<string, array{0: Expression<mixed> | string, 1: string, 2?: Declarations}>
      */
     public static function toStringCases(): iterable
     {
@@ -166,11 +210,16 @@ final class ExpressionTest extends TestCase
         yield Literal::class . ': false' => [Expr::literal(false), 'false'];
         yield Literal::class . ': null' => [Expr::literal(null), 'null'];
         yield 'Option type' => ['myint:Option<int>', 'myint:Option<int>'];
+        yield 'Variable access with implicit type' => [
+            'foo',
+            'foo',
+            new Declarations(variables: ['foo' => Type::string()]),
+        ];
         yield 'Any type' => ['myval:any', 'myval:any'];
     }
 
     /**
-     * @return iterable<string, array{0: Expression<mixed>, 1: Scope, 2?: string}>
+     * @return iterable<string, array{0: Expression<mixed> | array{0: string, 1?: Declarations}, 1: Scope, 2?: string}>
      */
     public static function evaluationErrorsCases(): iterable
     {
@@ -230,6 +279,11 @@ final class ExpressionTest extends TestCase
             Expr::literal('foo')->call('unknown', Type::string(), []),
             new Scope(['item' => 'foo']),
             'Unknown function',
+        ];
+        yield 'Declared function return type is different from actual return type' => [
+            ['foo:string.chars()', new Declarations(functions: ['chars' => Type::func(Type::int(), [Type::string()])])],
+            new Scope(['foo' => 'test'], ['chars' => static fn(string $text): string => $text]),
+            'Expected int, got string',
         ];
     }
 
@@ -306,13 +360,12 @@ final class ExpressionTest extends TestCase
      * @param Expression<mixed> | string | callable(): Expression<mixed> $expression
      * @dataProvider evaluateCases
      */
-    public function testEvaluate(Expression|string|callable $expression, Scope $scope, mixed $expected): void
+    public function testEvaluate(Expression|string|callable $expression, Scope $scope, Declarations|null $declarations, mixed $expected): void
     {
         if (is_callable($expression)) {
             $expression = $expression();
         } elseif (is_string($expression)) {
-            $types = new Types(['MyCustomObject' => Type::object(SomeObject::class)]);
-            $expression = ExpressionParser::parse($expression, $types);
+            $expression = ExpressionParser::parse($expression, $declarations);
         }
 
         self::assertSame($expected, $expression->evaluate($scope));
@@ -322,21 +375,25 @@ final class ExpressionTest extends TestCase
      * @param Expression<mixed> | string $expr
      * @dataProvider toStringCases
      */
-    public function testToString(Expression|string $expr, string $expected): void
+    public function testToString(Expression|string $expr, string $expected, Declarations|null $declarations = null): void
     {
         if (is_string($expr)) {
-            $expr = ExpressionParser::parse($expr);
+            $expr = ExpressionParser::parse($expr, $declarations);
         }
 
         self::assertSame($expected, (string)$expr);
     }
 
     /**
-     * @param Expression<mixed> $expression
+     * @param Expression<mixed> | array{0: string, 1?: Declarations} $expression
      * @dataProvider evaluationErrorsCases
      */
-    public function testEvaluationErrors(Expression $expression, Scope $scope, string|null $message = null): void
+    public function testEvaluationErrors(Expression|array $expression, Scope $scope, string|null $message = null): void
     {
+        if (is_array($expression)) {
+            $declarations = $expression[1] ?? null;
+            $expression = ExpressionParser::parse($expression[0], $declarations);
+        }
         $this->expectException(EvaluationError::class);
         if ($message !== null) {
             $this->expectExceptionMessage($message);

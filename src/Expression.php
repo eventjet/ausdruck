@@ -77,6 +77,14 @@ abstract class Expression implements Stringable
         return $this->getType()->equals($type);
     }
 
+    /**
+     * @param Type<mixed> $type
+     */
+    public function isSubtypeOf(Type $type): bool
+    {
+        return $this->getType()->isSubtypeOf($type);
+    }
+
     abstract public function location(): Span;
 
     /**

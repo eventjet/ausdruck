@@ -6,6 +6,7 @@ namespace Eventjet\Ausdruck\Test\Unit\Parser;
 
 use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
+use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\SyntaxError;
@@ -115,7 +116,10 @@ final class ExpressionParserTest extends TestCase
         yield 'triple equals without left hand side' => ['=== foo:string'];
         yield 'offset without a target' => ['["foo"]'];
         yield 'missing variable type' => ['foo'];
-        yield 'missing variable type in sub-expression' => ['foo === bar:true', 'Expected :, got ==='];
+        yield 'missing variable type in sub-expression' => [
+            'foo === bar:true',
+            'Variable foo must either be declared or have an inline type',
+        ];
         yield 'end of string after lambda argument' => ['|one, two'];
         yield 'two commas in lambda arguments' => ['|one,, two| one:bool || two:bool'];
         yield 'standalone pipe' => ['|'];
@@ -133,10 +137,11 @@ final class ExpressionParserTest extends TestCase
         yield 'end of string after function call and colon' => ['foo:string.substr:'];
         yield 'end of string after function dot' => ['foo:string.'];
         yield 'missing function name' => ['foo:string.:string()'];
+        yield 'end of string after function name' => ['foo:string.substr'];
     }
 
     /**
-     * @return iterable<string, array{0: string, 1?: string}>
+     * @return iterable<string, array{0: string, 1?: string, 2?: Declarations}>
      */
     public static function invalidExpressions(): iterable
     {
@@ -173,6 +178,53 @@ final class ExpressionParserTest extends TestCase
             'Invalid type "Option<string, string>": Option expects exactly one argument, got 2',
         ];
         yield 'option with invalid type argument' => ['foo:Option<Foo>', 'Unknown type Foo'];
+        yield 'inline variable type does not match declared' => [
+            'foo:string',
+            'Variable foo is declared as int, but used as string',
+            new Declarations(variables: ['foo' => Type::int()]),
+        ];
+        yield 'inline function return type does not match declared' => [
+            'foo:string.substr:int(0, 3)',
+            'Inline return type int of function substr does not match declared return type string',
+        ];
+        yield 'calling a function on the wrong type' => [
+            'foo:int.substr(0, 3)',
+            'substr must be called on an expression of type string, but foo:int is of type int',
+        ];
+        yield 'calling a function that doesn\'t take any arguments' => [
+            'foo:string.myCustomFn()',
+            'myCustomFn can\'t be used as a receiver function because it doesn\'t accept any arguments',
+            new Declarations(functions: ['myCustomFn' => Type::func(Type::string())]),
+        ];
+        yield 'too few function arguments' => [
+            'foo:string.substr(0)',
+            'substr expects 2 arguments, got 1',
+        ];
+        yield 'wrong argument type' => [
+            'foo:string.substr(0, "3")',
+            'Argument 2 of substr must be of type int, got string',
+        ];
+        yield 'lambda returning the wrong type' => [
+            'x:list<string>.some(|i| i:string)',
+            'Argument 1 of some must be of type func(mixed): bool, got func(mixed): string',
+        ];
+        yield 'passing a string to a function expecting a lambda' => [
+            'x:list<string>.some("foo")',
+            'Argument 1 of some must be of type func(mixed): bool, got string',
+        ];
+        yield 'passing a lambda to a function expecting an int' => [
+            'x:string.substr(|i| i:int, 3)',
+            'Argument 1 of substr must be of type int, got func(mixed): int',
+        ];
+        yield 'calling contains on an int' => [
+            'x:int.contains(42)',
+            'contains must be called on an expression of type list<mixed>, but x:int is of type int',
+        ];
+        yield 'call to undeclared function without an inline type' => [
+            'x:string.foo()',
+            'Function foo is not declared and has no inline type',
+        ];
+        yield 'some with invalid type argument' => ['foo:Some<Foo>', 'Unknown type Foo'];
     }
 
     /**
@@ -184,10 +236,6 @@ final class ExpressionParserTest extends TestCase
             [
                 '--',
                 '  =',
-            ],
-            [
-                'x:list<int>.take(5)',
-                '                =  ',
             ],
             [
                 'x:list<int>.take:(5)',
@@ -207,7 +255,7 @@ final class ExpressionParserTest extends TestCase
             ],
             [
                 'x.take:list<int>(5)',
-                ' =                 ',
+                '=                  ',
             ],
             [
                 '|x x:string',
@@ -407,14 +455,14 @@ final class ExpressionParserTest extends TestCase
     /**
      * @dataProvider invalidExpressions
      */
-    public function testTypeError(string $expression, string|null $expectedMessage = null): void
+    public function testTypeError(string $expression, string|null $expectedMessage = null, Declarations|null $declarations = null): void
     {
         $this->expectException(TypeError::class);
         if ($expectedMessage !== null) {
             $this->expectExceptionMessage($expectedMessage);
         }
 
-        ExpressionParser::parse($expression);
+        ExpressionParser::parse($expression, $declarations);
     }
 
     public function testParseTypedThrowsIfTheExpressionDoesNotMatchTheGivenType(): void
@@ -468,6 +516,7 @@ final class ExpressionParserTest extends TestCase
     {
         try {
             ExpressionParser::parse($expression);
+            self::fail('Expected a SyntaxError');
         } catch (SyntaxError $e) {
             self::assertNotNull($e->location);
             self::assertSame(

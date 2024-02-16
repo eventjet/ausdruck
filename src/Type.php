@@ -11,8 +11,11 @@ use TypeError;
 
 use function array_is_list;
 use function array_key_first;
+use function array_shift;
+use function array_slice;
 use function gettype;
 use function implode;
+use function in_array;
 use function is_array;
 use function is_object;
 use function sprintf;
@@ -28,7 +31,7 @@ final class Type implements Stringable
 
     /**
      * @param callable(mixed): T $validate
-     * @param list<self<mixed>> $args
+     * @param list<Type<mixed>> $args
      * @param self<T> | null $aliasFor
      */
     private function __construct(public readonly string $name, callable $validate, public readonly array $args = [], public readonly self|null $aliasFor = null)
@@ -121,6 +124,17 @@ final class Type implements Stringable
     }
 
     /**
+     * @template U
+     * @param Type<U> $return
+     * @param list<Type<mixed>> $parameters
+     * @return self<callable(mixed...): U>
+     */
+    public static function func(self $return, array $parameters = []): self
+    {
+        return new self('Func', Assert::func($return), [$return, ...$parameters]);
+    }
+
+    /**
      * @psalm-suppress InvalidReturnType False positive
      * @template U
      * @param U $value
@@ -168,6 +182,16 @@ final class Type implements Stringable
     }
 
     /**
+     * @template U
+     * @param Type<U> $some
+     * @return self<U>
+     */
+    public static function some(self $some): self
+    {
+        return new self('Some', $some->assert, [$some]);
+    }
+
+    /**
      * @template K of array-key
      * @param non-empty-array<K, mixed> $value
      * @return self<K>
@@ -194,6 +218,11 @@ final class Type implements Stringable
 
     public function __toString(): string
     {
+        if ($this->name === 'Func') {
+            $args = $this->args;
+            $returnType = array_shift($args);
+            return sprintf('func(%s): %s', implode(', ', $args), $returnType);
+        }
         return $this->name . ($this->args === [] ? '' : sprintf('<%s>', implode(', ', $this->args)));
     }
 
@@ -207,17 +236,102 @@ final class Type implements Stringable
     }
 
     /**
-     * @template O
-     * @param Type<O> $type
-     * @psalm-assert-if-true self<O> $this
+     * @template O of Type
+     * @param O $type
+     * @psalm-assert-if-true O $this
      */
     public function equals(self $type): bool
     {
-        return ($this->aliasFor ?? $this)->name === ($type->aliasFor ?? $type)->name;
+        if (($this->aliasFor ?? $this)->name !== ($type->aliasFor ?? $type)->name) {
+            return false;
+        }
+        if ($this->name !== 'Func') {
+            return true;
+        }
+        foreach ($this->args as $i => $arg) {
+            /**
+             * @psalm-suppress RedundantCondition I think it's complaining about Type<mixed> being equal to Type<mixed>,
+             *     but I don't know how to fix it.
+             */
+            if ($arg->equals($type->args[$i])) {
+                continue;
+            }
+            return false;
+        }
+        return true;
     }
 
     public function isOption(): bool
     {
         return $this->name === 'Option';
+    }
+
+    /**
+     * @param Type<mixed> $other
+     */
+    public function isSubtypeOf(self $other): bool
+    {
+        $self = $this->canonical();
+        $other = $other->canonical();
+        if ($other->name === 'mixed') {
+            return true;
+        }
+        if ($self->name === 'mixed') {
+            return false;
+        }
+        if ($self->name === 'Option') {
+            return $other->name === 'Option' && $self->args[0]->isSubtypeOf($other->args[0]);
+        }
+        if ($self->name === 'Some') {
+            return in_array($other->name, ['Option', 'Some'], true) && $self->args[0]->isSubtypeOf($other->args[0]);
+        }
+        if ($self->name !== $other->name) {
+            return false;
+        }
+        if ($self->name === 'Func') {
+            if (!$self->returnType()->isSubtypeOf($other->returnType())) {
+                return false;
+            }
+            $params = $self->parameterTypes();
+            $otherParams = $other->parameterTypes();
+            foreach ($params as $i => $param) {
+                $otherParam = $otherParams[$i] ?? null;
+                if ($otherParam === null) {
+                    return false;
+                }
+                if (!$otherParam->isSubtypeOf($param)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Returns the return type of a function type.
+     *
+     * This should only be called on function types. The behavior is undefined for other types.
+     *
+     * @return self<mixed>
+     */
+    public function returnType(): self
+    {
+        return $this->args[0];
+    }
+
+    /**
+     * @return list<self<mixed>>
+     */
+    private function parameterTypes(): array
+    {
+        return array_slice($this->args, 1);
+    }
+
+    /**
+     * @return self<T>
+     */
+    private function canonical(): self
+    {
+        return $this->aliasFor ?? $this;
     }
 }

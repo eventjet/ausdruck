@@ -11,6 +11,7 @@ use function array_map;
 use function get_debug_type;
 use function is_array;
 use function is_bool;
+use function is_callable;
 use function is_float;
 use function is_int;
 use function is_string;
@@ -140,6 +141,32 @@ final class Assert
          * @return U | null
          */
         $assert = static fn(mixed $value): mixed => $value === null ? null : $some->assert($value);
+        return $assert;
+    }
+
+    /**
+     * @template U
+     * @param Type<U> $returnType
+     * @return callable(mixed): (callable(mixed...): U)
+     */
+    public static function func(Type $returnType): callable
+    {
+        /**
+         * @return callable(): U
+         */
+        $assert = static function (mixed $value) use ($returnType): callable {
+            if (!is_callable($value)) {
+                throw new Parser\TypeError('Expected callable, got ' . get_debug_type($value));
+            }
+            /**
+             * @param mixed ...$params
+             * @return U
+             */
+            $fn = static function (mixed ...$params) use ($returnType, $value): mixed {
+                return $returnType->assert($value(...$params));
+            };
+            return $fn;
+        };
         return $assert;
     }
 }

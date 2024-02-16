@@ -16,6 +16,7 @@ use function array_values;
 use function count;
 use function get_debug_type;
 use function implode;
+use function in_array;
 use function is_bool;
 use function is_int;
 use function is_string;
@@ -48,6 +49,8 @@ final class Scope
             'some' => self::some(...),
             'substr' => substr(...),
             'take' => self::take(...),
+            'unique' => self::unique(...),
+            'unwrap' => self::identity(...),
         ] : [];
         $shadowed = array_intersect(array_keys($predefinedFuncs), array_keys($funcs));
         if ($shadowed !== []) {
@@ -161,6 +164,33 @@ final class Scope
     private static function take(array $items, int $n): array
     {
         return array_slice($items, 0, $n);
+    }
+
+    /**
+     * @template T
+     * @param list<T> $items
+     * @return list<T>
+     */
+    private static function unique(array $items): array
+    {
+        $unique = [];
+        foreach ($items as $item) {
+            if (in_array($item, $unique, true)) {
+                continue;
+            }
+            $unique[] = $item;
+        }
+        return $unique;
+    }
+
+    /**
+     * @template T
+     * @param T $value
+     * @return T
+     */
+    private static function identity(mixed $value): mixed
+    {
+        return $value;
     }
 
     /**
