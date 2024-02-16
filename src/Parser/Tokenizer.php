@@ -77,7 +77,7 @@ final class Tokenizer
             }
             if ($char === '-' || is_numeric($char)) {
                 $startCol = $column;
-                yield new ParsedToken(self::number($chars, $column), $line, $startCol);
+                yield new ParsedToken(self::numberOrArrow($chars, $column), $line, $startCol);
                 continue;
             }
             if ($char === '|') {
@@ -177,7 +177,7 @@ final class Tokenizer
      * @param positive-int $column
      * @return Literal<int | float> | Token
      */
-    private static function number(Peekable $chars, int &$column): Literal|Token
+    private static function numberOrArrow(Peekable $chars, int &$column): Literal|Token
     {
         $number = '';
         while (true) {
@@ -187,6 +187,10 @@ final class Tokenizer
                 $chars->next();
                 $column++;
                 continue;
+            }
+            if ($number === '-' && $char === '>') {
+                $chars->next();
+                return Token::Arrow;
             }
             if ($char === null || !is_numeric($number . $char)) {
                 break;

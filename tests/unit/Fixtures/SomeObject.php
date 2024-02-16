@@ -11,8 +11,8 @@ final class SomeObject
      */
     protected string $protected = 'protected';
     /**
-     * @phpstan-ignore-next-line
      * @psalm-suppress UnusedProperty
+     * @phpstan-ignore-next-line
      */
     private string $private = 'private';
 }

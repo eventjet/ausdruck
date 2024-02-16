@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
-use LogicException;
 
+use function array_map;
 use function implode;
 use function sprintf;
 
@@ -57,9 +57,11 @@ final class Lambda extends Expression
             && $this->body->equals($other->body);
     }
 
-    public function getType(): never
+    /**
+     * @return Type<callable(mixed...): T>
+     */
+    public function getType(): Type
     {
-        /** @infection-ignore-all */
-        throw new LogicException('Not implemented');
+        return Type::func($this->body->getType(), array_map(static fn(string $_name) => Type::any(), $this->parameters));
     }
 }
