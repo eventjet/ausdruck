@@ -120,7 +120,7 @@ final class Type implements Stringable
      */
     public static function any(): self
     {
-        return new self('mixed', Assert::mixed(...));
+        return new self('any', Assert::mixed(...));
     }
 
     /**
@@ -273,10 +273,10 @@ final class Type implements Stringable
     {
         $self = $this->canonical();
         $other = $other->canonical();
-        if ($other->name === 'mixed') {
+        if ($other->name === 'any') {
             return true;
         }
-        if ($self->name === 'mixed') {
+        if ($self->name === 'any') {
             return false;
         }
         if ($self->name === 'Option') {

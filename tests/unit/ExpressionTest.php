@@ -215,6 +215,7 @@ final class ExpressionTest extends TestCase
             'foo',
             new Declarations(variables: ['foo' => Type::string()]),
         ];
+        yield 'Any type' => ['myval:any', 'myval:any'];
     }
 
     /**
