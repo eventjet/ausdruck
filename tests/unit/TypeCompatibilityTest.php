@@ -31,6 +31,8 @@ final class TypeCompatibilityTest extends TestCase
             ['fn() -> string', 'fn() -> string'],
             ['fn(int) -> string', 'fn(int) -> string'],
             ['fn(int, string) -> bool', 'fn(int, string) -> bool'],
+            ['Option<string>', 'Option<string>'],
+            ['Some<string>', 'Some<string>'],
 
             // Every type is a subtype of any
             ['bool', 'any'],
@@ -40,11 +42,17 @@ final class TypeCompatibilityTest extends TestCase
             ['fn() -> string', 'any'],
             ['fn(int) -> string', 'any'],
             ['fn(int, string) -> bool', 'any'],
+            ['Option<int>', 'any'],
+            ['Some<int>', 'any'],
 
             // Functions
             ['fn() -> string', 'fn() -> any'],
             ['fn(any) -> string', 'fn(int) -> string'],
             ['fn(int) -> int', 'fn(int, string) -> int'],
+
+            // Option
+            ['Option<string>', 'Option<any>'],
+            ['Some<string>', 'Option<string>'],
         ];
         foreach ($cases as $case) {
             yield sprintf('%s is a subtype of %s', ...$case) => $case;
@@ -65,6 +73,8 @@ final class TypeCompatibilityTest extends TestCase
             ['any', 'fn() -> string'],
             ['any', 'fn(int) -> string'],
             ['any', 'fn(int, string) -> bool'],
+            ['any', 'Option<bool>'],
+            ['any', 'Some<bool>'],
 
             // Functions
             ['fn() -> any', 'fn() -> int'],
@@ -76,6 +86,12 @@ final class TypeCompatibilityTest extends TestCase
             // Misc
             ['fn() -> int', 'int'],
             ['int', 'fn() -> int'],
+
+            // Option
+            ['Option<int>', 'Option<string>'],
+            ['Option<any>', 'Option<string>'],
+            ['Option<string>', 'Some<string>'],
+            ['Some<string>', 'string'],
         ];
         foreach ($cases as $case) {
             yield sprintf('%s is not a subtype of %s', ...$case) => $case;

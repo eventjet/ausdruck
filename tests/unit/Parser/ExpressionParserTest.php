@@ -224,6 +224,7 @@ final class ExpressionParserTest extends TestCase
             'x:string.foo()',
             'Function foo is not declared and has no inline type',
         ];
+        yield 'some with invalid type argument' => ['foo:Some<Foo>', 'Unknown type Foo'];
     }
 
     /**

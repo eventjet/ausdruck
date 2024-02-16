@@ -199,7 +199,7 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{Expression<mixed> | string, string}>
+     * @return iterable<string, array{0: Expression<mixed> | string, 1: string, 2?: Declarations}>
      */
     public static function toStringCases(): iterable
     {
@@ -210,6 +210,11 @@ final class ExpressionTest extends TestCase
         yield Literal::class . ': false' => [Expr::literal(false), 'false'];
         yield Literal::class . ': null' => [Expr::literal(null), 'null'];
         yield 'Option type' => ['myint:Option<int>', 'myint:Option<int>'];
+        yield 'Variable access with implicit type' => [
+            'foo',
+            'foo',
+            new Declarations(variables: ['foo' => Type::string()]),
+        ];
     }
 
     /**
@@ -369,10 +374,10 @@ final class ExpressionTest extends TestCase
      * @param Expression<mixed> | string $expr
      * @dataProvider toStringCases
      */
-    public function testToString(Expression|string $expr, string $expected): void
+    public function testToString(Expression|string $expr, string $expected, Declarations|null $declarations = null): void
     {
         if (is_string($expr)) {
-            $expr = ExpressionParser::parse($expr);
+            $expr = ExpressionParser::parse($expr, $declarations);
         }
 
         self::assertSame($expected, (string)$expr);
