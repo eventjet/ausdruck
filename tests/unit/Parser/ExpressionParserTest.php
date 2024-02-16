@@ -206,19 +206,19 @@ final class ExpressionParserTest extends TestCase
         ];
         yield 'lambda returning the wrong type' => [
             'x:list<string>.some(|i| i:string)',
-            'Argument 1 of some must be of type func(mixed): bool, got func(mixed): string',
+            'Argument 1 of some must be of type func(any): bool, got func(any): string',
         ];
         yield 'passing a string to a function expecting a lambda' => [
             'x:list<string>.some("foo")',
-            'Argument 1 of some must be of type func(mixed): bool, got string',
+            'Argument 1 of some must be of type func(any): bool, got string',
         ];
         yield 'passing a lambda to a function expecting an int' => [
             'x:string.substr(|i| i:int, 3)',
-            'Argument 1 of substr must be of type int, got func(mixed): int',
+            'Argument 1 of substr must be of type int, got func(any): int',
         ];
         yield 'calling contains on an int' => [
             'x:int.contains(42)',
-            'contains must be called on an expression of type list<mixed>, but x:int is of type int',
+            'contains must be called on an expression of type list<any>, but x:int is of type int',
         ];
         yield 'call to undeclared function without an inline type' => [
             'x:string.foo()',
