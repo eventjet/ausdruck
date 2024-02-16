@@ -117,7 +117,7 @@ final class Type implements Stringable
      */
     public static function any(): self
     {
-        return new self('mixed', Assert::mixed(...));
+        return new self('any', Assert::mixed(...));
     }
 
     /**

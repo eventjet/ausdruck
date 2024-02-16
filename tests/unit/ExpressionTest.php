@@ -166,6 +166,7 @@ final class ExpressionTest extends TestCase
         yield Literal::class . ': false' => [Expr::literal(false), 'false'];
         yield Literal::class . ': null' => [Expr::literal(null), 'null'];
         yield 'Option type' => ['myint:Option<int>', 'myint:Option<int>'];
+        yield 'Any type' => ['myval:any', 'myval:any'];
     }
 
     /**
