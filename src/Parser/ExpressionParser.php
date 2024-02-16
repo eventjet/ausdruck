@@ -220,7 +220,7 @@ final class ExpressionParser
         $declaredType = $declarations->variables[$name] ?? null;
         if ($tokens->peek()?->token !== Token::Colon) {
             if ($declaredType !== null) {
-                return Expr::get($name, [$declaredType], $start->location());
+                return Expr::get($name, new TypeHint($declaredType, false), $start->location());
             }
             throw SyntaxError::create(
                 sprintf('Variable %s must either be declared or have an inline type', $name),

@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Eventjet\Ausdruck\Parser\TypeHint;
 use TypeError;
 
 use function get_debug_type;
-use function is_array;
 use function sprintf;
 
 /**
@@ -21,27 +21,24 @@ final class Get extends Expression
 {
     use LocationTrait;
 
-    /** @var Type<T> */
-    private readonly Type $type;
-    private bool $typeIsImplicit;
+    /** @var TypeHint<T> */
+    private readonly TypeHint $typeHint;
 
     /**
-     * @param Type<T> | array{Type<T>} $type
+     * @param Type<T> | TypeHint<T> $type
      */
-    public function __construct(public readonly string $name, Type|array $type, Span $location)
+    public function __construct(public readonly string $name, Type|TypeHint $type, Span $location)
     {
         $this->location = $location;
-        $this->type = $type instanceof Type ? $type : $type[0];
-        $this->typeIsImplicit = is_array($type);
+        if ($type instanceof Type) {
+            $type = new TypeHint($type, true);
+        }
+        $this->typeHint = $type;
     }
 
     public function __toString(): string
     {
-        if ($this->typeIsImplicit) {
-            return $this->name;
-        }
-        /** @psalm-suppress ImplicitToStringCast */
-        return sprintf('%s:%s', $this->name, $this->type);
+        return sprintf('%s%s', $this->name, $this->typeHint);
     }
 
     /**
@@ -51,18 +48,18 @@ final class Get extends Expression
     {
         /** @psalm-suppress MixedAssignment */
         $value = $scope->get($this->name);
-        if ($value === null && !$this->type->isOption()) {
+        if ($value === null && !$this->typeHint->type->isOption()) {
             throw new EvaluationError(sprintf('Unknown variable "%s"', $this->name));
         }
         try {
-            return $this->type->assert($value);
+            return $this->typeHint->type->assert($value);
         } catch (TypeError $e) {
             /** @psalm-suppress ImplicitToStringCast */
             throw new EvaluationError(
                 sprintf(
                     'Expected variable "%s" to be of type %s, got %s: %s',
                     $this->name,
-                    $this->type,
+                    $this->typeHint->type,
                     get_debug_type($value),
                     $e->getMessage(),
                 ),
@@ -75,11 +72,11 @@ final class Get extends Expression
     {
         return $other instanceof self
             && $this->name === $other->name
-            && $this->type->equals($other->type);
+            && $this->typeHint->type->equals($other->typeHint->type);
     }
 
     public function getType(): Type
     {
-        return $this->type;
+        return $this->typeHint->type;
     }
 }
