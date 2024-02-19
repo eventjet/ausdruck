@@ -114,7 +114,6 @@ final class ExpressionParserTest extends TestCase
         yield 'standalone dot' => ['.'];
         yield 'prop access without an object' => ['.foo:string'];
         yield 'triple equals without left hand side' => ['=== foo:string'];
-        yield 'offset without a target' => ['["foo"]'];
         yield 'missing variable type' => ['foo'];
         yield 'missing variable type in sub-expression' => [
             'foo === bar:true',
@@ -138,6 +137,8 @@ final class ExpressionParserTest extends TestCase
         yield 'end of string after function dot' => ['foo:string.'];
         yield 'missing function name' => ['foo:string.:string()'];
         yield 'end of string after function name' => ['foo:string.substr'];
+        yield 'list literal: missing closing bracket' => ['[1, 2'];
+        yield 'empty pair or curly braces' => ['{}'];
     }
 
     /**

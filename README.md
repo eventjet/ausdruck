@@ -56,6 +56,8 @@ See [Types](#types)
 - `123`: Integer
 - `"foo"`: String
 - `1.23`: Float
+- `[1, myInt:int, 3]`: List of integers
+- `["foo", myString:string, "bar"]`: List of strings
 
 ### Operators
 

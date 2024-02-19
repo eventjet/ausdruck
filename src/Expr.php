@@ -57,6 +57,16 @@ final class Expr
 
     /**
      * @template T
+     * @param list<Expression<T>> $elements
+     * @return ListLiteral<T>
+     */
+    public static function listLiteral(array $elements, Span $location): ListLiteral
+    {
+        return new ListLiteral($elements, $location);
+    }
+
+    /**
+     * @template T
      * @param Expression<mixed> $target
      * @param list<Expression<mixed>> $arguments
      * @param Type<T> $type

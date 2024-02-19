@@ -11,9 +11,11 @@ use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Gt;
 use Eventjet\Ausdruck\Lambda;
+use Eventjet\Ausdruck\ListLiteral;
 use Eventjet\Ausdruck\Literal;
 use Eventjet\Ausdruck\Negative;
 use Eventjet\Ausdruck\Or_;
+use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Subtract;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\TestCase;
@@ -52,6 +54,10 @@ final class ExpressionComparisonTest extends TestCase
         yield [
             Expr::negative(Expr::literal(1)),
             Expr::negative(Expr::literal(1)),
+        ];
+        yield [
+            Expr::listLiteral([Expr::literal(1), Expr::literal(2), Expr::literal(3)], Span::char(1, 1)),
+            Expr::listLiteral([Expr::literal(1), Expr::literal(2), Expr::literal(3)], Span::char(1, 1)),
         ];
     }
 
@@ -187,6 +193,14 @@ final class ExpressionComparisonTest extends TestCase
         yield Negative::class . ': different expression' => [
             Expr::negative(Expr::literal(1)),
             Expr::negative(Expr::literal(2)),
+        ];
+        yield ListLiteral::class . ': different elements' => [
+            Expr::listLiteral([Expr::literal(1), Expr::literal(2), Expr::literal(3)], Span::char(1, 1)),
+            Expr::listLiteral([Expr::literal(1), Expr::literal(9), Expr::literal(3)], Span::char(1, 1)),
+        ];
+        yield ListLiteral::class . ': different type' => [
+            Expr::listLiteral([Expr::literal(1)], Span::char(1, 1)),
+            Expr::literal(1),
         ];
     }
 

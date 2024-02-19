@@ -8,6 +8,7 @@ use Eventjet\Ausdruck\Call;
 use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\Get;
+use Eventjet\Ausdruck\ListLiteral;
 use Eventjet\Ausdruck\Scope;
 use Eventjet\Ausdruck\Type;
 
@@ -203,6 +204,9 @@ final class ExpressionParser
             }
             /** @phpstan-ignore-next-line False positive */
             return $left->gt($right);
+        }
+        if ($token === Token::OpenBracket) {
+            return self::parseListLiteral($tokens, $declarations);
         }
         return null;
     }
@@ -431,7 +435,7 @@ final class ExpressionParser
             if ($returnType instanceof TypeError) {
                 throw $returnType;
             }
-            if ($fnType !== null && !$fnType->args[0]->isSubtypeOf($returnType)) {
+            if ($fnType !== null && !$returnType->isSubtypeOf($fnType->args[0])) {
                 throw TypeError::create(
                     sprintf(
                         'Inline return type %s of function %s does not match declared return type %s',
@@ -484,7 +488,7 @@ final class ExpressionParser
                         sprintf('%s expects %d arguments, got %d', $name, count($parameterTypes), count($args)),
                     );
                 }
-                if (!$argument->matchesType($parameterType)) {
+                if (!$argument->isSubtypeOf($parameterType)) {
                     throw new TypeError(
                         sprintf(
                             'Argument %d of %s must be of type %s, got %s',
@@ -537,5 +541,27 @@ final class ExpressionParser
         }
         $previous = $tokens->previous();
         return $previous === null ? Span::char(1, 1) : Span::char($previous->line, $previous->column + 1);
+    }
+
+    /**
+     * @param Peekable<ParsedToken> $tokens
+     * @return ListLiteral<mixed>
+     */
+    private static function parseListLiteral(Peekable $tokens, Declarations $declarations): ListLiteral
+    {
+        $start = self::expect($tokens, Token::OpenBracket);
+        $items = [];
+        while (true) {
+            $item = self::parseLazy(null, $tokens, $declarations);
+            if ($item === null) {
+                break;
+            }
+            $items[] = $item;
+            if ($tokens->peek()?->token === Token::Comma) {
+                $tokens->next();
+            }
+        }
+        $close = self::expect($tokens, Token::CloseBracket);
+        return Expr::listLiteral($items, $start->location()->to($close->location()));
     }
 }
