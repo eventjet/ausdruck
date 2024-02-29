@@ -53,6 +53,11 @@ final class TypeCompatibilityTest extends TestCase
             // Option
             ['Option<string>', 'Option<any>'],
             ['Some<string>', 'Option<string>'],
+
+            // Lists
+            ['list<any>', 'list<any>'],
+            ['list<string>', 'list<string>'],
+            ['list<string>', 'list<any>'],
         ];
         foreach ($cases as $case) {
             yield sprintf('%s is a subtype of %s', ...$case) => $case;
@@ -92,6 +97,10 @@ final class TypeCompatibilityTest extends TestCase
             ['Option<any>', 'Option<string>'],
             ['Option<string>', 'Some<string>'],
             ['Some<string>', 'string'],
+
+            // Lists
+            ['list<string>', 'list<int>'],
+            ['list<any>', 'list<string>'],
         ];
         foreach ($cases as $case) {
             yield sprintf('%s is not a subtype of %s', ...$case) => $case;

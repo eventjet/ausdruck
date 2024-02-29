@@ -245,7 +245,7 @@ final class Type implements Stringable
         if (($this->aliasFor ?? $this)->name !== ($type->aliasFor ?? $type)->name) {
             return false;
         }
-        if ($this->name !== 'Func') {
+        if (!in_array($this->name, ['Func', 'list'], true)) {
             return true;
         }
         foreach ($this->args as $i => $arg) {
@@ -287,6 +287,9 @@ final class Type implements Stringable
         }
         if ($self->name !== $other->name) {
             return false;
+        }
+        if ($this->name === 'list') {
+            return $self->args[0]->isSubtypeOf($other->args[0]);
         }
         if ($self->name === 'Func') {
             if (!$self->returnType()->isSubtypeOf($other->returnType())) {

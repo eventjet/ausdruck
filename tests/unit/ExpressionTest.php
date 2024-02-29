@@ -184,6 +184,9 @@ final class ExpressionTest extends TestCase
                     ],
                 ),
             ],
+            ['["foo", "bar"]', new Scope(), ['foo', 'bar']],
+            ['["foo", myVar:string, "bar"].contains("test")', new Scope(['myVar' => 'test']), true],
+            ['["foo",]', new Scope(), ['foo']],
         ];
         /**
          * @psalm-suppress PossiblyUndefinedArrayOffset The runtime behavior is well-defined: `$declarations` is just null
@@ -216,6 +219,7 @@ final class ExpressionTest extends TestCase
             new Declarations(variables: ['foo' => Type::string()]),
         ];
         yield 'Any type' => ['myval:any', 'myval:any'];
+        yield 'List literal' => ['["foo", "bar"]', '["foo", "bar"]'];
     }
 
     /**
@@ -288,7 +292,7 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{Expression<mixed>, Type<mixed>}>
+     * @return iterable<string, array{Expression<mixed> | string, Type<mixed>}>
      */
     public static function typeCases(): iterable
     {
@@ -354,6 +358,9 @@ final class ExpressionTest extends TestCase
             ]),
             Type::bool(),
         ];
+        yield 'List literal with strings' => ['["foo", myVar:string]', Type::listOf(Type::string())];
+        yield 'List literal with strings and ints' => ['["foo", "bar", 42, myVar:string]', Type::listOf(Type::any())];
+        yield 'Empty list literal' => ['[]', Type::listOf(Type::any())];
     }
 
     /**
@@ -403,12 +410,16 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> $expression
+     * @param Expression<mixed> | string $expression
      * @param Type<mixed> $expected
      * @dataProvider typeCases
      */
-    public function testType(Expression $expression, Type $expected): void
+    public function testType(Expression|string $expression, Type $expected): void
     {
+        if (is_string($expression)) {
+            $expression = ExpressionParser::parse($expression);
+        }
+
         /**
          * @psalm-suppress ImplicitToStringCast
          * @psalm-suppress RedundantCondition I have no idea how to type this better
