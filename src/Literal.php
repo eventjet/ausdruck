@@ -29,7 +29,7 @@ final class Literal extends Expression
     /**
      * @param T $value
      */
-    public function __construct(private readonly mixed $value, Span $location)
+    public function __construct(public readonly mixed $value, Span $location)
     {
         $this->location = $location;
     }

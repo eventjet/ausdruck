@@ -20,7 +20,7 @@ final class Gt extends Expression
      * @param Expression<T> $left
      * @param Expression<T> $right
      */
-    public function __construct(private readonly Expression $left, private readonly Expression $right)
+    public function __construct(public readonly Expression $left, public readonly Expression $right)
     {
     }
 
