@@ -108,7 +108,7 @@ final class PhpTranspiler
         if ($expression->name === 'isSome') {
             return new NotIdentical(
                 self::transpile($expression->target),
-                new Variable('null'),
+                new ConstFetch(new Name('null')),
             );
         }
         $name = match ($expression->name) {
