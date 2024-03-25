@@ -220,6 +220,7 @@ final class ExpressionTest extends TestCase
         ];
         yield 'Any type' => ['myval:any', 'myval:any'];
         yield 'List literal' => ['["foo", "bar"]', '["foo", "bar"]'];
+        yield 'Negative variable' => ['-myval:int', '-myval:int'];
     }
 
     /**

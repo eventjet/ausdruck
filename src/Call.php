@@ -34,8 +34,32 @@ final class Call extends Expression
         public readonly Type $type,
         public readonly array $arguments,
         Span $location,
+        public readonly CallType $callType = CallType::Method,
     ) {
         $this->location = $location;
+    }
+
+    /**
+     * @template U
+     * @param Expression<mixed> $left
+     * @param Expression<mixed> $right
+     * @param Type<U> $type
+     * @return self<U>
+     */
+    public static function infix(string $name, Expression $left, Expression $right, Type $type): self
+    {
+        return new self($left, $name, $type, [$right], $left->location()->to($right->location()), CallType::Infix);
+    }
+
+    /**
+     * @template U
+     * @param Expression<mixed> $argument
+     * @param Type<U> $type
+     * @return self<U>
+     */
+    public static function prefix(string $name, Expression $argument, Type $type, Span $location): self
+    {
+        return new self($argument, $name, $type, [], $location, CallType::Prefix);
     }
 
     /**
@@ -58,8 +82,12 @@ final class Call extends Expression
 
     public function __toString(): string
     {
-        /** @psalm-suppress ImplicitToStringCast */
-        return sprintf('%s.%s:%s(%s)', $this->target, $this->name, $this->type, implode(', ', $this->arguments));
+        return match ($this->callType) {
+            CallType::Infix => sprintf('%s %s %s', $this->target, $this->name, $this->arguments[0]),
+            CallType::Prefix => sprintf('%s%s', $this->name, $this->target),
+            /** @psalm-suppress ImplicitToStringCast */
+            CallType::Method => sprintf('%s.%s:%s(%s)', $this->target, $this->name, $this->type, implode(', ', $this->arguments)),
+        };
     }
 
     public function evaluate(Scope $scope): mixed

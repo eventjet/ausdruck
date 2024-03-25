@@ -15,8 +15,9 @@ abstract class Expression implements Stringable
 {
     /**
      * @param self<mixed> $other
+     * @return Expression<bool>
      */
-    public function eq(self $other): Eq
+    public function eq(self $other): self
     {
         return Expr::eq($this, $other);
     }
@@ -24,9 +25,9 @@ abstract class Expression implements Stringable
     /**
      * @template U of int | float
      * @param Expression<U> $subtrahend
-     * @return Subtract<U>
+     * @return Expression<U>
      */
-    public function subtract(self $subtrahend): Subtract
+    public function subtract(self $subtrahend): self
     {
         /** @var self<U> $self */
         $self = $this;
@@ -36,9 +37,9 @@ abstract class Expression implements Stringable
     /**
      * @template U of int | float
      * @param Expression<U> $right
-     * @return Gt<U>
+     * @return Expression<bool>
      */
-    public function gt(self $right): Gt
+    public function gt(self $right): self
     {
         /** @var self<U> $self */
         $self = $this;
@@ -47,8 +48,9 @@ abstract class Expression implements Stringable
 
     /**
      * @param self<bool> $other
+     * @return Expression<bool>
      */
-    public function or_(self $other): Or_
+    public function or_(self $other): self
     {
         /** @var self<bool> $self */
         $self = $this;
