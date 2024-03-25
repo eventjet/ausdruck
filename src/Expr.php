@@ -26,10 +26,11 @@ final class Expr
      * @template T
      * @param Expression<T> $left
      * @param Expression<T> $right
+     * @return Expression<bool>
      */
-    public static function eq(Expression $left, Expression $right): Eq
+    public static function eq(Expression $left, Expression $right): Expression
     {
-        return new Eq($left, $right);
+        return new Call($left, '===', Type::bool(), [$right], $left->location()->to($right->location()), CallType::Infix);
     }
 
     /**
@@ -80,10 +81,11 @@ final class Expr
     /**
      * @param Expression<bool> $left
      * @param Expression<bool> $right
+     * @return Expression<bool>
      */
-    public static function or_(Expression $left, Expression $right): Or_
+    public static function or_(Expression $left, Expression $right): Expression
     {
-        return new Or_($left, $right);
+        return new Call($left, '||', Type::bool(), [$right], $left->location()->to($right->location()), CallType::Infix);
     }
 
     /**
@@ -103,32 +105,40 @@ final class Expr
      * @template T of int | float
      * @param Expression<T> $minuend
      * @param Expression<T> $subtrahend
-     * @return Subtract<T>
+     * @return Expression<T>
      */
-    public static function subtract(Expression $minuend, Expression $subtrahend): Subtract
+    public static function subtract(Expression $minuend, Expression $subtrahend): Expression
     {
-        return new Subtract($minuend, $subtrahend);
+        return new Call(
+            $minuend,
+            '-',
+            $minuend->getType(),
+            [$subtrahend],
+            $minuend->location()->to($subtrahend->location()),
+            CallType::Infix,
+        );
     }
 
     /**
      * @template T of int | float
      * @param Expression<T> $left
      * @param Expression<T> $right
-     * @return Gt<T>
+     * @return Expression<bool>
      */
-    public static function gt(Expression $left, Expression $right): Gt
+    public static function gt(Expression $left, Expression $right): Expression
     {
-        return new Gt($left, $right);
+        return new Call($left, '>', Type::bool(), [$right], $left->location()->to($right->location()), CallType::Infix);
     }
 
     /**
      * @template T of int | float
      * @param Expression<T> $expression
-     * @return Negative<T>
+     * @return Expression<T>
      */
-    public static function negative(Expression $expression, Span|null $location = null): Negative
+    public static function negative(Expression $expression, Span|null $location = null): Expression
     {
-        return new Negative($expression, $location ?? self::dummySpan());
+        $location ??= self::dummySpan();
+        return new Call($expression, '-', $expression->getType(), [], $location, CallType::Prefix);
     }
 
     private static function dummySpan(): Span

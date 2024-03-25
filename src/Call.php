@@ -34,6 +34,7 @@ final class Call extends Expression
         public readonly Type $type,
         public readonly array $arguments,
         Span $location,
+        public readonly CallType $callType = CallType::Method,
     ) {
         $this->location = $location;
     }
@@ -58,8 +59,12 @@ final class Call extends Expression
 
     public function __toString(): string
     {
-        /** @psalm-suppress ImplicitToStringCast */
-        return sprintf('%s.%s:%s(%s)', $this->target, $this->name, $this->type, implode(', ', $this->arguments));
+        return match ($this->callType) {
+            CallType::Infix => sprintf('%s %s %s', $this->target, $this->name, $this->arguments[0]),
+            CallType::Prefix => sprintf('%s%s', $this->name, $this->target),
+            /** @psalm-suppress ImplicitToStringCast */
+            CallType::Method => sprintf('%s.%s:%s(%s)', $this->target, $this->name, $this->type, implode(', ', $this->arguments)),
+        };
     }
 
     public function evaluate(Scope $scope): mixed
