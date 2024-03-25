@@ -30,7 +30,7 @@ final class Expr
      */
     public static function eq(Expression $left, Expression $right): Expression
     {
-        return new Call($left, '===', Type::bool(), [$right], $left->location()->to($right->location()), CallType::Infix);
+        return Call::infix('===', $left, $right, Type::bool());
     }
 
     /**
@@ -85,7 +85,7 @@ final class Expr
      */
     public static function or_(Expression $left, Expression $right): Expression
     {
-        return new Call($left, '||', Type::bool(), [$right], $left->location()->to($right->location()), CallType::Infix);
+        return Call::infix('||', $left, $right, Type::bool());
     }
 
     /**
@@ -109,14 +109,7 @@ final class Expr
      */
     public static function subtract(Expression $minuend, Expression $subtrahend): Expression
     {
-        return new Call(
-            $minuend,
-            '-',
-            $minuend->getType(),
-            [$subtrahend],
-            $minuend->location()->to($subtrahend->location()),
-            CallType::Infix,
-        );
+        return Call::infix('-', $minuend, $subtrahend, $minuend->getType());
     }
 
     /**
@@ -127,7 +120,7 @@ final class Expr
      */
     public static function gt(Expression $left, Expression $right): Expression
     {
-        return new Call($left, '>', Type::bool(), [$right], $left->location()->to($right->location()), CallType::Infix);
+        return Call::infix('>', $left, $right, Type::bool());
     }
 
     /**
@@ -137,8 +130,7 @@ final class Expr
      */
     public static function negative(Expression $expression, Span|null $location = null): Expression
     {
-        $location ??= self::dummySpan();
-        return new Call($expression, '-', $expression->getType(), [], $location, CallType::Prefix);
+        return Call::prefix('-', $expression, $expression->getType(), $location ?? self::dummySpan());
     }
 
     private static function dummySpan(): Span
