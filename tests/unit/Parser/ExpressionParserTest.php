@@ -139,6 +139,7 @@ final class ExpressionParserTest extends TestCase
         yield 'end of string after function name' => ['foo:string.substr'];
         yield 'list literal: missing closing bracket' => ['[1, 2'];
         yield 'empty pair or curly braces' => ['{}'];
+        yield 'single ampersand' => ['foo:bool & bar:bool'];
     }
 
     /**
@@ -313,6 +314,14 @@ final class ExpressionParserTest extends TestCase
             [
                 '|x, "test"| x:string',
                 '    ======          ',
+            ],
+            [
+                'foo:bool & bar:bool',
+                '         =         ',
+            ],
+            [
+                'foo:bool && bar::bool',
+                '                =    ',
             ],
         ];
         foreach ($cases as [$expression, $location]) {

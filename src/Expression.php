@@ -56,6 +56,17 @@ abstract class Expression implements Stringable
     }
 
     /**
+     * @param self<bool> $other
+     * @return Expression<bool>
+     */
+    public function and_(self $other): self
+    {
+        /** @var self<bool> $self */
+        $self = $this;
+        return Expr::and_($self, $other);
+    }
+
+    /**
      * @template U
      * @param list<Expression<mixed>> $arguments
      * @param Type<U> $type

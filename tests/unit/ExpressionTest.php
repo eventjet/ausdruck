@@ -187,6 +187,10 @@ final class ExpressionTest extends TestCase
             ['["foo", "bar"]', new Scope(), ['foo', 'bar']],
             ['["foo", myVar:string, "bar"].contains("test")', new Scope(['myVar' => 'test']), true],
             ['["foo",]', new Scope(), ['foo']],
+            ['foo:bool && bar:bool', new Scope(['foo' => true, 'bar' => true]), true],
+            ['foo:bool && bar:bool', new Scope(['foo' => true, 'bar' => false]), false],
+            ['foo:bool && bar:bool', new Scope(['foo' => false, 'bar' => true]), false],
+            ['foo:bool && bar:bool', new Scope(['foo' => false, 'bar' => false]), false],
         ];
         /**
          * @psalm-suppress PossiblyUndefinedArrayOffset The runtime behavior is well-defined: `$declarations` is just null

@@ -20,6 +20,7 @@ enum Token: string
     case OpenAngle = '<';
     case CloseAngle = '>';
     case Or = '||';
+    case And = '&&';
     case Pipe = '|';
     case Comma = ',';
     case Colon = ':';

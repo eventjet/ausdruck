@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
+use Eventjet\Ausdruck\And_;
 use Eventjet\Ausdruck\Call;
 use Eventjet\Ausdruck\Eq;
 use Eventjet\Ausdruck\Expr;
@@ -58,6 +59,10 @@ final class ExpressionComparisonTest extends TestCase
         yield [
             Expr::listLiteral([Expr::literal(1), Expr::literal(2), Expr::literal(3)], Span::char(1, 1)),
             Expr::listLiteral([Expr::literal(1), Expr::literal(2), Expr::literal(3)], Span::char(1, 1)),
+        ];
+        yield [
+            Expr::and_(Expr::literal(true), Expr::literal(false)),
+            Expr::and_(Expr::literal(true), Expr::literal(false)),
         ];
     }
 
@@ -129,6 +134,30 @@ final class ExpressionComparisonTest extends TestCase
         yield Or_::class . ': different type' => [
             Expr::or_(Expr::literal(true), Expr::literal(false)),
             Expr::eq(Expr::literal(true), Expr::literal(false)),
+        ];
+        yield And_::class . ': left is different' => [
+            Expr::and_(Expr::literal(true), Expr::literal(false)),
+            Expr::and_(Expr::literal(false), Expr::literal(false)),
+        ];
+        yield And_::class . ': right is different' => [
+            Expr::and_(Expr::literal(true), Expr::literal(false)),
+            Expr::and_(Expr::literal(true), Expr::literal(true)),
+        ];
+        yield And_::class . ': both are different' => [
+            Expr::and_(Expr::literal(true), Expr::literal(false)),
+            Expr::and_(Expr::literal(false), Expr::literal(true)),
+        ];
+        yield And_::class . ': different type' => [
+            Expr::and_(Expr::literal(true), Expr::literal(false)),
+            Expr::eq(Expr::literal(true), Expr::literal(false)),
+        ];
+        yield And_::class . ' and ' . Or_::class => [
+            Expr::and_(Expr::literal(false), Expr::literal(false)),
+            Expr::or_(Expr::literal(false), Expr::literal(false)),
+        ];
+        yield And_::class . ' and ' . Or_::class . ' with different operands' => [
+            Expr::and_(Expr::literal(false), Expr::literal(false)),
+            Expr::or_(Expr::literal(true), Expr::literal(true)),
         ];
         yield Subtract::class . ': minuend is different' => [
             Expr::subtract(Expr::literal(1), Expr::literal(2)),

@@ -87,6 +87,15 @@ final class Expr
     }
 
     /**
+     * @param Expression<bool> $left
+     * @param Expression<bool> $right
+     */
+    public static function and_(Expression $left, Expression $right): And_
+    {
+        return new And_($left, $right);
+    }
+
+    /**
      * @template T
      * @param Expression<T> $body
      * @param list<string> $parameters
