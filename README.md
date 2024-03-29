@@ -69,6 +69,7 @@ Both operands must be of the same type.
 | `-`      | Subtraction  | `foo:int - bar:int`      | Operands must be of type `int` or `float` |
 | `>`      | Greater than | `foo:int > bar:int`      | Operands must be of type `int` or `float` |
 | `\|\|`   | Logical OR   | `foo:bool \|\| bar:bool` | Operands must be of type `bool`           |
+| &&       | Logical AND  | `foo:bool && bar:bool`   | Operands must be of type `bool`           |
 
 Where's the rest? We're implementing more as we need them.
 

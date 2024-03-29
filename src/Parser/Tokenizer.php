@@ -95,6 +95,18 @@ final class Tokenizer
                 }
                 continue;
             }
+            if ($char === '&') {
+                $chars->next();
+                $char = $chars->peek();
+                if ($char === '&') {
+                    $chars->next();
+                    yield new ParsedToken(Token::And, $line, $column);
+                    $column += 2;
+                } else {
+                    throw SyntaxError::create('Unexpected character &', Span::char($line, $column));
+                }
+                continue;
+            }
             if (!str_contains(self::NON_IDENTIFIER_CHARS, $char)) {
                 $startCol = $column;
                 yield new ParsedToken(self::identifier($chars, $line, $column), $line, $startCol);

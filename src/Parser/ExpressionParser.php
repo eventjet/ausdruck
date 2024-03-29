@@ -15,6 +15,7 @@ use Eventjet\Ausdruck\Type;
 use function array_shift;
 use function assert;
 use function count;
+use function in_array;
 use function is_string;
 use function sprintf;
 use function str_split;
@@ -134,7 +135,7 @@ final class ExpressionParser
             ));
             return $left->eq($right);
         }
-        if ($token === Token::Or) {
+        if (in_array($token, [Token::Or, Token::And], true)) {
             $tokens->next();
             if ($left === null) {
                 self::unexpectedToken($parsedToken);
@@ -152,7 +153,7 @@ final class ExpressionParser
                 Token::print($token),
                 $right->getType(),
             ));
-            return $left->or_($right);
+            return $token === Token::Or ? $left->or_($right) : $left->and_($right);
         }
         if ($token === Token::Pipe) {
             return self::lambda($tokens, $declarations);
