@@ -12,12 +12,8 @@ use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Scope;
-use Eventjet\Ausdruck\Test\Unit\Fixtures\Bag;
-use Eventjet\Ausdruck\Test\Unit\Fixtures\Item;
-use Eventjet\Ausdruck\Test\Unit\Fixtures\SomeObject;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\TestCase;
-use stdClass;
 
 use function is_array;
 use function is_callable;
@@ -90,17 +86,6 @@ final class ExpressionTest extends TestCase
                 new Scope(['items' => [1.5, 3.0, 4.5], 'needle' => 3.0]),
                 true,
             ],
-            (static function (): array {
-                $a = new stdClass();
-                $b = new stdClass();
-                $c = new stdClass();
-                return [
-                    static fn(): Expression => Expr::get('items', Type::listOf(Type::object(stdClass::class)))
-                        ->call('contains', Type::bool(), [Expr::get('needle', Type::object(stdClass::class))]),
-                    new Scope(['items' => [$a, $b, $c], 'needle' => $b]),
-                    true,
-                ];
-            })(),
             [
                 Expr::get('foo', Type::int())->subtract(Expr::get('bar', Type::int())),
                 new Scope(['foo' => 5, 'bar' => 2]),
@@ -126,12 +111,6 @@ final class ExpressionTest extends TestCase
                 [69, 24],
             ],
             ['myfloat:float === 23.42', new Scope(['myfloat' => 23.42]), true],
-            [
-                'obj:MyCustomObject.matches:bool()',
-                new Scope(['obj' => new SomeObject()], ['matches' => static fn(mixed $value): bool => $value instanceof SomeObject]),
-                true,
-                new Declarations(types: new Types(['MyCustomObject' => Type::object(SomeObject::class)])),
-            ],
             ['myMap:map<int, string>', new Scope(['myMap' => [42 => 'a', 69 => 'b']]), [42 => 'a', 69 => 'b']],
             [
                 'items:list<string>.take:list<string>(3)',
@@ -166,23 +145,10 @@ final class ExpressionTest extends TestCase
                 ),
             ],
             [
-                'bag.items().map:list<string>(|i| i:Item.name())',
-                new Scope(
-                    ['bag' => new Bag([new Item('a'), new Item('b')])],
-                    [
-                        'items' => static fn(Bag $bag): array => $bag->items,
-                        'name' => static fn(Item $item): string => $item->name,
-                    ],
-                ),
-                ['a', 'b'],
-                new Declarations(
-                    types: new Types(['Bag' => Type::object(Bag::class), 'Item' => Type::object(Item::class)]),
-                    variables: ['bag' => Type::object(Bag::class)],
-                    functions: [
-                        'items' => Type::func(Type::listOf(Type::object(Item::class)), [Type::object(Bag::class)]),
-                        'name' => Type::func(Type::string(), [Type::object(Item::class)]),
-                    ],
-                ),
+                'ints:IntList.contains(42)',
+                new Scope(['ints' => [23, 42, 69]]),
+                true,
+                new Declarations(types: new Types(['IntList' => Type::listOf(Type::int())])),
             ],
             ['["foo", "bar"]', new Scope(), ['foo', 'bar']],
             ['["foo", myVar:string, "bar"].contains("test")', new Scope(['myVar' => 'test']), true],
@@ -240,14 +206,6 @@ final class ExpressionTest extends TestCase
             Expr::get('foo', Type::string()),
             new Scope(['foo' => 69]),
             'Expected string, got int',
-        ];
-        yield 'Get object variable, but it\'s not an object' => [
-            Expr::get('foo', stdClass::class),
-            new Scope(['foo' => 'bar']),
-        ];
-        yield 'Get object variable, but it\'s not the right class' => [
-            Expr::get('foo', stdClass::class),
-            new Scope(['foo' => new SomeObject()]),
         ];
         yield 'Get float variable, but it\'s not a float' => [
             Expr::get('foo', Type::float()),
@@ -315,10 +273,6 @@ final class ExpressionTest extends TestCase
         yield 'Get bool' => [
             Expr::get('foo', Type::bool()),
             Type::bool(),
-        ];
-        yield 'Get object' => [
-            Expr::get('foo', Type::object(SomeObject::class)),
-            Type::object(SomeObject::class),
         ];
         yield 'String literal' => [
             Expr::literal('foo'),

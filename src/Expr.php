@@ -7,8 +7,6 @@ namespace Eventjet\Ausdruck;
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\TypeHint;
 
-use function is_string;
-
 /**
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -34,14 +32,11 @@ final class Expr
 
     /**
      * @template T
-     * @param Type<T> | class-string<T> | TypeHint<T> $type
+     * @param Type<T> | TypeHint<T> $type
      * @return Get<T>
      */
-    public static function get(string $name, TypeHint|Type|string $type, Span|null $location = null): Get
+    public static function get(string $name, TypeHint|Type $type, Span|null $location = null): Get
     {
-        /** @phpstan-ignore-next-line Must be a PHPStan bug */
-        $type = is_string($type) ? Type::object($type) : $type;
-        /** @phpstan-ignore-next-line False positive */
         return new Get($name, $type, $location ?? self::dummySpan());
     }
 

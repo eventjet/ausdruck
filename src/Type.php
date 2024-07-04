@@ -17,7 +17,6 @@ use function gettype;
 use function implode;
 use function in_array;
 use function is_array;
-use function is_object;
 use function sprintf;
 
 /**
@@ -96,16 +95,6 @@ final class Type implements Stringable
     }
 
     /**
-     * @template U of object
-     * @param class-string<U> $class
-     * @return self<U>
-     */
-    public static function object(string $class): self
-    {
-        return new self($class, Assert::class($class));
-    }
-
-    /**
      * @template U
      * @param Type<U> $type
      * @return self<U>
@@ -148,14 +137,6 @@ final class Type implements Stringable
             $type = array_is_list($value)
                 ? self::listOf($valueType)
                 : self::mapOf(self::keyTypeFromArray($value), $valueType);
-            return $type;
-        }
-        if (is_object($value)) {
-            /**
-             * @var self<U> $type We need to use an assertion here because our static analyzers aren't smart enough
-             * @phpstan-ignore-next-line False positive
-             */
-            $type = self::object($value::class);
             return $type;
         }
         /**

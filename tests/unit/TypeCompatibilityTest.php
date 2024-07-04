@@ -12,12 +12,13 @@ use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
+use function is_string;
 use function sprintf;
 
 final class TypeCompatibilityTest extends TestCase
 {
     /**
-     * @return iterable<string, array{string, string}>
+     * @return iterable<string, array{Type<mixed> | string, Type<mixed> | string}>
      */
     public static function isSubtypeCases(): iterable
     {
@@ -58,6 +59,10 @@ final class TypeCompatibilityTest extends TestCase
             ['list<any>', 'list<any>'],
             ['list<string>', 'list<string>'],
             ['list<string>', 'list<any>'],
+
+            // Aliases
+            ['list<int>', Type::alias('IntList', Type::listOf(Type::int()))],
+            ['list<int>', Type::alias('IntList', Type::listOf(Type::any()))],
         ];
         foreach ($cases as $case) {
             yield sprintf('%s is a subtype of %s', ...$case) => $case;
@@ -128,12 +133,14 @@ final class TypeCompatibilityTest extends TestCase
     }
 
     /**
+     * @param Type<mixed> | string $subtype
+     * @param Type<mixed> | string $supertype
      * @dataProvider isSubtypeCases
      */
-    public function testIsSubtype(string $subtype, string $supertype): void
+    public function testIsSubtype(Type|string $subtype, Type|string $supertype): void
     {
-        $super = self::fromString($supertype);
-        $sub = self::fromString($subtype);
+        $super = is_string($supertype) ? self::fromString($supertype) : $supertype;
+        $sub = is_string($subtype) ? self::fromString($subtype) : $subtype;
 
         self::assertTrue($sub->isSubtypeOf($super));
     }

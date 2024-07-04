@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Test\Unit;
 
 use Eventjet\Ausdruck\Parser\TypeError;
-use Eventjet\Ausdruck\Test\Unit\Fixtures\SomeObject;
 use Eventjet\Ausdruck\Type;
 use LogicException;
 use PHPUnit\Framework\TestCase;
@@ -54,20 +53,9 @@ final class TypeTest extends TestCase
         Type::fromValue($value);
     }
 
-    public function testFromValueWithObjectEqualsFromObject(): void
-    {
-        $fromValue = Type::fromValue(new SomeObject());
-        $object = Type::object(SomeObject::class);
-
-        /** @psalm-suppress RedundantCondition */
-        self::assertTrue($fromValue->equals($object));
-        /** @psalm-suppress RedundantCondition */
-        self::assertTrue($object->equals($fromValue));
-    }
-
     public function testAliasTypeEqualsAliasTarget(): void
     {
-        $concrete = Type::object(SomeObject::class);
+        $concrete = Type::listOf(Type::bool());
         $alias = Type::alias('Foo', $concrete);
 
         /** @psalm-suppress RedundantCondition */
@@ -78,7 +66,7 @@ final class TypeTest extends TestCase
 
     public function testDifferentAliasesForTheSameTypeAreEqual(): void
     {
-        $concrete = Type::object(SomeObject::class);
+        $concrete = Type::listOf(Type::float());
         $foo = Type::alias('Foo', $concrete);
         $bar = Type::alias('Bar', $concrete);
 
