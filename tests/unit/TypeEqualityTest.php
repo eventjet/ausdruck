@@ -19,6 +19,7 @@ final class TypeEqualityTest extends TestCase
     public static function equal(): iterable
     {
         yield ['int', 'int'];
+        yield ['{foo: string}', '{foo: string}'];
     }
 
     /**
@@ -28,6 +29,8 @@ final class TypeEqualityTest extends TestCase
     {
         yield ['fn(string) -> int', 'fn(string) -> string'];
         yield ['fn(string) -> int', 'fn(int) -> int'];
+        yield ['{foo: string}', '{foo: int}'];
+        yield ['{foo: string}', '{bar: string}'];
     }
 
     /**

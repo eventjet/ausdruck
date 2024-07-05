@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use TypeError;
+use Eventjet\Ausdruck\Parser\TypeError;
 
 use function array_is_list;
 use function array_map;
@@ -14,7 +14,9 @@ use function is_bool;
 use function is_callable;
 use function is_float;
 use function is_int;
+use function is_object;
 use function is_string;
+use function property_exists;
 use function sprintf;
 
 /**
@@ -54,6 +56,38 @@ final class Assert
             throw new TypeError(sprintf('Expected bool, got %s', get_debug_type($value)));
         }
         return $value;
+    }
+
+    /**
+     * @param array<string, Type<mixed>> $fields
+     * @return callable(mixed): object
+     */
+    public static function struct(array $fields): callable
+    {
+        return static function (mixed $value) use ($fields): object {
+            if (!is_object($value)) {
+                throw new TypeError(sprintf('Expected object, got %s', get_debug_type($value)));
+            }
+            foreach ($fields as $name => $type) {
+                if (!property_exists($value, $name)) {
+                    throw new TypeError(sprintf('Missing property "%s"', $name));
+                }
+                try {
+                    // @phpstan-ignore-next-line Dynamic property access is ok here
+                    $value->$name = $type->assert($value->$name);
+                } catch (TypeError $error) {
+                    throw new TypeError(sprintf(
+                        'Property "%s" must be of type %s, got %s: %s',
+                        $name,
+                        $type,
+                        // @phpstan-ignore-next-line Dynamic property access is ok here
+                        get_debug_type($value->$name),
+                        $error->getMessage(),
+                    ));
+                }
+            }
+            return $value;
+        };
     }
 
     public static function mixed(mixed $value): mixed
@@ -140,7 +174,7 @@ final class Assert
          */
         $assert = static function (mixed $value) use ($returnType): callable {
             if (!is_callable($value)) {
-                throw new Parser\TypeError('Expected callable, got ' . get_debug_type($value));
+                throw new TypeError('Expected callable, got ' . get_debug_type($value));
             }
             /**
              * @param mixed ...$params

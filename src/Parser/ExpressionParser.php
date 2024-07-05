@@ -108,6 +108,23 @@ final class ExpressionParser
             }
             return self::call($left, $tokens, $declarations);
         }
+        if ($token === Token::Arrow) {
+            if ($left === null) {
+                self::unexpectedToken($parsedToken);
+            }
+            self::assertExpressionType(
+                $left,
+                Type::struct([]),
+                sprintf('The left side of -> must be a struct, got %s', $left->getType()),
+            );
+            $tokens->next();
+            $fieldName = self::expectIdentifier($tokens, $parsedToken);
+            /**
+             * @psalm-suppress MixedArgumentTypeCoercion False positive?
+             * @phpstan-ignore-next-line False positive?
+             */
+            return Expr::structField($left, $fieldName[0], $fieldName[1]);
+        }
         if (is_string($token)) {
             if ($left !== null) {
                 throw SyntaxError::create(
@@ -391,7 +408,7 @@ final class ExpressionParser
     private static function assertExpressionType(Expression $expr, Type $type, string $errorMessage): Expression
     {
         /** @psalm-suppress RedundantCondition False positive. This check is _not_ redundant. */
-        if ($expr->matchesType($type)) {
+        if ($expr->isSubtypeOf($type)) {
             return $expr;
         }
         /**

@@ -6,7 +6,6 @@ namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\TypeHint;
-use TypeError;
 
 use function get_debug_type;
 use function sprintf;
@@ -53,7 +52,7 @@ final class Get extends Expression
         }
         try {
             return $this->typeHint->type->assert($value);
-        } catch (TypeError $e) {
+        } catch (Parser\TypeError $e) {
             /** @psalm-suppress ImplicitToStringCast */
             throw new EvaluationError(
                 sprintf(

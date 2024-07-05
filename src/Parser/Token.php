@@ -26,6 +26,8 @@ enum Token: string
     case Colon = ':';
     case Minus = '-';
     case Arrow = '->';
+    case OpenBrace = '{';
+    case CloseBrace = '}';
 
     /**
      * @param Token | string | Literal<string | int | float> $token

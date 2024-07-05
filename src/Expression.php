@@ -89,7 +89,10 @@ abstract class Expression implements Stringable
     }
 
     /**
-     * @param Type<mixed> $type
+     * @template U
+     * @param Type<U> $type
+     * @psalm-assert-if-true self<U> $this
+     * @phpstan-assert-if-true self<U> $this
      */
     public function isSubtypeOf(Type $type): bool
     {

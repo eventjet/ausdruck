@@ -31,6 +31,22 @@ final class TypeTest extends TestCase
             'not a function',
             'Expected callable, got string',
         ];
+        yield 'Struct is an int' => [Type::struct(['foo' => Type::string()]), 42, 'Expected object, got int'];
+        yield 'Struct is an array' => [
+            Type::struct(['foo' => Type::string()]),
+            ['foo' => 'bar'],
+            'Expected object, got array',
+        ];
+        yield 'Struct is missing a field' => [
+            Type::struct(['foo' => Type::string()]),
+            (object)[],
+            'Missing property "foo"',
+        ];
+        yield 'Struct: wrong field type' => [
+            Type::struct(['foo' => Type::string()]),
+            (object)['foo' => 42],
+            'Property "foo" must be of type string, got int',
+        ];
     }
 
     /**

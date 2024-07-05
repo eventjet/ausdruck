@@ -16,7 +16,7 @@ use function sprintf;
 final class TypeNode implements Stringable
 {
     /**
-     * @param list<self> $args
+     * @param list<self> | array<string, TypeNode> $args
      */
     public function __construct(
         public readonly string $name,

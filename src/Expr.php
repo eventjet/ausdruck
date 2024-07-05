@@ -135,6 +135,14 @@ final class Expr
         return new Negative($expression, $location ?? self::dummySpan());
     }
 
+    /**
+     * @param Expression<object> $struct
+     */
+    public static function structField(Expression $struct, string $fieldName, Span $location): StructField
+    {
+        return new StructField($struct, $fieldName, $location);
+    }
+
     private static function dummySpan(): Span
     {
         /** @infection-ignore-all These dummy spans are just there to fill parameter lists */

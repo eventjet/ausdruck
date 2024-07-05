@@ -7,9 +7,9 @@ namespace Eventjet\Ausdruck;
 use InvalidArgumentException;
 use LogicException;
 use Stringable;
-use TypeError;
 
 use function array_is_list;
+use function array_key_exists;
 use function array_key_first;
 use function array_shift;
 use function array_slice;
@@ -32,9 +32,15 @@ final class Type implements Stringable
      * @param callable(mixed): T $validate
      * @param list<Type<mixed>> $args
      * @param self<T> | null $aliasFor
+     * @param array<string, self<mixed>> $fields
      */
-    private function __construct(public readonly string $name, callable $validate, public readonly array $args = [], public readonly self|null $aliasFor = null)
-    {
+    private function __construct(
+        public readonly string $name,
+        callable $validate,
+        public readonly array $args = [],
+        public readonly self|null $aliasFor = null,
+        public readonly array $fields = [],
+    ) {
         $this->assert = $validate;
     }
 
@@ -92,6 +98,15 @@ final class Type implements Stringable
     {
         /** @psalm-suppress ImplicitToStringCast */
         return new self('map', Assert::mapOf($keys, $values), [$keys, $values]);
+    }
+
+    /**
+     * @param array<string, self<mixed>> $fields
+     * @return self<object>
+     */
+    public static function struct(array $fields): self
+    {
+        return new self('struct', Assert::struct($fields), [], null, $fields);
     }
 
     /**
@@ -209,7 +224,7 @@ final class Type implements Stringable
 
     /**
      * @return T
-     * @throws TypeError
+     * @throws Parser\TypeError
      */
     public function assert(mixed $value): mixed
     {
@@ -226,7 +241,7 @@ final class Type implements Stringable
         if (($this->aliasFor ?? $this)->name !== ($type->aliasFor ?? $type)->name) {
             return false;
         }
-        if (!in_array($this->name, ['Func', 'list'], true)) {
+        if (!in_array($this->name, ['Func', 'list', 'struct'], true)) {
             return true;
         }
         foreach ($this->args as $i => $arg) {
@@ -235,6 +250,19 @@ final class Type implements Stringable
              *     but I don't know how to fix it.
              */
             if ($arg->equals($type->args[$i])) {
+                continue;
+            }
+            return false;
+        }
+        foreach ($this->fields as $name => $field) {
+            if (!array_key_exists($name, $type->fields)) {
+                return false;
+            }
+            /**
+             * @psalm-suppress RedundantCondition I think it's complaining about Type<mixed> being equal to Type<mixed>,
+             *     but I don't know how to fix it.
+             */
+            if ($field->equals($type->fields[$name])) {
                 continue;
             }
             return false;
@@ -284,6 +312,16 @@ final class Type implements Stringable
                     return false;
                 }
                 if (!$otherParam->isSubtypeOf($param)) {
+                    return false;
+                }
+            }
+        }
+        if ($self->name === 'struct') {
+            foreach ($other->fields as $name => $field) {
+                if (!array_key_exists($name, $self->fields)) {
+                    return false;
+                }
+                if (!$self->fields[$name]->isSubtypeOf($field)) {
                     return false;
                 }
             }

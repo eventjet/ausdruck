@@ -63,6 +63,11 @@ final class TypeCompatibilityTest extends TestCase
             // Aliases
             ['list<int>', Type::alias('IntList', Type::listOf(Type::int()))],
             ['list<int>', Type::alias('IntList', Type::listOf(Type::any()))],
+
+            // Struct
+            ['{foo: string}', '{foo: string}'],
+            ['{foo: string}', '{foo: any}'],
+            ['{foo: string, bar: int}', '{foo: string}'],
         ];
         foreach ($cases as $case) {
             yield sprintf('%s is a subtype of %s', ...$case) => $case;
@@ -106,6 +111,11 @@ final class TypeCompatibilityTest extends TestCase
             // Lists
             ['list<string>', 'list<int>'],
             ['list<any>', 'list<string>'],
+
+            // Structs
+            ['{foo: string}', '{bar: string}'],
+            ['{foo: string}', '{foo: int}'],
+            ['{foo: string}', '{foo: string, bar: int}'],
         ];
         foreach ($cases as $case) {
             yield sprintf('%s is not a subtype of %s', ...$case) => $case;

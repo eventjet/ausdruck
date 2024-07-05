@@ -157,6 +157,18 @@ final class ExpressionTest extends TestCase
             ['foo:bool && bar:bool', new Scope(['foo' => true, 'bar' => false]), false],
             ['foo:bool && bar:bool', new Scope(['foo' => false, 'bar' => true]), false],
             ['foo:bool && bar:bool', new Scope(['foo' => false, 'bar' => false]), false],
+            [
+                'person->name',
+                new Scope(['person' => (object)['name' => 'Tom']]),
+                'Tom',
+                new Declarations(variables: ['person' => Type::struct(['name' => Type::string()])]),
+            ],
+            [
+                'people.map:list<string>(|person| person:{name: string}->name)',
+                new Scope(['people' => [(object)['name' => 'Tom'], (object)['name' => 'John']]]),
+                ['Tom', 'John'],
+                new Declarations(variables: ['people' => Type::listOf(Type::struct(['name' => Type::string()]))]),
+            ],
         ];
         /**
          * @psalm-suppress PossiblyUndefinedArrayOffset The runtime behavior is well-defined: `$declarations` is just null
