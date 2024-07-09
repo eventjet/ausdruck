@@ -191,6 +191,12 @@ final class ExpressionTest extends TestCase
             ['foo:bool && bar:bool', new Scope(['foo' => true, 'bar' => false]), false],
             ['foo:bool && bar:bool', new Scope(['foo' => false, 'bar' => true]), false],
             ['foo:bool && bar:bool', new Scope(['foo' => false, 'bar' => false]), false],
+            ['ints1:list<int>.head:Option<int>().unwrap:int()', new Scope(['ints1' => [42, 69, 23]]), 42],
+            ['ints2:list<int>.head:Option<int>().unwrap:int()', new Scope(['ints2' => [42]]), 42],
+            ['ints:list<int>.head:Option<int>().isSome()', new Scope(['ints' => []]), false],
+            ['ints1:list<int>.tail:list<int>()', new Scope(['ints1' => [42, 69, 23]]), [69, 23]],
+            ['ints2:list<int>.tail:list<int>()', new Scope(['ints2' => [42]]), []],
+            ['ints3:list<int>.tail:list<int>()', new Scope(['ints3' => []]), []],
         ];
         /**
          * @psalm-suppress PossiblyUndefinedArrayOffset The runtime behavior is well-defined: `$declarations` is just null
