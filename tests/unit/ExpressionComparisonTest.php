@@ -95,15 +95,15 @@ final class ExpressionComparisonTest extends TestCase
             Expr::get('a', Type::string()),
             Expr::literal('a'),
         ];
-        yield Lambda::class .': different number of parameters' => [
+        yield Lambda::class . ': different number of parameters' => [
             Expr::lambda(Expr::literal(true), ['foo']),
             Expr::lambda(Expr::literal(true), ['foo', 'bar']),
         ];
-        yield Lambda::class .': different parameter' => [
+        yield Lambda::class . ': different parameter' => [
             Expr::lambda(Expr::literal(true), ['a', 'b', 'c']),
             Expr::lambda(Expr::literal(true), ['a', 'x', 'c']),
         ];
-        yield Lambda::class .': different body' => [
+        yield Lambda::class . ': different body' => [
             Expr::lambda(Expr::literal(true), ['a', 'b', 'c']),
             Expr::lambda(Expr::literal(false), ['a', 'b', 'c']),
         ];

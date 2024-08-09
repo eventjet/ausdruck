@@ -56,22 +56,6 @@ final class Assert
         return $value;
     }
 
-    /**
-     * @template T of object
-     * @param class-string<T> $class
-     * @return callable(mixed): T
-     */
-    public static function class(string $class): callable
-    {
-        /**
-         * @return T
-         */
-        $assert = static fn(mixed $value): object => $value instanceof $class
-            ? $value
-            : throw new TypeError(sprintf('Expected %s, got %s', $class, get_debug_type($value)));
-        return $assert;
-    }
-
     public static function mixed(mixed $value): mixed
     {
         return $value;

@@ -10,19 +10,17 @@ composer require eventjet/ausdruck
 
 ```php
 use Eventjet\Ausdruck\Parser\ExpressionParser;
-use Eventjet\Ausdruck\Parser\Types;
-
-class Person { public function __construct(public string $name) {} }
+use Eventjet\Ausdruck\Parser\Types;use Eventjet\Ausdruck\Type;
 
 $expression = ExpressionParser::parse(
     'joe:MyPersonType.name:string()',
-    new Types(['MyPersonType' => Person::class]),
+    new Types(['MyPersonType' => Type::listOf(Type::string())]),
 );
 $scope = new Scope(
     // Passing values to the expression
-    ['joe' => new Person('Joe')],
+    ['joe' => ['joe']],
     // Custom function definitions
-    ['name' => static fn (Person $person): string => $person->name],
+    ['name' => static fn (array $person): string => $person[0]],
 );
 $name = $expression->evaluate($scope);
 assert($name === 'Joe');
@@ -88,7 +86,7 @@ The following types are supported:
   use Eventjet\Ausdruck\Parser\ExpressionParser;
   use Eventjet\Ausdruck\Type;
   
-  ExpressionParser::parse('foo:MyType', ['MyType' => Type::object(Foo::class)]);
+  ExpressionParser::parse('foo:MyType', ['MyType' => Type::alias(Type::listOf(Type::string()))]);
   ```
 
 ### Functions
