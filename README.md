@@ -10,7 +10,8 @@ composer require eventjet/ausdruck
 
 ```php
 use Eventjet\Ausdruck\Parser\ExpressionParser;
-use Eventjet\Ausdruck\Parser\Types;use Eventjet\Ausdruck\Type;
+use Eventjet\Ausdruck\Parser\Types;
+use Eventjet\Ausdruck\Type;
 
 $expression = ExpressionParser::parse(
     'joe:MyPersonType.name:string()',
