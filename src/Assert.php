@@ -14,7 +14,9 @@ use function is_bool;
 use function is_callable;
 use function is_float;
 use function is_int;
+use function is_object;
 use function is_string;
+use function property_exists;
 use function sprintf;
 
 /**
@@ -150,6 +152,36 @@ final class Assert
                 return $returnType->assert($value(...$params));
             };
             return $fn;
+        };
+        return $assert;
+    }
+
+    /**
+     * @param array<string, Type<mixed>> $fields
+     * @return callable(mixed): object
+     */
+    public static function struct(array $fields): callable
+    {
+        $assert = static function (mixed $value) use ($fields): object {
+            if (!is_object($value)) {
+                throw new Parser\TypeError('Expected object, got ' . get_debug_type($value));
+            }
+            foreach ($fields as $name => $type) {
+                if (!property_exists($value, $name)) {
+                    throw new Parser\TypeError(
+                        sprintf('Expected object with property %s, got %s', $name, get_debug_type($value)),
+                    );
+                }
+                try {
+                    /** @phpstan-ignore-next-line property.dynamicName */
+                    $type->assert($value->{$name});
+                } catch (TypeError $e) {
+                    throw new Parser\TypeError(
+                        sprintf('Property %s is invalid: %s', $name, $e->getMessage()),
+                    );
+                }
+            }
+            return $value;
         };
         return $assert;
     }

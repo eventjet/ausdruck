@@ -31,6 +31,89 @@ final class TypeTest extends TestCase
             'not a function',
             'Expected callable, got string',
         ];
+        yield 'Struct: not an object' => [
+            Type::struct(['name' => Type::string()]),
+            'not an object',
+            'Expected object, got string',
+        ];
+        yield 'Missing struct field' => [
+            Type::struct(['name' => Type::string(), 'age' => Type::int()]),
+            new class {
+                public string $name = 'John Doe';
+            },
+            'Expected object with property age',
+        ];
+        yield 'Struct field has wrong type' => [
+            Type::struct(['name' => Type::string()]),
+            new class {
+                public int $name = 42;
+            },
+            'Expected string, got int',
+        ];
+    }
+
+    /**
+     * @return iterable<string, array{Type<mixed>, mixed}>
+     */
+    public static function successfulAssertCases(): iterable
+    {
+        yield 'Struct' => [
+            Type::struct(['name' => Type::string()]),
+            new class {
+                public string $name = 'John Doe';
+            },
+        ];
+        yield 'Struct is allowed to have additional fields' => [
+            Type::struct(['name' => Type::string()]),
+            new class {
+                public string $name = 'John Doe';
+                public int $age = 42;
+            },
+        ];
+    }
+
+    /**
+     * @return iterable<string, array{mixed, Type<mixed>}>
+     */
+    public static function fromValuesCases(): iterable
+    {
+        yield 'struct' => [
+            new class {
+                public string $name = 'John Doe';
+                public int $age = 42;
+            },
+            Type::struct(['name' => Type::string(), 'age' => Type::int()]),
+        ];
+    }
+
+    /**
+     * @return iterable<string, array{Type<mixed>, Type<mixed>}>
+     */
+    public static function notEqualsCases(): iterable
+    {
+        yield 'Struct: one has more fields' => [
+            Type::struct(['name' => Type::string()]),
+            Type::struct(['name' => Type::string(), 'age' => Type::int()]),
+        ];
+        yield 'Struct: one has different field type' => [
+            Type::struct(['name' => Type::string()]),
+            Type::struct(['name' => Type::int()]),
+        ];
+        yield 'Struct: one has different field name' => [
+            Type::struct(['name' => Type::string()]),
+            Type::struct(['firstName' => Type::string()]),
+        ];
+    }
+
+    /**
+     * @return iterable<string, array{Type<mixed>, string}>
+     */
+    public static function toStringCases(): iterable
+    {
+        yield 'Struct' => [
+            Type::struct(['name' => Type::string(), 'age' => Type::int()]),
+            '{name: string, age: int}',
+        ];
     }
 
     /**
@@ -86,5 +169,56 @@ final class TypeTest extends TestCase
         $this->expectExceptionMessage($expectedMessage);
 
         $type->assert($value);
+    }
+
+    /**
+     * @param Type<mixed> $type
+     * @dataProvider successfulAssertCases
+     */
+    public function testSuccessfulAssert(Type $type, mixed $value): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $type->assert($value);
+    }
+
+    /**
+     * @param Type<mixed> $expected
+     * @dataProvider fromValuesCases
+     */
+    public function testFromValue(mixed $value, Type $expected): void
+    {
+        $actual = Type::fromValue($value);
+
+        /** @psalm-suppress RedundantCondition */
+        self::assertTrue($actual->equals($expected));
+    }
+
+    /**
+     * @param Type<mixed> $a
+     * @param Type<mixed> $b
+     * @dataProvider notEqualsCases
+     */
+    public function testNotEquals(Type $a, Type $b): void
+    {
+        /**
+         * @psalm-suppress RedundantCondition
+         * @phpstan-ignore-next-line staticMethod.impossibleType
+         */
+        self::assertFalse($a->equals($b));
+        /**
+         * @psalm-suppress RedundantCondition
+         * @phpstan-ignore-next-line staticMethod.impossibleType
+         */
+        self::assertFalse($b->equals($a));
+    }
+
+    /**
+     * @param Type<mixed> $type
+     * @dataProvider toStringCases
+     */
+    public function testToString(Type $type, string $expected): void
+    {
+        self::assertSame($expected, (string)$type);
     }
 }
