@@ -29,7 +29,7 @@ final class ExpressionTest extends TestCase
 {
     /**
      * @return iterable<string, array{
-     *     string | Expression<mixed> | callable(): Expression<mixed>,
+     *     string | Expression | callable(): Expression,
      *     Scope,
      *     Declarations | null,
      *     mixed,
@@ -158,7 +158,7 @@ final class ExpressionTest extends TestCase
             ['foo:string.substr(0, 3)', new Scope(['foo' => 'test']), 'tes'],
             [
                 'foo.customHash("test")',
-                new Scope(['foo' => 'mystr'], ['customHash' => static fn(string $text, string $salt): string => md5($text.$salt)]),
+                new Scope(['foo' => 'mystr'], ['customHash' => static fn(string $text, string $salt): string => md5($text . $salt)]),
                 md5('mystrtest'),
                 new Declarations(
                     variables: ['foo' => Type::string()],
@@ -212,7 +212,7 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{0: Expression<mixed> | string, 1: string, 2?: Declarations}>
+     * @return iterable<string, array{0: Expression | string, 1: string, 2?: Declarations}>
      */
     public static function toStringCases(): iterable
     {
@@ -233,7 +233,7 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{0: Expression<mixed> | array{0: string, 1?: Declarations}, 1: Scope, 2?: string}>
+     * @return iterable<string, array{0: Expression | array{0: string, 1?: Declarations}, 1: Scope, 2?: string}>
      */
     public static function evaluationErrorsCases(): iterable
     {
@@ -302,7 +302,7 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{Expression<mixed> | string, Type<mixed>}>
+     * @return iterable<string, array{Expression | string, Type}>
      */
     public static function typeCases(): iterable
     {
@@ -374,7 +374,7 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> | string | callable(): Expression<mixed> $expression
+     * @param Expression | string | callable(): Expression $expression
      * @dataProvider evaluateCases
      */
     public function testEvaluate(Expression|string|callable $expression, Scope $scope, Declarations|null $declarations, mixed $expected): void
@@ -389,7 +389,6 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> | string $expr
      * @dataProvider toStringCases
      */
     public function testToString(Expression|string $expr, string $expected, Declarations|null $declarations = null): void
@@ -402,7 +401,7 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> | array{0: string, 1?: Declarations} $expression
+     * @param Expression | array{0: string, 1?: Declarations} $expression
      * @dataProvider evaluationErrorsCases
      */
     public function testEvaluationErrors(Expression|array $expression, Scope $scope, string|null $message = null): void
@@ -420,8 +419,6 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> | string $expression
-     * @param Type<mixed> $expected
      * @dataProvider typeCases
      */
     public function testType(Expression|string $expression, Type $expected): void

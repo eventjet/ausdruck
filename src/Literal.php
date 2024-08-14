@@ -17,8 +17,6 @@ use function is_string;
 use function sprintf;
 
 /**
- * @template T of string | int | float | bool | null | array<array-key, mixed>
- * @extends Expression<T>
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
@@ -26,9 +24,6 @@ final class Literal extends Expression
 {
     use LocationTrait;
 
-    /**
-     * @param T $value
-     */
     public function __construct(private readonly mixed $value, Span $location)
     {
         $this->location = $location;
@@ -67,9 +62,6 @@ final class Literal extends Expression
         return self::dumpValue($this->value);
     }
 
-    /**
-     * @return T
-     */
     public function evaluate(Scope $scope): mixed
     {
         return $this->value;
@@ -81,9 +73,6 @@ final class Literal extends Expression
             && $this->value === $other->value;
     }
 
-    /**
-     * @return Type<T>
-     */
     public function getType(): Type
     {
         return Type::fromValue($this->value);

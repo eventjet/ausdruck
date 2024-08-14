@@ -79,14 +79,12 @@ final class Assert
 
     /**
      * @psalm-suppress InvalidReturnType False positive
-     * @template U
-     * @param Type<U> $type
-     * @return callable(mixed): list<U>
+     * @return callable(mixed): list<mixed>
      */
     public static function listOf(Type $type): callable
     {
         /**
-         * @return list<U>
+         * @return list<mixed>
          */
         $assert = static function (mixed $value) use ($type): array {
             if (!is_array($value)) {
@@ -102,16 +100,12 @@ final class Assert
     }
 
     /**
-     * @template K of array-key
-     * @template V
-     * @param Type<K> $keys
-     * @param Type<V> $values
-     * @return callable(mixed): array<K, V>
+     * @return callable(mixed): array<array-key, mixed>
      */
     public static function mapOf(Type $keys, Type $values): callable
     {
         /**
-         * @return array<K, V>
+         * @return array<array-key, mixed>
          */
         $assert = static function (mixed $value) use ($keys, $values): array {
             if (!is_array($value)) {
@@ -131,28 +125,24 @@ final class Assert
     }
 
     /**
-     * @template U
-     * @param Type<U> $some
-     * @return callable(mixed): (U | null)
+     * @return callable(mixed): mixed
      */
     public static function option(Type $some): callable
     {
         /**
-         * @return U | null
+         * @return mixed
          */
         $assert = static fn(mixed $value): mixed => $value === null ? null : $some->assert($value);
         return $assert;
     }
 
     /**
-     * @template U
-     * @param Type<U> $returnType
-     * @return callable(mixed): (callable(mixed...): U)
+     * @return callable(mixed): (callable(mixed...): mixed)
      */
     public static function func(Type $returnType): callable
     {
         /**
-         * @return callable(): U
+         * @return callable(): mixed
          */
         $assert = static function (mixed $value) use ($returnType): callable {
             if (!is_callable($value)) {
@@ -160,7 +150,7 @@ final class Assert
             }
             /**
              * @param mixed ...$params
-             * @return U
+             * @return mixed
              */
             $fn = static function (mixed ...$params) use ($returnType, $value): mixed {
                 return $returnType->assert($value(...$params));

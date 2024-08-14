@@ -9,16 +9,11 @@ use Eventjet\Ausdruck\Parser\Span;
 use function sprintf;
 
 /**
- * @extends Expression<bool>
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
 final class And_ extends Expression
 {
-    /**
-     * @param Expression<bool> $left
-     * @param Expression<bool> $right
-     */
     public function __construct(public readonly Expression $left, public readonly Expression $right)
     {
     }

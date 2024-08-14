@@ -30,9 +30,6 @@ final class TypeEqualityTest extends TestCase
         yield ['fn(string) -> int', 'fn(int) -> int'];
     }
 
-    /**
-     * @return Type<mixed>
-     */
     private static function fromString(string $str, Types|null $types = null): Type
     {
         /**

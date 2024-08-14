@@ -9,17 +9,11 @@ use Eventjet\Ausdruck\Parser\Span;
 use function sprintf;
 
 /**
- * @template T of int | float
- * @extends Expression<T>
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
 final class Subtract extends Expression
 {
-    /**
-     * @param Expression<T> $minuend
-     * @param Expression<T> $subtrahend
-     */
     public function __construct(public readonly Expression $minuend, public readonly Expression $subtrahend)
     {
     }

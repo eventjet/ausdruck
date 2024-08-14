@@ -11,8 +11,6 @@ use function implode;
 use function sprintf;
 
 /**
- * @template T
- * @extends Expression<callable(Scope): T>
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
@@ -21,7 +19,6 @@ final class Lambda extends Expression
     use LocationTrait;
 
     /**
-     * @param Expression<T> $body
      * @param list<string> $parameters
      */
     public function __construct(public readonly Expression $body, public readonly array $parameters, Span $location)
@@ -36,7 +33,7 @@ final class Lambda extends Expression
     }
 
     /**
-     * @return callable(Scope): T
+     * @return callable(Scope): mixed
      */
     public function evaluate(Scope $scope): callable
     {
@@ -57,9 +54,6 @@ final class Lambda extends Expression
             && $this->body->equals($other->body);
     }
 
-    /**
-     * @return Type<callable(mixed...): T>
-     */
     public function getType(): Type
     {
         return Type::func($this->body->getType(), array_map(static fn(string $_name) => Type::any(), $this->parameters));

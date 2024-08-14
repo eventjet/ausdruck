@@ -23,7 +23,7 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{Type<mixed>, mixed, string}>
+     * @return iterable<string, array{Type, mixed, string}>
      */
     public static function failingAssertCases(): iterable
     {
@@ -89,7 +89,6 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * @param Type<mixed> $type
      * @dataProvider failingAssertCases
      */
     public function testFailingAssert(Type $type, mixed $value, string $expectedMessage): void

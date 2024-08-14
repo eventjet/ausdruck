@@ -9,17 +9,11 @@ use Eventjet\Ausdruck\Parser\Span;
 use function sprintf;
 
 /**
- * @template T of int | float
- * @extends Expression<bool>
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
 final class Gt extends Expression
 {
-    /**
-     * @param Expression<T> $left
-     * @param Expression<T> $right
-     */
     public function __construct(private readonly Expression $left, private readonly Expression $right)
     {
     }

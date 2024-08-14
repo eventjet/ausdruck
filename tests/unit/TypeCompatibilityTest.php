@@ -107,9 +107,6 @@ final class TypeCompatibilityTest extends TestCase
         }
     }
 
-    /**
-     * @return Type<mixed>
-     */
     private static function fromString(string $str, Types|null $types = null): Type
     {
         /**

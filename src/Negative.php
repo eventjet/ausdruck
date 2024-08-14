@@ -8,17 +8,10 @@ use Eventjet\Ausdruck\Parser\Span;
 
 use function sprintf;
 
-/**
- * @template T of int | float
- * @extends Expression<T>
- */
 final class Negative extends Expression
 {
     use LocationTrait;
 
-    /**
-     * @param Expression<T> $expression
-     */
     public function __construct(public readonly Expression $expression, Span $location)
     {
         $this->location = $location;

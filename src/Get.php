@@ -12,8 +12,6 @@ use function get_debug_type;
 use function sprintf;
 
 /**
- * @template T
- * @extends Expression<T>
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
@@ -21,12 +19,8 @@ final class Get extends Expression
 {
     use LocationTrait;
 
-    /** @var TypeHint<T> */
     private readonly TypeHint $typeHint;
 
-    /**
-     * @param Type<T> | TypeHint<T> $type
-     */
     public function __construct(public readonly string $name, Type|TypeHint $type, Span $location)
     {
         $this->location = $location;
@@ -41,9 +35,6 @@ final class Get extends Expression
         return sprintf('%s%s', $this->name, $this->typeHint);
     }
 
-    /**
-     * @return T
-     */
     public function evaluate(Scope $scope): mixed
     {
         /** @psalm-suppress MixedAssignment */
