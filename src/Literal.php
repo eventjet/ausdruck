@@ -24,6 +24,10 @@ final class Literal extends Expression
 {
     use LocationTrait;
 
+    /**
+     * @param string | int | float | bool | null | array<array-key, mixed> $value
+     * @param Span $location
+     */
     public function __construct(private readonly mixed $value, Span $location)
     {
         $this->location = $location;

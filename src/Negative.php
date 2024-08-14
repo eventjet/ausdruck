@@ -6,6 +6,7 @@ namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
 
+use function is_int;
 use function sprintf;
 
 final class Negative extends Expression
@@ -27,8 +28,11 @@ final class Negative extends Expression
      */
     public function evaluate(Scope $scope): float|int
     {
-        /** @psalm-suppress InvalidReturnStatement False positive */
-        return -$this->expression->evaluate($scope);
+        $value = $this->expression->evaluate($scope);
+        if (!is_int($value) && !is_float($value)) {
+            throw new EvaluationError('Expected operand to be of type int or float');
+        }
+        return -$value;
     }
 
     public function equals(Expression $other): bool

@@ -102,18 +102,12 @@ final class Type implements Stringable
     public static function fromValue(mixed $value): self
     {
         if (is_array($value)) {
-            $valueType = self::valueTypeFromArray($value);
-            $type = array_is_list($value)
-                ? self::listOf($valueType)
-                : self::mapOf(self::keyTypeFromArray($value), $valueType);
-            return $type;
+            [$keyType, $valueType] = self::keyAndValueTypeFromArray($value);
+            return array_is_list($value) ? self::listOf($valueType) : self::mapOf($keyType, $valueType);
         }
         if (is_object($value)) {
             return self::object($value::class);
         }
-        /**
-         * @psalm-suppress InvalidReturnStatement False positive
-         */
         return match (gettype($value)) {
             'string' => self::string(),
             'integer' => self::int(),
@@ -134,23 +128,16 @@ final class Type implements Stringable
     }
 
     /**
-     * @param non-empty-array<array-key, mixed> $value
-     */
-    private static function keyTypeFromArray(array $value): self
-    {
-        return self::fromValue(array_key_first($value));
-    }
-
-    /**
      * @param array<array-key, mixed> $value
-     * @psalm-assert non-empty-array<array-key, mixed> $value
+     * @return array{Type, Type}
      */
-    private static function valueTypeFromArray(array $value): self
+    private static function keyAndValueTypeFromArray(array $value): array
     {
         if ($value === []) {
             throw new LogicException('Can\'t infer key and value types from empty array');
         }
-        return self::fromValue($value[array_key_first($value)]);
+        $firstKey = array_key_first($value);
+        return [self::fromValue($firstKey), self::fromValue($value[$firstKey])];
     }
 
     public function __toString(): string
@@ -173,11 +160,6 @@ final class Type implements Stringable
             : throw new TypeError(sprintf('Expected %s, got %s', $this, get_debug_type($value)));
     }
 
-    /**
-     * @template O of Type
-     * @param O $type
-     * @psalm-assert-if-true O $this
-     */
     public function equals(self $type): bool
     {
         if (($this->aliasFor ?? $this)->name !== ($type->aliasFor ?? $type)->name) {

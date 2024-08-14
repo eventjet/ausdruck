@@ -69,9 +69,7 @@ final class TypeEqualityTest extends TestCase
         $typeA = self::fromString($a);
         $typeB = self::fromString($b);
 
-        /** @phpstan-ignore-next-line */
         self::assertFalse($typeA->equals($typeB));
-        /** @phpstan-ignore-next-line */
         self::assertFalse($typeB->equals($typeA));
     }
 }
