@@ -197,6 +197,7 @@ final class ExpressionTest extends TestCase
             ['ints1:list<int>.tail:list<int>()', new Scope(['ints1' => [42, 69, 23]]), [69, 23]],
             ['ints2:list<int>.tail:list<int>()', new Scope(['ints2' => [42]]), []],
             ['ints3:list<int>.tail:list<int>()', new Scope(['ints3' => []]), []],
+            ['foo:float - bar:float', new Scope(['foo' => 5.5, 'bar' => 3.4]), 2.1],
         ];
         /**
          * @psalm-suppress PossiblyUndefinedArrayOffset The runtime behavior is well-defined: `$declarations` is just null
@@ -298,6 +299,46 @@ final class ExpressionTest extends TestCase
             ['foo:string.chars()', new Declarations(functions: ['chars' => Type::func(Type::int(), [Type::string()])])],
             new Scope(['foo' => 'test'], ['chars' => static fn(string $text): string => $text]),
             'Expected int, got string',
+        ];
+        yield 'Subtracting a float from an integer' => [
+            Expr::subtract(Expr::get('myint', Type::int()), Expr::get('myfloat', Type::float())),
+            new Scope(['myint' => 42, 'myfloat' => 23.42]),
+            'Expected operands to be of the same type, got int and float',
+        ];
+        yield 'Subtracting an integer from a float' => [
+            Expr::subtract(Expr::get('myfloat', Type::float()), Expr::get('myint', Type::int())),
+            new Scope(['myint' => 42, 'myfloat' => 23.42]),
+            'Expected operands to be of the same type, got float and int',
+        ];
+        yield 'Subtracting a string from a string' => [
+            Expr::subtract(Expr::get('mystr', Type::string()), Expr::get('mystr2', Type::string())),
+            new Scope(['mystr' => 'foo', 'mystr2' => 'bar']),
+            'Expected operands to be of type int or float, got string and string',
+        ];
+        yield 'Logical or with string on the left' => [
+            Expr::get('foo', Type::string())->or_(Expr::get('bar', Type::bool())),
+            new Scope(['foo' => 'foo', 'bar' => true]),
+            'Expected boolean operands, got string and bool',
+        ];
+        yield 'Logical or with string on the right' => [
+            Expr::get('foo', Type::bool())->or_(Expr::get('bar', Type::string())),
+            new Scope(['foo' => true, 'bar' => 'bar']),
+            'Expected boolean operands, got bool and string',
+        ];
+        yield 'Logical and with string on the left' => [
+            Expr::get('foo', Type::string())->and_(Expr::get('bar', Type::bool())),
+            new Scope(['foo' => 'foo', 'bar' => true]),
+            'Expected boolean operands, got string and bool',
+        ];
+        yield 'Logical and with string on the right' => [
+            Expr::get('foo', Type::bool())->and_(Expr::get('bar', Type::string())),
+            new Scope(['foo' => true, 'bar' => 'bar']),
+            'Expected boolean operands, got bool and string',
+        ];
+        yield 'Negative bool' => [
+            Expr::negative(Expr::get('foo', Type::bool())),
+            new Scope(['foo' => true]),
+            'Expected operand to be of type int or float',
         ];
     }
 

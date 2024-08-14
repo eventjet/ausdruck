@@ -52,6 +52,7 @@ final class Types
             'list' => $this->resolveList($node),
             'Option' => $this->resolveOption($this->exactlyOneTypeArg($node)),
             'Some' => $this->resolveSome($this->exactlyOneTypeArg($node)),
+            'None' => self::noArgs(Type::none(), $node),
             default => $this->resolveAlias($node->name) ?? TypeError::create(
                 sprintf('Unknown type %s', $node->name),
                 $node->location,

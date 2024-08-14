@@ -30,11 +30,6 @@ final class Type implements Stringable
     {
     }
 
-    public static function never(): self
-    {
-        return new self('never');
-    }
-
     public static function string(): self
     {
         return new self('string');
@@ -127,9 +122,14 @@ final class Type implements Stringable
         return new self('Some', [$some]);
     }
 
-    private static function none(): self
+    public static function none(): self
     {
-        return new self('none');
+        return new self('None');
+    }
+
+    private static function never(): self
+    {
+        return new self('never');
     }
 
     /**
@@ -196,8 +196,8 @@ final class Type implements Stringable
     {
         $self = $this->canonical();
         $other = $other->canonical();
-        if ($self->name === 'none') {
-            return $other->name === 'none' || $other->isOption();
+        if ($self->isNone()) {
+            return $other->isNone() || $other->isOption();
         }
         if ($other->isOption() && (!$self->isOption() && $self->name !== 'Some')) {
             return $self->isSubtypeOf($other->args[0]);
@@ -263,5 +263,10 @@ final class Type implements Stringable
     private function canonical(): self
     {
         return $this->aliasFor ?? $this;
+    }
+
+    private function isNone(): bool
+    {
+        return $this->name === 'None';
     }
 }
