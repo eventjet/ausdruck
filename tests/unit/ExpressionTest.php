@@ -267,12 +267,12 @@ final class ExpressionTest extends TestCase
         yield 'Expect list, but it\'s not an array' => [
             Expr::get('item', Type::listOf(Type::string())),
             new Scope(['item' => 'not an array']),
-            'Expected array',
+            'Expected list<string>, got string',
         ];
         yield 'Expect list, but it\'s a map' => [
             Expr::get('item', Type::listOf(Type::string())),
             new Scope(['item' => ['foo' => 'bar']]),
-            'not a list',
+            'Expected list<string>, got map<string, string>',
         ];
         yield 'Wrong item type in list' => [
             Expr::get('item', Type::listOf(Type::string())),

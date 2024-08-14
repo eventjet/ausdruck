@@ -38,8 +38,6 @@ final class Expr
 
     /**
      * @param string | int | float | bool | null | array<array-key, mixed> $value
-     * @param Span|null $location
-     * @return Literal
      */
     public static function literal(mixed $value, Span|null $location = null): Literal
     {

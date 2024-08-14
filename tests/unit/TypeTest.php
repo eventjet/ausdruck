@@ -30,18 +30,8 @@ final class TypeTest extends TestCase
         yield 'Function is not callable' => [
             Type::func(Type::string()),
             'not a function',
-            'Expected callable, got string',
+            'Expected func(): string, got string',
         ];
-    }
-
-    /**
-     * We might want to accept empty arrays in the future, but we would probably want a never type for that.
-     */
-    public function testFromValueFailsWhenGivenAnEmptyArray(): void
-    {
-        $this->expectException(LogicException::class);
-
-        Type::fromValue([]);
     }
 
     /**

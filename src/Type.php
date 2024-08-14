@@ -5,15 +5,12 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use InvalidArgumentException;
-use LogicException;
 use Stringable;
-use TypeError;
 
 use function array_is_list;
 use function array_key_first;
 use function array_shift;
 use function array_slice;
-use function get_debug_type;
 use function gettype;
 use function implode;
 use function in_array;
@@ -108,6 +105,9 @@ final class Type implements Stringable
         if (is_object($value)) {
             return self::object($value::class);
         }
+        if ($value === null) {
+            return self::none();
+        }
         return match (gettype($value)) {
             'string' => self::string(),
             'integer' => self::int(),
@@ -127,6 +127,11 @@ final class Type implements Stringable
         return new self('Some', [$some]);
     }
 
+    private static function none(): self
+    {
+        return new self('none');
+    }
+
     /**
      * @param array<array-key, mixed> $value
      * @return array{Type, Type}
@@ -134,7 +139,7 @@ final class Type implements Stringable
     private static function keyAndValueTypeFromArray(array $value): array
     {
         if ($value === []) {
-            throw new LogicException('Can\'t infer key and value types from empty array');
+            return [self::never(), self::never()];
         }
         $firstKey = array_key_first($value);
         return [self::fromValue($firstKey), self::fromValue($value[$firstKey])];
@@ -151,13 +156,14 @@ final class Type implements Stringable
     }
 
     /**
-     * @throws TypeError
+     * @throws Parser\TypeError
      */
     public function assert(mixed $value): mixed
     {
-        return self::fromValue($value)->isSubtypeOf($this)
+        $valueType = self::fromValue($value);
+        return $valueType->isSubtypeOf($this)
             ? $value
-            : throw new TypeError(sprintf('Expected %s, got %s', $this, get_debug_type($value)));
+            : throw new Parser\TypeError(sprintf('Expected %s, got %s', $this, $valueType));
     }
 
     public function equals(self $type): bool
@@ -190,6 +196,15 @@ final class Type implements Stringable
     {
         $self = $this->canonical();
         $other = $other->canonical();
+        if ($self->name === 'none') {
+            return $other->name === 'none' || $other->isOption();
+        }
+        if ($other->isOption() && (!$self->isOption() && $self->name !== 'Some')) {
+            return $self->isSubtypeOf($other->args[0]);
+        }
+        if ($self->name === 'never') {
+            return true;
+        }
         if ($other->name === 'any') {
             return true;
         }
