@@ -199,9 +199,6 @@ final class ExpressionTest extends TestCase
             ['ints3:list<int>.tail:list<int>()', new Scope(['ints3' => []]), []],
             ['foo:float - bar:float', new Scope(['foo' => 5.5, 'bar' => 3.4]), 2.1],
         ];
-        /**
-         * @psalm-suppress PossiblyUndefinedArrayOffset The runtime behavior is well-defined: `$declarations` is just null
-         */
         foreach ($cases as $tuple) {
             [$expr, $scope, $expected] = $tuple;
             $declarations = $tuple[3] ?? null;
@@ -468,10 +465,6 @@ final class ExpressionTest extends TestCase
             $expression = ExpressionParser::parse($expression);
         }
 
-        /**
-         * @psalm-suppress ImplicitToStringCast
-         * @psalm-suppress RedundantCondition I have no idea how to type this better
-         */
         self::assertTrue(
             $expression->matchesType($expected),
             sprintf('Expected %s, got %s', $expected, $expression->getType()),

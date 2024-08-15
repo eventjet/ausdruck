@@ -54,7 +54,6 @@ final class Call extends Expression
 
     public function __toString(): string
     {
-        /** @psalm-suppress ImplicitToStringCast */
         return sprintf('%s.%s:%s(%s)', $this->target, $this->name, $this->type, implode(', ', $this->arguments));
     }
 
@@ -75,7 +74,6 @@ final class Call extends Expression
 
     public function equals(Expression $other): bool
     {
-        /** @psalm-suppress RedundantConditionGivenDocblockType False positive */
         return $other instanceof self
             && $this->target->equals($other->target)
             && $this->name === $other->name

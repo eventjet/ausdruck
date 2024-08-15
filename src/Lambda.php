@@ -28,7 +28,6 @@ final class Lambda extends Expression
 
     public function __toString(): string
     {
-        /** @psalm-suppress ImplicitToStringCast */
         return sprintf('|%s| %s', implode(', ', $this->parameters), $this->body);
     }
 
@@ -40,7 +39,6 @@ final class Lambda extends Expression
         return function (mixed ...$params) use ($scope): mixed {
             $localVars = [];
             foreach ($this->parameters as $index => $parameter) {
-                /** @psalm-suppress MixedAssignment */
                 $localVars[$parameter] = $params[$index];
             }
             return $this->body->evaluate($scope->sub($localVars));

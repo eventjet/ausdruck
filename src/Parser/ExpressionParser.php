@@ -46,7 +46,6 @@ final class ExpressionParser
     public static function parseTyped(string $expression, Type $type, Declarations|Types|null $types = null): Expression
     {
         $expr = self::parse($expression, $types);
-        /** @psalm-suppress ImplicitToStringCast */
         return self::assertExpressionType($expr, $type, sprintf(
             'Expected parsed expression to be of type %s, got %s',
             $type,
@@ -115,7 +114,6 @@ final class ExpressionParser
                 self::unexpectedToken($parsedToken);
             }
             $right = self::parseExpression($tokens, $declarations);
-            /** @psalm-suppress ImplicitToStringCast */
             $right = self::assertExpressionType($right, $left->getType(), sprintf(
                 'The expressions of both sides of === must be of the same type. Left: %s, right: %s',
                 $left->getType(),
@@ -128,14 +126,12 @@ final class ExpressionParser
             if ($left === null) {
                 self::unexpectedToken($parsedToken);
             }
-            /** @psalm-suppress ImplicitToStringCast */
             $left = self::assertExpressionType($left, Type::bool(), sprintf(
                 'The expression on the left side of %s must be boolean, got %s',
                 Token::print($token),
                 $left->getType(),
             ));
             $right = self::parseExpression($tokens, $declarations);
-            /** @psalm-suppress ImplicitToStringCast */
             $right = self::assertExpressionType($right, Type::bool(), sprintf(
                 'The expression on the right side of %s must be boolean, got %s',
                 Token::print($token),
@@ -153,7 +149,6 @@ final class ExpressionParser
                 throw SyntaxError::create('Unexpected end of input', Span::char($parsedToken->line, $parsedToken->column + 1));
             }
             if (!$right->matchesType(Type::int()) && !$right->matchesType(Type::float())) {
-                /** @psalm-suppress ImplicitToStringCast */
                 throw TypeError::create(
                     $left === null
                         ? sprintf('Can\'t negate %s', $right->getType())
@@ -165,7 +160,6 @@ final class ExpressionParser
                 return Expr::negative($right, $parsedToken->location()->to($right->location()));
             }
             if (!$left->getType()->equals($right->getType())) {
-                /** @psalm-suppress ImplicitToStringCast */
                 throw TypeError::create(
                     sprintf('Can\'t subtract %s from %s', $right->getType(), $left->getType()),
                     $left->location(),
@@ -180,11 +174,9 @@ final class ExpressionParser
             $tokens->next();
             $right = self::parseExpression($tokens, $declarations);
             if (!$right->matchesType(Type::int()) && !$right->matchesType(Type::float())) {
-                /** @psalm-suppress ImplicitToStringCast */
                 throw TypeError::create(sprintf('Can\'t compare %s to %s', $right->getType(), $left->getType()), $right->location());
             }
             if (!$left->matchesType($right->getType())) {
-                /** @psalm-suppress ImplicitToStringCast */
                 throw TypeError::create(sprintf('Can\'t compare %s to %s', $left->getType(), $right->getType()), $left->location()->to($right->location()));
             }
             return $left->gt($right);
@@ -364,14 +356,9 @@ final class ExpressionParser
 
     private static function assertExpressionType(Expression $expr, Type $type, string $errorMessage): Expression
     {
-        /** @psalm-suppress RedundantCondition False positive. This check is _not_ redundant. */
         if ($expr->matchesType($type)) {
             return $expr;
         }
-        /**
-         * @psalm-suppress MixedArgument False positive
-         * @psalm-suppress MixedMethodCall False positive
-         */
         throw TypeError::create($errorMessage, $expr->location());
     }
 

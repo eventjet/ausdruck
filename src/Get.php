@@ -44,7 +44,6 @@ final class Get extends Expression
         try {
             return $this->typeHint->type->assert($value);
         } catch (Parser\TypeError $e) {
-            /** @psalm-suppress ImplicitToStringCast */
             throw new EvaluationError(
                 sprintf(
                     'Expected variable "%s" to be of type %s, got %s: %s',

@@ -49,9 +49,7 @@ final class TypeTest extends TestCase
         $fromValue = Type::fromValue(new SomeObject());
         $object = Type::object(SomeObject::class);
 
-        /** @psalm-suppress RedundantCondition */
         self::assertTrue($fromValue->equals($object));
-        /** @psalm-suppress RedundantCondition */
         self::assertTrue($object->equals($fromValue));
     }
 
@@ -60,9 +58,7 @@ final class TypeTest extends TestCase
         $concrete = Type::object(SomeObject::class);
         $alias = Type::alias('Foo', $concrete);
 
-        /** @psalm-suppress RedundantCondition */
         self::assertTrue($alias->equals($concrete));
-        /** @psalm-suppress RedundantCondition */
         self::assertTrue($concrete->equals($alias));
     }
 
@@ -72,9 +68,7 @@ final class TypeTest extends TestCase
         $foo = Type::alias('Foo', $concrete);
         $bar = Type::alias('Bar', $concrete);
 
-        /** @psalm-suppress RedundantCondition */
         self::assertTrue($foo->equals($bar));
-        /** @psalm-suppress RedundantCondition */
         self::assertTrue($bar->equals($foo));
     }
 
