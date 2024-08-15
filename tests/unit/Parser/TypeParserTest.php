@@ -6,7 +6,6 @@ namespace Eventjet\Ausdruck\Test\Unit\Parser;
 
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\SyntaxError;
-use Eventjet\Ausdruck\Parser\TypeNode;
 use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Type;
@@ -55,6 +54,38 @@ final class TypeParserTest extends TestCase
             ==
             AUSDRUCK,
             'Expected type, got ->',
+        ];
+        yield 'Open curly brace' => [
+            '{',
+            'Expected }, got end of input',
+        ];
+        yield 'Struct instead of struct field name' => [
+            '{{name: string}: string}',
+            'Expected field name, got {',
+        ];
+        yield 'Struct: end of input after field name' => [
+            '{name',
+            'Expected :, got end of input',
+        ];
+        yield 'Struct: missing colon between field name and type' => [
+            '{name string}',
+            'Expected :, got string',
+        ];
+        yield 'Struct: pipe instead of colon' => [
+            '{name | string}',
+            'Expected :, got |',
+        ];
+        yield 'End of input after struct colon' => [
+            '{name:',
+            'Expected type, got end of input',
+        ];
+        yield 'Struct: double colon' => [
+            '{name:: string}',
+            'Expected type, got :',
+        ];
+        yield 'Struct: end of input after struct type' => [
+            '{name: string',
+            'Expected }, got end of input',
         ];
     }
 
@@ -206,7 +237,9 @@ final class TypeParserTest extends TestCase
          * @psalm-suppress InternalClass
          */
         $node = TypeParser::parseString($typeString);
-        assert($node instanceof TypeNode);
+        if ($node instanceof SyntaxError) {
+            self::fail($node->getMessage());
+        }
         $actual = (new Types())->resolve($node);
 
         self::assertInstanceOf(Type::class, $actual);

@@ -15,7 +15,7 @@ enum Delimiters
     public function start(): string
     {
         return match ($this) {
-            self::CurlyBraces => '{',
+            self::CurlyBraces => '{ ',
             self::AngleBrackets => '<',
         };
     }
@@ -23,7 +23,7 @@ enum Delimiters
     public function end(): string
     {
         return match ($this) {
-            self::CurlyBraces => '}',
+            self::CurlyBraces => ' }',
             self::AngleBrackets => '>',
         };
     }

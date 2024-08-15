@@ -144,15 +144,21 @@ final class TypeParser
             if ($nameToken === null) {
                 break;
             }
+            if ($nameToken->token === Token::CloseBrace) {
+                break;
+            }
             $name = $nameToken->token;
             if (!is_string($name)) {
-                break;
+                throw SyntaxError::create(
+                    sprintf('Expected field name, got %s', Token::print($name)),
+                    $nameToken->location(),
+                );
             }
             $tokens->next();
             self::expect($tokens, Token::Colon);
             $type = self::parse($tokens);
             if ($type === null) {
-                break;
+                throw SyntaxError::create('Expected type, got end of input', $nameToken->location());
             }
             if (!$type instanceof TypeNode) {
                 throw SyntaxError::create(

@@ -70,11 +70,6 @@ final class Type implements Stringable
         return new self('map', [$keys, $values]);
     }
 
-    public static function object(string $class): self
-    {
-        return new self($class);
-    }
-
     public static function alias(string $name, self $type): self
     {
         return new self($name, $type->args, $type);

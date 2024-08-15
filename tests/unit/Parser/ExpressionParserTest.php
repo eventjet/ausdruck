@@ -170,6 +170,10 @@ final class ExpressionParserTest extends TestCase
         yield 'map with an unknown value type' => ['foo:map<string, Foo>'];
         yield 'list with no type arguments' => ['foo:list', 'The list type requires one argument, none given'];
         yield 'list with two type arguments' => ['foo:list<string, string>', 'Invalid type "list<string, string>"'];
+        yield 'list with two type arguments, second is struct' => [
+            'foo:list<string, { name: string }>',
+            'Invalid type "list<string, { name: string }>"',
+        ];
         yield 'list with an unknown type argument' => ['foo:list<Foo>'];
         yield 'function call with unknown type' => ['foo:string.substr:Foo(0, 3)'];
         yield 'negating a string literal' => ['-"foo"', 'Can\'t negate string'];
