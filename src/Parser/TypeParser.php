@@ -135,7 +135,9 @@ final class TypeParser
      */
     private static function parseStruct(Peekable $tokens, Span $location): TypeNode
     {
-        $openBrace = $tokens->peek()?->location();
+        $openBraceToken = $tokens->peek();
+        assert($openBraceToken !== null);
+        $openBrace = $openBraceToken?->location();
         assert($openBrace !== null);
         $tokens->next();
         $fields = [];
