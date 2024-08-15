@@ -197,7 +197,6 @@ final class TypeTest extends TestCase
     {
         $actual = Type::fromValue($value);
 
-        /** @psalm-suppress RedundantCondition */
         self::assertTrue($actual->equals($expected));
     }
 
