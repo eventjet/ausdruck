@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use InvalidArgumentException;
-use LogicException;
 use Stringable;
-use TypeError;
 
 use function array_is_list;
 use function array_key_first;
@@ -20,129 +18,84 @@ use function is_array;
 use function sprintf;
 
 /**
- * @template-covariant T
  * @api
  */
 final class Type implements Stringable
 {
-    /** @var callable(mixed): T */
-    private readonly mixed $assert;
-
     /**
-     * @param callable(mixed): T $validate
-     * @param list<Type<mixed>> $args
-     * @param self<T> | null $aliasFor
+     * @param list<self> $args
      */
-    private function __construct(public readonly string $name, callable $validate, public readonly array $args = [], public readonly self|null $aliasFor = null)
+    private function __construct(public readonly string $name, public readonly array $args = [], public readonly self|null $aliasFor = null)
     {
-        $this->assert = $validate;
     }
 
-    /**
-     * @return self<string>
-     */
     public static function string(): self
     {
-        return new self('string', Assert::string(...));
+        return new self('string');
     }
 
-    /**
-     * @return self<int>
-     */
     public static function int(): self
     {
-        return new self('int', Assert::int(...));
+        return new self('int');
     }
 
-    /**
-     * @return self<float>
-     */
     public static function float(): self
     {
-        return new self('float', Assert::float(...));
+        return new self('float');
     }
 
-    /**
-     * @return self<bool>
-     */
     public static function bool(): self
     {
-        return new self('bool', Assert::bool(...));
+        return new self('bool');
     }
 
-    /**
-     * @template U
-     * @param Type<U> $item
-     * @return self<list<U>>
-     */
     public static function listOf(self $item): self
     {
         /** @psalm-suppress ImplicitToStringCast */
-        return new self('list', Assert::listOf($item), [$item]);
+        return new self('list', [$item]);
     }
 
-    /**
-     * @template K of array-key
-     * @template V
-     * @param Type<K> $keys
-     * @param Type<V> $values
-     * @return self<array<K, V>>
-     */
     public static function mapOf(self $keys, self $values): self
     {
         /** @psalm-suppress ImplicitToStringCast */
-        return new self('map', Assert::mapOf($keys, $values), [$keys, $values]);
+        return new self('map', [$keys, $values]);
     }
 
-    /**
-     * @template U
-     * @param Type<U> $type
-     * @return self<U>
-     */
+    public static function object(string $class): self
+    {
+        return new self($class);
+    }
+
     public static function alias(string $name, self $type): self
     {
-        return new self($name, $type->assert, $type->args, $type);
+        return new self($name, $type->args, $type);
     }
 
-    /**
-     * @return self<mixed>
-     */
     public static function any(): self
     {
-        return new self('any', Assert::mixed(...));
+        return new self('any');
     }
 
     /**
-     * @template U
-     * @param Type<U> $return
-     * @param list<Type<mixed>> $parameters
-     * @return self<callable(mixed...): U>
+     * @param list<Type> $parameters
      */
     public static function func(self $return, array $parameters = []): self
     {
-        return new self('Func', Assert::func($return), [$return, ...$parameters]);
+        return new self('Func', [$return, ...$parameters]);
     }
 
     /**
      * @psalm-suppress InvalidReturnType False positive
-     * @template U
-     * @param U $value
-     * @return self<U>
      */
     public static function fromValue(mixed $value): self
     {
         if (is_array($value)) {
-            $valueType = self::valueTypeFromArray($value);
-            /** @var self<U> $type We need to use an assertion here because our static analyzers aren't smart enough */
-            $type = array_is_list($value)
-                ? self::listOf($valueType)
-                : self::mapOf(self::keyTypeFromArray($value), $valueType);
-            return $type;
+            [$keyType, $valueType] = self::keyAndValueTypeFromArray($value);
+            return array_is_list($value) ? self::listOf($valueType) : self::mapOf($keyType, $valueType);
         }
-        /**
-         * @psalm-suppress InvalidReturnStatement False positive
-         * @phpstan-ignore-next-line False positive
-         */
+        if ($value === null) {
+            return self::none();
+        }
         return match (gettype($value)) {
             'string' => self::string(),
             'integer' => self::int(),
@@ -152,49 +105,37 @@ final class Type implements Stringable
         };
     }
 
-    /**
-     * @template U
-     * @param Type<U> $some
-     * @return self<U | null>
-     */
     public static function option(self $some): self
     {
-        return new self('Option', Assert::option($some), [$some]);
+        return new self('Option', [$some]);
     }
 
-    /**
-     * @template U
-     * @param Type<U> $some
-     * @return self<U>
-     */
     public static function some(self $some): self
     {
-        return new self('Some', $some->assert, [$some]);
+        return new self('Some', [$some]);
     }
 
-    /**
-     * @template K of array-key
-     * @param non-empty-array<K, mixed> $value
-     * @return self<K>
-     */
-    private static function keyTypeFromArray(array $value): self
+    public static function none(): self
     {
-        return self::fromValue(array_key_first($value));
+        return new self('None');
+    }
+
+    private static function never(): self
+    {
+        return new self('never');
     }
 
     /**
-     * @template K of array-key
-     * @template V
-     * @param array<K, V> $value
-     * @return self<V>
-     * @psalm-assert non-empty-array<K, V> $value
+     * @param array<array-key, mixed> $value
+     * @return array{Type, Type}
      */
-    private static function valueTypeFromArray(array $value): self
+    private static function keyAndValueTypeFromArray(array $value): array
     {
         if ($value === []) {
-            throw new LogicException('Can\'t infer key and value types from empty array');
+            return [self::never(), self::never()];
         }
-        return self::fromValue($value[array_key_first($value)]);
+        $firstKey = array_key_first($value);
+        return [self::fromValue($firstKey), self::fromValue($value[$firstKey])];
     }
 
     public function __toString(): string
@@ -208,19 +149,16 @@ final class Type implements Stringable
     }
 
     /**
-     * @return T
-     * @throws TypeError
+     * @throws Parser\TypeError
      */
     public function assert(mixed $value): mixed
     {
-        return ($this->assert)($value);
+        $valueType = self::fromValue($value);
+        return $valueType->isSubtypeOf($this)
+            ? $value
+            : throw new Parser\TypeError(sprintf('Expected %s, got %s', $this, $valueType));
     }
 
-    /**
-     * @template O of Type
-     * @param O $type
-     * @psalm-assert-if-true O $this
-     */
     public function equals(self $type): bool
     {
         if (($this->aliasFor ?? $this)->name !== ($type->aliasFor ?? $type)->name) {
@@ -247,13 +185,19 @@ final class Type implements Stringable
         return $this->name === 'Option';
     }
 
-    /**
-     * @param Type<mixed> $other
-     */
     public function isSubtypeOf(self $other): bool
     {
         $self = $this->canonical();
         $other = $other->canonical();
+        if ($self->isNone()) {
+            return $other->isNone() || $other->isOption();
+        }
+        if ($other->isOption() && (!$self->isOption() && $self->name !== 'Some')) {
+            return $self->isSubtypeOf($other->args[0]);
+        }
+        if ($self->name === 'never') {
+            return true;
+        }
         if ($other->name === 'any') {
             return true;
         }
@@ -295,8 +239,6 @@ final class Type implements Stringable
      * Returns the return type of a function type.
      *
      * This should only be called on function types. The behavior is undefined for other types.
-     *
-     * @return self<mixed>
      */
     public function returnType(): self
     {
@@ -304,18 +246,20 @@ final class Type implements Stringable
     }
 
     /**
-     * @return list<self<mixed>>
+     * @return list<self>
      */
     private function parameterTypes(): array
     {
         return array_slice($this->args, 1);
     }
 
-    /**
-     * @return self<T>
-     */
     private function canonical(): self
     {
         return $this->aliasFor ?? $this;
+    }
+
+    private function isNone(): bool
+    {
+        return $this->name === 'None';
     }
 }

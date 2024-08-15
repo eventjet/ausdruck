@@ -24,7 +24,7 @@ use PHPUnit\Framework\TestCase;
 final class ExpressionComparisonTest extends TestCase
 {
     /**
-     * @return iterable<array-key, array{Expression<mixed>, Expression<mixed>}>
+     * @return iterable<array-key, array{Expression, Expression}>
      */
     public static function equalsCases(): iterable
     {
@@ -67,7 +67,7 @@ final class ExpressionComparisonTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{Expression<mixed>, Expression<mixed>}>
+     * @return iterable<string, array{Expression, Expression}>
      */
     public static function notEqualsCases(): iterable
     {
@@ -234,8 +234,6 @@ final class ExpressionComparisonTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> $a
-     * @param Expression<mixed> $b
      * @dataProvider equalsCases
      */
     public function testEquals(Expression $a, Expression $b): void
@@ -245,8 +243,6 @@ final class ExpressionComparisonTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> $a
-     * @param Expression<mixed> $b
      * @dataProvider notEqualsCases
      */
     public function testNotEquals(Expression $a, Expression $b): void

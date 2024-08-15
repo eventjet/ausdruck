@@ -22,7 +22,7 @@ use function strlen;
 final class ExpressionParserTest extends TestCase
 {
     /**
-     * @return iterable<array-key, array{string, Expression<mixed>}>
+     * @return iterable<array-key, array{string, Expression}>
      */
     public static function parseCases(): iterable
     {
@@ -68,7 +68,7 @@ final class ExpressionParserTest extends TestCase
     }
 
     /**
-     * @return iterable<array-key, array{string, Expression<mixed>}>
+     * @return iterable<array-key, array{string, Expression}>
      */
     public static function nonCanonicalParseCases(): iterable
     {
@@ -424,7 +424,6 @@ final class ExpressionParserTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> $expected
      * @dataProvider parseCases
      * @dataProvider nonCanonicalParseCases
      */
@@ -441,7 +440,6 @@ final class ExpressionParserTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> $expr
      * @dataProvider parseCases
      */
     public function testToString(string $expected, Expression $expr): void

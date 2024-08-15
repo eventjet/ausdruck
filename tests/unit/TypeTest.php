@@ -22,25 +22,15 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{Type<mixed>, mixed, string}>
+     * @return iterable<string, array{Type, mixed, string}>
      */
     public static function failingAssertCases(): iterable
     {
         yield 'Function is not callable' => [
             Type::func(Type::string()),
             'not a function',
-            'Expected callable, got string',
+            'Expected func(): string, got string',
         ];
-    }
-
-    /**
-     * We might want to accept empty arrays in the future, but we would probably want a never type for that.
-     */
-    public function testFromValueFailsWhenGivenAnEmptyArray(): void
-    {
-        $this->expectException(LogicException::class);
-
-        Type::fromValue([]);
     }
 
     /**
@@ -77,7 +67,6 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * @param Type<mixed> $type
      * @dataProvider failingAssertCases
      */
     public function testFailingAssert(Type $type, mixed $value, string $expectedMessage): void

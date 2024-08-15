@@ -9,14 +9,8 @@ use Stringable;
 
 use function sprintf;
 
-/**
- * @template T
- */
 final class TypeHint implements Stringable
 {
-    /**
-     * @param Type<T> $type
-     */
     public function __construct(public readonly Type $type, public readonly bool $explicit)
     {
     }
