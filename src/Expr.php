@@ -89,6 +89,11 @@ final class Expr
         return new Negative($expression, $location ?? self::dummySpan());
     }
 
+    public static function fieldAccess(Expression $struct, string $field, Span $location): FieldAccess
+    {
+        return new FieldAccess($struct, $field, $location);
+    }
+
     private static function dummySpan(): Span
     {
         /** @infection-ignore-all These dummy spans are just there to fill parameter lists */

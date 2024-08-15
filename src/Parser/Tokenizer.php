@@ -7,6 +7,7 @@ namespace Eventjet\Ausdruck\Parser;
 use function assert;
 use function ctype_space;
 use function is_numeric;
+use function ord;
 use function sprintf;
 use function str_contains;
 use function substr;
@@ -17,7 +18,13 @@ use function substr;
  */
 final class Tokenizer
 {
-    public const NON_IDENTIFIER_CHARS = '.[]()"=|<>{}:, -';
+    private const LOWER_A = 97;
+    private const LOWER_Z = 122;
+    private const UPPER_A = 65;
+    private const UPPER_Z = 90;
+    private const ZERO = 48;
+    private const NINE = 57;
+    private const UNDERSCORE = 95;
 
     /**
      * @param iterable<mixed, string> $chars
@@ -109,7 +116,7 @@ final class Tokenizer
                 }
                 continue;
             }
-            if (!str_contains(self::NON_IDENTIFIER_CHARS, $char)) {
+            if (self::isIdentifierChar($char, first: true)) {
                 $startCol = $column;
                 yield new ParsedToken(self::identifier($chars, $line, $column), $line, $startCol);
                 continue;
@@ -127,6 +134,7 @@ final class Tokenizer
     {
         $identifier = '';
 
+        $first = true;
         while (true) {
             $char = $chars->peek();
 
@@ -134,13 +142,14 @@ final class Tokenizer
                 break;
             }
 
-            if (ctype_space($char) || str_contains(self::NON_IDENTIFIER_CHARS, $char)) {
+            if (ctype_space($char) || !self::isIdentifierChar($char, first: $first)) {
                 break;
             }
 
             $identifier .= $char;
             $chars->next();
             $column++;
+            $first = false;
         }
 
         return $identifier;
@@ -245,5 +254,17 @@ final class Tokenizer
             $column++;
         }
         return new Literal($string);
+    }
+
+    private static function isIdentifierChar(string $char, bool $first = false): bool
+    {
+        $byte = ord($char);
+        $isChar = ($byte >= self::LOWER_A && $byte <= self::LOWER_Z) || ($byte >= self::UPPER_A && $byte <= self::UPPER_Z);
+        if ($first) {
+            return $isChar;
+        }
+        return $isChar
+            || ($byte >= self::ZERO && $byte <= self::NINE)
+            || $byte === self::UNDERSCORE;
     }
 }

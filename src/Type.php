@@ -287,6 +287,11 @@ final class Type implements Stringable
         return $this->args[0];
     }
 
+    public function isStruct(): bool
+    {
+        return $this->name === 'Struct';
+    }
+
     /**
      * @return list<self>
      */

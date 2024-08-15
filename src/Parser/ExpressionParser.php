@@ -7,10 +7,12 @@ namespace Eventjet\Ausdruck\Parser;
 use Eventjet\Ausdruck\Call;
 use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
+use Eventjet\Ausdruck\FieldAccess;
 use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\ListLiteral;
 use Eventjet\Ausdruck\Type;
 
+use function array_key_exists;
 use function array_shift;
 use function assert;
 use function count;
@@ -94,7 +96,7 @@ final class ExpressionParser
             if ($left === null) {
                 self::unexpectedToken($parsedToken);
             }
-            return self::call($left, $tokens, $declarations);
+            return self::dot($left, $tokens, $declarations);
         }
         if (is_string($token)) {
             if ($left !== null) {
@@ -381,17 +383,31 @@ final class ExpressionParser
     }
 
     /**
+     * @param Peekable<ParsedToken> $tokens
+     */
+    private static function dot(Expression $target, Peekable $tokens, Declarations $declarations): Call|FieldAccess
+    {
+        $dot = self::expect($tokens, Token::Dot);
+        [$name, $nameLocation] = self::expectIdentifier($tokens, $dot, 'function name');
+        $token = $tokens->peek()?->token;
+        return match ($token) {
+            Token::Colon, Token::OpenParen => self::call($name, $nameLocation, $target, $tokens, $declarations),
+            default => self::fieldAccess($target, $name, $target->location()->to($nameLocation)),
+        };
+    }
+
+    /**
      * list<string>.some:bool(|item| item:string === needle:string)
      *             ================================================
      *
      * @param Peekable<ParsedToken> $tokens
      */
-    private static function call(Expression $target, Peekable $tokens, Declarations $declarations): Call
+    private static function call(string $name, Span $nameLocation, Expression $target, Peekable $tokens, Declarations $declarations): Call
     {
-        $dot = self::expect($tokens, Token::Dot);
-        [$name, $nameLocation] = self::expectIdentifier($tokens, $dot, 'function name');
         $fnType = $declarations->functions[$name] ?? null;
-        if ($tokens->peek()?->token === Token::Colon) {
+        $colonOrOpenParen = $tokens->peek();
+        assert($colonOrOpenParen !== null);
+        if ($colonOrOpenParen->token === Token::Colon) {
             $tokens->next();
             $typeNode = TypeParser::parse($tokens);
             if ($typeNode === null) {
@@ -474,6 +490,18 @@ final class ExpressionParser
             }
         }
         return $target->call($name, $returnType, $args, $target->location()->to($closeParen->location()));
+    }
+
+    private static function fieldAccess(Expression $target, string $name, Span $location): FieldAccess
+    {
+        $targetType = $target->getType();
+        if (!$targetType->isStruct()) {
+            throw TypeError::create(sprintf('Can\'t access field "%s" on non-struct type %s', $name, $targetType), $location);
+        }
+        if (!array_key_exists($name, $targetType->fields)) {
+            throw TypeError::create(sprintf('Unknown field "%s" on type %s', $name, $targetType), $location);
+        }
+        return Expr::fieldAccess($target, $name, $location);
     }
 
     /**

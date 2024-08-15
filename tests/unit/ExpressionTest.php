@@ -10,6 +10,7 @@ use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\Literal;
 use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
+use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Scope;
 use Eventjet\Ausdruck\Type;
@@ -34,6 +35,9 @@ final class ExpressionTest extends TestCase
     public static function evaluateCases(): iterable
     {
         $s = Type::string();
+        $user = new class {
+            public string $name = 'John';
+        };
         $cases = [
             [static fn(): Expression => Expr::get('foo', $s), new Scope(['foo' => 'bar']), 'bar'],
             [
@@ -205,6 +209,17 @@ final class ExpressionTest extends TestCase
             ['ints2:list<int>.tail:list<int>()', new Scope(['ints2' => [42]]), []],
             ['ints3:list<int>.tail:list<int>()', new Scope(['ints3' => []]), []],
             ['foo:float - bar:float', new Scope(['foo' => 5.5, 'bar' => 3.4]), 2.1],
+            ['user:{ name: string }.name', new Scope(['user' => $user]), 'John'],
+            [
+                'user:{ name: string }.name()',
+                new Scope(['user' => $user], ['name' => static fn() => 'from function']),
+                'from function',
+                new Declarations(functions: ['name' => Type::func(Type::string(), [Type::any()])]),
+            ],
+            ['user:{ name: string }.name.substr(1, 2)', new Scope(['user' => $user]), 'oh'],
+            ['abcdefghijklmnopqrstuvwxyz:bool', new Scope(['abcdefghijklmnopqrstuvwxyz' => false]), false],
+            ['ABCDEFGHIJKLMNOPQRSTUVWXYZ:bool', new Scope(['ABCDEFGHIJKLMNOPQRSTUVWXYZ' => false]), false],
+            ['x0123456789:bool', new Scope(['x0123456789' => false]), false],
         ];
         /**
          * @psalm-suppress PossiblyUndefinedArrayOffset The runtime behavior is well-defined: `$declarations` is just null
@@ -339,6 +354,16 @@ final class ExpressionTest extends TestCase
             new Scope(['foo' => true]),
             'Expected operand to be of type int or float',
         ];
+        yield 'Access non-existent struct field' => [
+            Expr::fieldAccess(Expr::get('user', Type::struct(['name' => Type::string()])), 'age', self::span()),
+            new Scope(['user' => (object)['name' => 'John']]),
+            'Unknown field "age"',
+        ];
+        yield 'Access field non non-struct' => [
+            Expr::fieldAccess(Expr::get('user', Type::string()), 'name', self::span()),
+            new Scope(['user' => 'John']),
+            'Expected object, got string',
+        ];
     }
 
     /**
@@ -407,6 +432,11 @@ final class ExpressionTest extends TestCase
         yield 'List literal with strings' => ['["foo", myVar:string]', Type::listOf(Type::string())];
         yield 'List literal with strings and ints' => ['["foo", "bar", 42, myVar:string]', Type::listOf(Type::any())];
         yield 'Empty list literal' => ['[]', Type::listOf(Type::any())];
+    }
+
+    private static function span(): Span
+    {
+        return Span::char(1, 1);
     }
 
     /**

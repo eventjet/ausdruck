@@ -136,16 +136,18 @@ final class ExpressionParserTest extends TestCase
         yield 'end of string after function call and colon' => ['foo:string.substr:'];
         yield 'end of string after function dot' => ['foo:string.'];
         yield 'missing function name' => ['foo:string.:string()'];
-        yield 'end of string after function name' => ['foo:string.substr'];
         yield 'list literal: missing closing bracket' => ['[1, 2'];
         yield 'empty pair or curly braces' => ['{}'];
         yield 'single ampersand' => ['foo:bool & bar:bool'];
+        yield 'non-token, non-identifier symbol' => ['foo:bool € bar:bool'];
+        yield 'identifier starting with a number' => ['42foo:bool'];
+        yield 'identifier starting with an underscore' => ['_foo:bool'];
     }
 
     /**
      * @return iterable<string, array{0: string, 1?: string, 2?: Declarations}>
      */
-    public static function invalidExpressions(): iterable
+    public static function typeErrorExpressions(): iterable
     {
         yield 'map type with bool key type' => ['foo:map<bool, string>'];
         yield 'or with string on the left' => ['foo:string || bar:bool'];
@@ -232,6 +234,11 @@ final class ExpressionParserTest extends TestCase
         ];
         yield 'some with invalid type argument' => ['foo:Some<Foo>', 'Unknown type Foo'];
         yield 'unknown type in struct field' => ['foo:{ name: Foo }', 'Unknown type Foo'];
+        yield 'access to unknown struct field' => [
+            'foo:{ name: string }.age',
+            'Unknown field "age" on type { name: string }',
+        ];
+        yield 'field access on string' => ['foo:string.age', 'Can\'t access field "age" on non-struct type string'];
     }
 
     /**
@@ -466,7 +473,7 @@ final class ExpressionParserTest extends TestCase
     }
 
     /**
-     * @dataProvider invalidExpressions
+     * @dataProvider typeErrorExpressions
      */
     public function testTypeError(string $expression, string|null $expectedMessage = null, Declarations|null $declarations = null): void
     {

@@ -9,6 +9,7 @@ use Eventjet\Ausdruck\Call;
 use Eventjet\Ausdruck\Eq;
 use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
+use Eventjet\Ausdruck\FieldAccess;
 use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Gt;
 use Eventjet\Ausdruck\Lambda;
@@ -63,6 +64,10 @@ final class ExpressionComparisonTest extends TestCase
         yield [
             Expr::and_(Expr::literal(true), Expr::literal(false)),
             Expr::and_(Expr::literal(true), Expr::literal(false)),
+        ];
+        yield [
+            Expr::fieldAccess(Expr::get('person', Type::struct(['name' => Type::string()])), 'name', self::location()),
+            Expr::fieldAccess(Expr::get('person', Type::struct(['name' => Type::string()])), 'name', self::location()),
         ];
     }
 
@@ -231,6 +236,24 @@ final class ExpressionComparisonTest extends TestCase
             Expr::listLiteral([Expr::literal(1)], Span::char(1, 1)),
             Expr::literal(1),
         ];
+        $personType = Type::struct(['name' => Type::string(), 'age' => Type::int()]);
+        yield FieldAccess::class . ': different fields' => [
+            Expr::fieldAccess(Expr::get('person', $personType), 'name', self::location()),
+            Expr::fieldAccess(Expr::get('person', $personType), 'age', self::location()),
+        ];
+        yield FieldAccess::class . ': different targets' => [
+            Expr::fieldAccess(Expr::get('person', $personType), 'name', self::location()),
+            Expr::fieldAccess(Expr::get('address', $personType), 'name', self::location()),
+        ];
+        yield FieldAccess::class . ': different type' => [
+            Expr::fieldAccess(Expr::get('person', $personType), 'name', self::location()),
+            Expr::call(Expr::get('person', $personType), 'name', Type::string(), []),
+        ];
+    }
+
+    private static function location(): Span
+    {
+        return Span::char(1, 1);
     }
 
     /**
