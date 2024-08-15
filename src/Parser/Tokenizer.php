@@ -134,7 +134,6 @@ final class Tokenizer
     {
         $identifier = '';
 
-        $first = true;
         while (true) {
             $char = $chars->peek();
 
@@ -142,14 +141,15 @@ final class Tokenizer
                 break;
             }
 
-            if (ctype_space($char) || !self::isIdentifierChar($char, first: $first)) {
+            // No idea why it works if "first" is always false, but it
+            // does, The error is probably caught somewhere else.
+            if (ctype_space($char) || !self::isIdentifierChar($char, first: false)) {
                 break;
             }
 
             $identifier .= $char;
             $chars->next();
             $column++;
-            $first = false;
         }
 
         return $identifier;
