@@ -34,7 +34,7 @@ final class TypeTest extends TestCase
         yield 'Struct: not an object' => [
             Type::struct(['name' => Type::string()]),
             'not an object',
-            'Expected object, got string',
+            'Expected {name: string}, got string',
         ];
         yield 'Missing struct field' => [
             Type::struct(['name' => Type::string(), 'age' => Type::int()]),
@@ -53,7 +53,7 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{Type<mixed>, mixed}>
+     * @return iterable<string, array{Type, mixed}>
      */
     public static function successfulAssertCases(): iterable
     {
@@ -73,7 +73,7 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{mixed, Type<mixed>}>
+     * @return iterable<string, array{mixed, Type}>
      */
     public static function fromValuesCases(): iterable
     {
@@ -87,7 +87,7 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{Type<mixed>, Type<mixed>}>
+     * @return iterable<string, array{Type, Type}>
      */
     public static function notEqualsCases(): iterable
     {
@@ -106,7 +106,7 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{Type<mixed>, string}>
+     * @return iterable<string, array{Type, string}>
      */
     public static function toStringCases(): iterable
     {
@@ -161,7 +161,6 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * @param Type<mixed> $type
      * @dataProvider successfulAssertCases
      */
     public function testSuccessfulAssert(Type $type, mixed $value): void
@@ -172,7 +171,6 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * @param Type<mixed> $expected
      * @dataProvider fromValuesCases
      */
     public function testFromValue(mixed $value, Type $expected): void
@@ -184,26 +182,15 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * @param Type<mixed> $a
-     * @param Type<mixed> $b
      * @dataProvider notEqualsCases
      */
     public function testNotEquals(Type $a, Type $b): void
     {
-        /**
-         * @psalm-suppress RedundantCondition
-         * @phpstan-ignore-next-line staticMethod.impossibleType
-         */
         self::assertFalse($a->equals($b));
-        /**
-         * @psalm-suppress RedundantCondition
-         * @phpstan-ignore-next-line staticMethod.impossibleType
-         */
         self::assertFalse($b->equals($a));
     }
 
     /**
-     * @param Type<mixed> $type
      * @dataProvider toStringCases
      */
     public function testToString(Type $type, string $expected): void
