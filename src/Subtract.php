@@ -24,13 +24,9 @@ final class Subtract extends Expression
 
     public function __toString(): string
     {
-        /** @psalm-suppress ImplicitToStringCast */
         return sprintf('%s - %s', $this->minuend, $this->subtrahend);
     }
 
-    /**
-     * @psalm-suppress InvalidReturnType False positive
-     */
     public function evaluate(Scope $scope): int|float
     {
         /** @var mixed $minuend */

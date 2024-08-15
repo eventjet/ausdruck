@@ -62,7 +62,6 @@ final class ListLiteral extends Expression
                 $elementType = $type;
                 continue;
             }
-            /** @psalm-suppress RedundantCondition */
             if ($elementType->equals($type)) {
                 continue;
             }

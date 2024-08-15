@@ -155,9 +155,7 @@ final class TypeTest extends TestCase
         $concrete = Type::listOf(Type::string());
         $alias = Type::alias('Foo', $concrete);
 
-        /** @psalm-suppress RedundantCondition */
         self::assertTrue($alias->equals($concrete));
-        /** @psalm-suppress RedundantCondition */
         self::assertTrue($concrete->equals($alias));
     }
 
@@ -167,9 +165,7 @@ final class TypeTest extends TestCase
         $foo = Type::alias('Foo', $concrete);
         $bar = Type::alias('Bar', $concrete);
 
-        /** @psalm-suppress RedundantCondition */
         self::assertTrue($foo->equals($bar));
-        /** @psalm-suppress RedundantCondition */
         self::assertTrue($bar->equals($foo));
     }
 

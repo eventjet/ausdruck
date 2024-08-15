@@ -60,13 +60,11 @@ final class Type implements Stringable
 
     public static function listOf(self $item): self
     {
-        /** @psalm-suppress ImplicitToStringCast */
         return new self('list', [$item]);
     }
 
     public static function mapOf(self $keys, self $values): self
     {
-        /** @psalm-suppress ImplicitToStringCast */
         return new self('map', [$keys, $values]);
     }
 
@@ -88,9 +86,6 @@ final class Type implements Stringable
         return new self('Func', [$return, ...$parameters]);
     }
 
-    /**
-     * @psalm-suppress InvalidReturnType False positive
-     */
     public static function fromValue(mixed $value): self
     {
         if (is_array($value)) {
@@ -189,10 +184,6 @@ final class Type implements Stringable
             return true;
         }
         foreach ($this->args as $i => $arg) {
-            /**
-             * @psalm-suppress RedundantCondition I think it's complaining about Type<mixed> being equal to Type<mixed>,
-             *     but I don't know how to fix it.
-             */
             if ($arg->equals($type->args[$i])) {
                 continue;
             }

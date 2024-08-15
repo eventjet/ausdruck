@@ -443,7 +443,6 @@ final class ExpressionParserTest extends TestCase
     {
         $actual = ExpressionParser::parse($str);
 
-        /** @psalm-suppress ImplicitToStringCast */
         self::assertTrue($actual->equals($expected), sprintf(
             "Expected:\n%s\nActual:\n%s",
             $expected,

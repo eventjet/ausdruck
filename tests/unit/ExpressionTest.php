@@ -221,9 +221,6 @@ final class ExpressionTest extends TestCase
             ['ABCDEFGHIJKLMNOPQRSTUVWXYZ:bool', new Scope(['ABCDEFGHIJKLMNOPQRSTUVWXYZ' => false]), false],
             ['x0123456789:bool', new Scope(['x0123456789' => false]), false],
         ];
-        /**
-         * @psalm-suppress PossiblyUndefinedArrayOffset The runtime behavior is well-defined: `$declarations` is just null
-         */
         foreach ($cases as $tuple) {
             [$expr, $scope, $expected] = $tuple;
             $declarations = $tuple[3] ?? null;
@@ -493,10 +490,6 @@ final class ExpressionTest extends TestCase
             $expression = ExpressionParser::parse($expression);
         }
 
-        /**
-         * @psalm-suppress ImplicitToStringCast
-         * @psalm-suppress RedundantCondition I have no idea how to type this better
-         */
         self::assertTrue(
             $expression->matchesType($expected),
             sprintf('Expected %s, got %s', $expected, $expression->getType()),
