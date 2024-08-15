@@ -6,20 +6,18 @@ namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
 
+use function get_debug_type;
+use function gettype;
+use function is_float;
+use function is_int;
 use function sprintf;
 
 /**
- * @template T of int | float
- * @extends Expression<T>
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
 final class Subtract extends Expression
 {
-    /**
-     * @param Expression<T> $minuend
-     * @param Expression<T> $subtrahend
-     */
     public function __construct(public readonly Expression $minuend, public readonly Expression $subtrahend)
     {
     }
@@ -35,11 +33,32 @@ final class Subtract extends Expression
      */
     public function evaluate(Scope $scope): int|float
     {
-        /**
-         * @psalm-suppress InvalidOperand False positive; they are guaranteed to have the same type
-         * @psalm-suppress InvalidReturnStatement False positive
-         */
-        return $this->minuend->evaluate($scope) - $this->subtrahend->evaluate($scope);
+        /** @var mixed $minuend */
+        $minuend = $this->minuend->evaluate($scope);
+        /** @var mixed $subtrahend */
+        $subtrahend = $this->subtrahend->evaluate($scope);
+        if (is_int($minuend) && is_int($subtrahend)) {
+            return $minuend - $subtrahend;
+        }
+        if (is_float($minuend) && is_float($subtrahend)) {
+            return $minuend - $subtrahend;
+        }
+        if (gettype($minuend) === gettype($subtrahend)) {
+            throw new EvaluationError(
+                sprintf(
+                    'Expected operands to be of type int or float, got %s and %s',
+                    get_debug_type($minuend),
+                    get_debug_type($subtrahend),
+                ),
+            );
+        }
+        throw new EvaluationError(
+            sprintf(
+                'Expected operands to be of the same type, got %s and %s',
+                get_debug_type($minuend),
+                get_debug_type($subtrahend),
+            ),
+        );
     }
 
     public function equals(Expression $other): bool

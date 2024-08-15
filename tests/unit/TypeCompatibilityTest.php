@@ -53,6 +53,7 @@ final class TypeCompatibilityTest extends TestCase
             // Option
             ['Option<string>', 'Option<any>'],
             ['Some<string>', 'Option<string>'],
+            ['None', 'None'],
 
             // Lists
             ['list<any>', 'list<any>'],
@@ -97,6 +98,7 @@ final class TypeCompatibilityTest extends TestCase
             ['Option<any>', 'Option<string>'],
             ['Option<string>', 'Some<string>'],
             ['Some<string>', 'string'],
+            ['None', 'string'],
 
             // Lists
             ['list<string>', 'list<int>'],
@@ -107,9 +109,6 @@ final class TypeCompatibilityTest extends TestCase
         }
     }
 
-    /**
-     * @return Type<mixed>
-     */
     private static function fromString(string $str, Types|null $types = null): Type
     {
         /**

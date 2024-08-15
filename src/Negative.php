@@ -6,19 +6,14 @@ namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
 
+use function is_float;
+use function is_int;
 use function sprintf;
 
-/**
- * @template T of int | float
- * @extends Expression<T>
- */
 final class Negative extends Expression
 {
     use LocationTrait;
 
-    /**
-     * @param Expression<T> $expression
-     */
     public function __construct(public readonly Expression $expression, Span $location)
     {
         $this->location = $location;
@@ -34,8 +29,11 @@ final class Negative extends Expression
      */
     public function evaluate(Scope $scope): float|int
     {
-        /** @psalm-suppress InvalidReturnStatement False positive */
-        return -$this->expression->evaluate($scope);
+        $value = $this->expression->evaluate($scope);
+        if (!is_int($value) && !is_float($value)) {
+            throw new EvaluationError('Expected operand to be of type int or float');
+        }
+        return -$value;
     }
 
     public function equals(Expression $other): bool

@@ -29,7 +29,7 @@ final class ExpressionTest extends TestCase
 {
     /**
      * @return iterable<string, array{
-     *     string | Expression<mixed> | callable(): Expression<mixed>,
+     *     string | Expression | callable(): Expression,
      *     Scope,
      *     Declarations | null,
      *     mixed,
@@ -158,7 +158,7 @@ final class ExpressionTest extends TestCase
             ['foo:string.substr(0, 3)', new Scope(['foo' => 'test']), 'tes'],
             [
                 'foo.customHash("test")',
-                new Scope(['foo' => 'mystr'], ['customHash' => static fn(string $text, string $salt): string => md5($text.$salt)]),
+                new Scope(['foo' => 'mystr'], ['customHash' => static fn(string $text, string $salt): string => md5($text . $salt)]),
                 md5('mystrtest'),
                 new Declarations(
                     variables: ['foo' => Type::string()],
@@ -197,6 +197,7 @@ final class ExpressionTest extends TestCase
             ['ints1:list<int>.tail:list<int>()', new Scope(['ints1' => [42, 69, 23]]), [69, 23]],
             ['ints2:list<int>.tail:list<int>()', new Scope(['ints2' => [42]]), []],
             ['ints3:list<int>.tail:list<int>()', new Scope(['ints3' => []]), []],
+            ['foo:float - bar:float', new Scope(['foo' => 5.5, 'bar' => 3.4]), 2.1],
         ];
         /**
          * @psalm-suppress PossiblyUndefinedArrayOffset The runtime behavior is well-defined: `$declarations` is just null
@@ -212,7 +213,7 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{0: Expression<mixed> | string, 1: string, 2?: Declarations}>
+     * @return iterable<string, array{0: Expression | string, 1: string, 2?: Declarations}>
      */
     public static function toStringCases(): iterable
     {
@@ -233,7 +234,7 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{0: Expression<mixed> | array{0: string, 1?: Declarations}, 1: Scope, 2?: string}>
+     * @return iterable<string, array{0: Expression | array{0: string, 1?: Declarations}, 1: Scope, 2?: string}>
      */
     public static function evaluationErrorsCases(): iterable
     {
@@ -267,12 +268,12 @@ final class ExpressionTest extends TestCase
         yield 'Expect list, but it\'s not an array' => [
             Expr::get('item', Type::listOf(Type::string())),
             new Scope(['item' => 'not an array']),
-            'Expected array',
+            'Expected list<string>, got string',
         ];
         yield 'Expect list, but it\'s a map' => [
             Expr::get('item', Type::listOf(Type::string())),
             new Scope(['item' => ['foo' => 'bar']]),
-            'not a list',
+            'Expected list<string>, got map<string, string>',
         ];
         yield 'Wrong item type in list' => [
             Expr::get('item', Type::listOf(Type::string())),
@@ -299,10 +300,50 @@ final class ExpressionTest extends TestCase
             new Scope(['foo' => 'test'], ['chars' => static fn(string $text): string => $text]),
             'Expected int, got string',
         ];
+        yield 'Subtracting a float from an integer' => [
+            Expr::subtract(Expr::get('myint', Type::int()), Expr::get('myfloat', Type::float())),
+            new Scope(['myint' => 42, 'myfloat' => 23.42]),
+            'Expected operands to be of the same type, got int and float',
+        ];
+        yield 'Subtracting an integer from a float' => [
+            Expr::subtract(Expr::get('myfloat', Type::float()), Expr::get('myint', Type::int())),
+            new Scope(['myint' => 42, 'myfloat' => 23.42]),
+            'Expected operands to be of the same type, got float and int',
+        ];
+        yield 'Subtracting a string from a string' => [
+            Expr::subtract(Expr::get('mystr', Type::string()), Expr::get('mystr2', Type::string())),
+            new Scope(['mystr' => 'foo', 'mystr2' => 'bar']),
+            'Expected operands to be of type int or float, got string and string',
+        ];
+        yield 'Logical or with string on the left' => [
+            Expr::get('foo', Type::string())->or_(Expr::get('bar', Type::bool())),
+            new Scope(['foo' => 'foo', 'bar' => true]),
+            'Expected boolean operands, got string and bool',
+        ];
+        yield 'Logical or with string on the right' => [
+            Expr::get('foo', Type::bool())->or_(Expr::get('bar', Type::string())),
+            new Scope(['foo' => true, 'bar' => 'bar']),
+            'Expected boolean operands, got bool and string',
+        ];
+        yield 'Logical and with string on the left' => [
+            Expr::get('foo', Type::string())->and_(Expr::get('bar', Type::bool())),
+            new Scope(['foo' => 'foo', 'bar' => true]),
+            'Expected boolean operands, got string and bool',
+        ];
+        yield 'Logical and with string on the right' => [
+            Expr::get('foo', Type::bool())->and_(Expr::get('bar', Type::string())),
+            new Scope(['foo' => true, 'bar' => 'bar']),
+            'Expected boolean operands, got bool and string',
+        ];
+        yield 'Negative bool' => [
+            Expr::negative(Expr::get('foo', Type::bool())),
+            new Scope(['foo' => true]),
+            'Expected operand to be of type int or float',
+        ];
     }
 
     /**
-     * @return iterable<string, array{Expression<mixed> | string, Type<mixed>}>
+     * @return iterable<string, array{Expression | string, Type}>
      */
     public static function typeCases(): iterable
     {
@@ -374,7 +415,7 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> | string | callable(): Expression<mixed> $expression
+     * @param Expression | string | callable(): Expression $expression
      * @dataProvider evaluateCases
      */
     public function testEvaluate(Expression|string|callable $expression, Scope $scope, Declarations|null $declarations, mixed $expected): void
@@ -389,7 +430,6 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> | string $expr
      * @dataProvider toStringCases
      */
     public function testToString(Expression|string $expr, string $expected, Declarations|null $declarations = null): void
@@ -402,7 +442,7 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> | array{0: string, 1?: Declarations} $expression
+     * @param Expression | array{0: string, 1?: Declarations} $expression
      * @dataProvider evaluationErrorsCases
      */
     public function testEvaluationErrors(Expression|array $expression, Scope $scope, string|null $message = null): void
@@ -420,8 +460,6 @@ final class ExpressionTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> | string $expression
-     * @param Type<mixed> $expected
      * @dataProvider typeCases
      */
     public function testType(Expression|string $expression, Type $expected): void

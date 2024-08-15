@@ -9,14 +9,10 @@ use Eventjet\Ausdruck\Parser\Span;
 use function array_map;
 use function implode;
 
-/**
- * @template T
- * @extends Expression<list<T>>
- */
 final class ListLiteral extends Expression
 {
     /**
-     * @param list<Expression<T>> $elements
+     * @param list<Expression> $elements
      */
     public function __construct(public readonly array $elements, public readonly Span $location)
     {
@@ -33,7 +29,7 @@ final class ListLiteral extends Expression
     }
 
     /**
-     * @return list<T>
+     * @return list<mixed>
      */
     public function evaluate(Scope $scope): array
     {
@@ -57,9 +53,6 @@ final class ListLiteral extends Expression
         return true;
     }
 
-    /**
-     * @return Type<list<T>>
-     */
     public function getType(): Type
     {
         $elementType = null;
