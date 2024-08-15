@@ -20,7 +20,6 @@ final class Gt extends Expression
 
     public function __toString(): string
     {
-        /** @psalm-suppress ImplicitToStringCast */
         return sprintf('%s > %s', $this->left, $this->right);
     }
 
