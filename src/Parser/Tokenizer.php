@@ -256,7 +256,7 @@ final class Tokenizer
         return new Literal($string);
     }
 
-    private static function isIdentifierChar(string $char, bool $first = false): bool
+    private static function isIdentifierChar(string $char, bool $first): bool
     {
         $byte = ord($char);
         $isChar = ($byte >= self::LOWER_A && $byte <= self::LOWER_Z) || ($byte >= self::UPPER_A && $byte <= self::UPPER_Z);
