@@ -140,8 +140,8 @@ final class ExpressionParserTest extends TestCase
         yield 'empty pair or curly braces' => ['{}'];
         yield 'single ampersand' => ['foo:bool & bar:bool'];
         yield 'non-token, non-identifier symbol' => ['foo:bool € bar:bool'];
-        yield 'identifier starting with a number' => ['42foo:bool'];
-        yield 'identifier starting with an underscore' => ['_foo:bool'];
+        yield 'identifier starting with a number' => ['42foo:bool', 'Unexpected identifier foo'];
+        yield 'identifier starting with an underscore' => ['_foo:bool', 'Unexpected character _'];
     }
 
     /**
