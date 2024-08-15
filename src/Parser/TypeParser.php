@@ -43,7 +43,7 @@ final class TypeParser
             return null;
         }
         if ($parsedToken->token === Token::OpenBrace) {
-            return self::parseStruct($tokens, $parsedToken->location());
+            return self::parseStruct($tokens);
         }
         $name = $parsedToken->token;
         if (!is_string($name)) {
@@ -133,12 +133,11 @@ final class TypeParser
     /**
      * @param Peekable<ParsedToken> $tokens
      */
-    private static function parseStruct(Peekable $tokens, Span $location): TypeNode
+    private static function parseStruct(Peekable $tokens): TypeNode
     {
         $openBraceToken = $tokens->peek();
         assert($openBraceToken !== null);
-        $openBrace = $openBraceToken?->location();
-        assert($openBrace !== null);
+        $start = $openBraceToken->location();
         $tokens->next();
         $fields = [];
         while (true) {
@@ -175,7 +174,7 @@ final class TypeParser
             }
             $tokens->next();
         }
-        $closeBrace = self::expect($tokens, Token::CloseBrace)->location();
-        return TypeNode::struct($fields, $location->to($closeBrace));
+        $end = self::expect($tokens, Token::CloseBrace)->location();
+        return TypeNode::struct($fields, $start->to($end));
     }
 }
