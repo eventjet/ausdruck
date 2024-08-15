@@ -24,9 +24,6 @@ final class Negative extends Expression
         return sprintf('-%s', $this->expression);
     }
 
-    /**
-     * @psalm-suppress InvalidReturnType False positive
-     */
     public function evaluate(Scope $scope): float|int
     {
         $value = $this->expression->evaluate($scope);

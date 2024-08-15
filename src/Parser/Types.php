@@ -29,7 +29,6 @@ final class Types
             return $type;
         }
         $location = $node->args[0]->location->to($node->args[count($node->args) - 1]->location);
-        /** @psalm-suppress ImplicitToStringCast */
         return TypeError::create(sprintf('Invalid type "%s": %s does not accept arguments', $node, $type), $location);
     }
 
@@ -91,7 +90,6 @@ final class Types
         $nArgs = count($args);
         if ($nArgs > 1) {
             $location = $args[0]->location->to($args[count($args) - 1]->location);
-            /** @psalm-suppress ImplicitToStringCast */
             return TypeError::create(
                 sprintf(
                     'Invalid type "%s": list expects exactly one argument, got %d',
@@ -116,9 +114,7 @@ final class Types
         }
         $nArgs = count($args);
         if ($nArgs !== 2) {
-            /** @psalm-suppress TypeDoesNotContainNull False positive */
             $location = $args[0]->location->to($args[count($args) - 1]->location);
-            /** @psalm-suppress ImplicitToStringCast */
             return TypeError::create(
                 sprintf(
                     'Invalid type "%s": map expects exactly two arguments, got %d',
@@ -133,7 +129,6 @@ final class Types
             return $keyType;
         }
         if (!$keyType->equals(Type::int()) && !$keyType->equals(Type::string())) {
-            /** @psalm-suppress ImplicitToStringCast */
             return TypeError::create(
                 sprintf(
                     'Invalid type "%s": map expects the key type to be int or string, got %s',

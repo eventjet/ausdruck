@@ -55,9 +55,7 @@ final class TypeEqualityTest extends TestCase
         $typeA = self::fromString($a);
         $typeB = self::fromString($b);
 
-        /** @psalm-suppress RedundantCondition */
         self::assertTrue($typeA->equals($typeB));
-        /** @psalm-suppress RedundantCondition */
         self::assertTrue($typeB->equals($typeA));
     }
 
