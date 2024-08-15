@@ -25,9 +25,6 @@ final class Expr
         return new Eq($left, $right);
     }
 
-    /**
-     * @param Type | TypeHint $type
-     */
     public static function get(string $name, TypeHint|Type $type, Span|null $location = null): Get
     {
         return new Get($name, $type, $location ?? self::dummySpan());
