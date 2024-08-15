@@ -231,6 +231,7 @@ final class ExpressionParserTest extends TestCase
             'Function foo is not declared and has no inline type',
         ];
         yield 'some with invalid type argument' => ['foo:Some<Foo>', 'Unknown type Foo'];
+        yield 'unknown type in struct field' => ['foo:{ name: Foo }', 'Unknown type Foo'];
     }
 
     /**

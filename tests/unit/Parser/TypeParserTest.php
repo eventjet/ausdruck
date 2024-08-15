@@ -87,6 +87,10 @@ final class TypeParserTest extends TestCase
             '{name: string',
             'Expected }, got end of input',
         ];
+        yield 'Struct: no comma between fields' => [
+            '{name: string age: int}',
+            'Expected }, got age',
+        ];
     }
 
     /**
