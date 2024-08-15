@@ -269,6 +269,16 @@ final class Type implements Stringable
                 }
             }
         }
+        if ($this->name === 'Struct') {
+            foreach ($other->fields as $name => $fieldType) {
+                if (!array_key_exists($name, $self->fields)) {
+                    return false;
+                }
+                if (!$self->fields[$name]->isSubtypeOf($fieldType)) {
+                    return false;
+                }
+            }
+        }
         return true;
     }
 

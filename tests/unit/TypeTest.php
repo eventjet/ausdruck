@@ -41,14 +41,26 @@ final class TypeTest extends TestCase
             new class {
                 public string $name = 'John Doe';
             },
-            'Expected object with property age',
+            'Expected {name: string, age: int}, got {name: string}',
         ];
         yield 'Struct field has wrong type' => [
             Type::struct(['name' => Type::string()]),
             new class {
                 public int $name = 42;
             },
-            'Expected string, got int',
+            'Expected {name: string}, got {name: int}',
+        ];
+        $name = new class {
+            public string $first = 'John';
+        };
+        yield 'Struct field has subtype' => [
+            Type::struct(['name' => Type::struct(['first' => Type::string(), 'last' => Type::string()])]),
+            new class ($name) {
+                public function __construct(public object $name)
+                {
+                }
+            },
+            'Expected {name: {first: string, last: string}}, got {name: {first: string}}',
         ];
     }
 
@@ -68,6 +80,18 @@ final class TypeTest extends TestCase
             new class {
                 public string $name = 'John Doe';
                 public int $age = 42;
+            },
+        ];
+        $name = new class {
+            public string $first = 'John';
+            public string $last = 'Doe';
+        };
+        yield 'Struct field has supertype' => [
+            Type::struct(['name' => Type::struct(['first' => Type::string()])]),
+            new class ($name) {
+                public function __construct(public readonly object $name)
+                {
+                }
             },
         ];
     }
