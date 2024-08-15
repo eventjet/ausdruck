@@ -20,30 +20,18 @@ final class Expr
     {
     }
 
-    /**
-     * @template T
-     * @param Expression<T> $left
-     * @param Expression<T> $right
-     */
     public static function eq(Expression $left, Expression $right): Eq
     {
         return new Eq($left, $right);
     }
 
-    /**
-     * @template T
-     * @param Type<T> | TypeHint<T> $type
-     * @return Get<T>
-     */
     public static function get(string $name, TypeHint|Type $type, Span|null $location = null): Get
     {
         return new Get($name, $type, $location ?? self::dummySpan());
     }
 
     /**
-     * @template T of string | int | float | bool | null | array<array-key, mixed>
-     * @param T $value
-     * @return Literal<T>
+     * @param string | int | float | bool | null | array<array-key, mixed> $value
      */
     public static function literal(mixed $value, Span|null $location = null): Literal
     {
@@ -51,9 +39,7 @@ final class Expr
     }
 
     /**
-     * @template T
-     * @param list<Expression<T>> $elements
-     * @return ListLiteral<T>
+     * @param list<Expression> $elements
      */
     public static function listLiteral(array $elements, Span $location): ListLiteral
     {
@@ -61,40 +47,25 @@ final class Expr
     }
 
     /**
-     * @template T
-     * @param Expression<mixed> $target
-     * @param list<Expression<mixed>> $arguments
-     * @param Type<T> $type
-     * @return Call<T>
+     * @param list<Expression> $arguments
      */
     public static function call(Expression $target, string $name, Type $type, array $arguments, Span|null $location = null): Call
     {
         return new Call($target, $name, $type, $arguments, $location ?? self::dummySpan());
     }
 
-    /**
-     * @param Expression<bool> $left
-     * @param Expression<bool> $right
-     */
     public static function or_(Expression $left, Expression $right): Or_
     {
         return new Or_($left, $right);
     }
 
-    /**
-     * @param Expression<bool> $left
-     * @param Expression<bool> $right
-     */
     public static function and_(Expression $left, Expression $right): And_
     {
         return new And_($left, $right);
     }
 
     /**
-     * @template T
-     * @param Expression<T> $body
      * @param list<string> $parameters
-     * @return Expression<callable(Scope): T>
      */
     public static function lambda(Expression $body, array $parameters = [], Span|null $location = null): Expression
     {
@@ -103,33 +74,16 @@ final class Expr
         return new Lambda($body, $parameters, $location);
     }
 
-    /**
-     * @template T of int | float
-     * @param Expression<T> $minuend
-     * @param Expression<T> $subtrahend
-     * @return Subtract<T>
-     */
     public static function subtract(Expression $minuend, Expression $subtrahend): Subtract
     {
         return new Subtract($minuend, $subtrahend);
     }
 
-    /**
-     * @template T of int | float
-     * @param Expression<T> $left
-     * @param Expression<T> $right
-     * @return Gt<T>
-     */
     public static function gt(Expression $left, Expression $right): Gt
     {
         return new Gt($left, $right);
     }
 
-    /**
-     * @template T of int | float
-     * @param Expression<T> $expression
-     * @return Negative<T>
-     */
     public static function negative(Expression $expression, Span|null $location = null): Negative
     {
         return new Negative($expression, $location ?? self::dummySpan());

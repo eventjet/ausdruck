@@ -14,8 +14,6 @@ use function implode;
 use function sprintf;
 
 /**
- * @template T
- * @extends Expression<T>
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
@@ -24,9 +22,7 @@ final class Call extends Expression
     use LocationTrait;
 
     /**
-     * @param Expression<mixed> $target
-     * @param list<Expression<mixed>> $arguments
-     * @param Type<T> $type
+     * @param list<Expression> $arguments
      */
     public function __construct(
         public readonly Expression $target,
@@ -39,8 +35,8 @@ final class Call extends Expression
     }
 
     /**
-     * @param list<Expression<mixed>> $a
-     * @param list<Expression<mixed>> $b
+     * @param list<Expression> $a
+     * @param list<Expression> $b
      */
     private static function compareArguments(array $a, array $b): bool
     {

@@ -6,19 +6,16 @@ namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
 
+use function get_debug_type;
+use function is_bool;
 use function sprintf;
 
 /**
- * @extends Expression<bool>
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
 final class Or_ extends Expression
 {
-    /**
-     * @param Expression<bool> $left
-     * @param Expression<bool> $right
-     */
     public function __construct(public readonly Expression $left, public readonly Expression $right)
     {
     }
@@ -31,7 +28,14 @@ final class Or_ extends Expression
 
     public function evaluate(Scope $scope): bool
     {
-        return $this->left->evaluate($scope) || $this->right->evaluate($scope);
+        $left = $this->left->evaluate($scope);
+        $right = $this->right->evaluate($scope);
+        if (!is_bool($left) || !is_bool($right)) {
+            throw new EvaluationError(
+                sprintf('Expected boolean operands, got %s and %s', get_debug_type($left), get_debug_type($right)),
+            );
+        }
+        return $left || $right;
     }
 
     public function equals(Expression $other): bool
