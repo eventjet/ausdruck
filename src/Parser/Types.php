@@ -8,6 +8,7 @@ use Eventjet\Ausdruck\Type;
 
 use function array_key_last;
 use function array_pop;
+use function assert;
 use function count;
 use function sprintf;
 
@@ -53,6 +54,7 @@ final class Types
             'Option' => $this->resolveOption($this->exactlyOneTypeArg($node)),
             'Some' => $this->resolveSome($this->exactlyOneTypeArg($node)),
             'None' => self::noArgs(Type::none(), $node),
+            '' => $this->resolveStruct($node),
             default => $this->resolveAlias($node->name) ?? TypeError::create(
                 sprintf('Unknown type %s', $node->name),
                 $node->location,
@@ -189,5 +191,20 @@ final class Types
             return $returnType;
         }
         return Type::func($returnType, $argTypes);
+    }
+
+    private function resolveStruct(TypeNode $node): Type|TypeError
+    {
+        $fields = [];
+        foreach ($node->args as $field) {
+            assert(count($field->args) === 2);
+            [$nameNode, $typeNode] = $field->args;
+            $type = $this->resolve($typeNode);
+            if ($type instanceof TypeError) {
+                return $type;
+            }
+            $fields[$nameNode->name] = $type;
+        }
+        return Type::struct($fields);
     }
 }

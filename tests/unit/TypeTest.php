@@ -34,21 +34,21 @@ final class TypeTest extends TestCase
         yield 'Struct: not an object' => [
             Type::struct(['name' => Type::string()]),
             'not an object',
-            'Expected {name: string}, got string',
+            'Expected { name: string }, got string',
         ];
         yield 'Missing struct field' => [
             Type::struct(['name' => Type::string(), 'age' => Type::int()]),
             new class {
                 public string $name = 'John Doe';
             },
-            'Expected {name: string, age: int}, got {name: string}',
+            'Expected { name: string, age: int }, got { name: string }',
         ];
         yield 'Struct field has wrong type' => [
             Type::struct(['name' => Type::string()]),
             new class {
                 public int $name = 42;
             },
-            'Expected {name: string}, got {name: int}',
+            'Expected { name: string }, got { name: int }',
         ];
         $name = new class {
             public string $first = 'John';
@@ -60,7 +60,7 @@ final class TypeTest extends TestCase
                 {
                 }
             },
-            'Expected {name: {first: string, last: string}}, got {name: {first: string}}',
+            'Expected { name: { first: string, last: string } }, got { name: { first: string } }',
         ];
     }
 
@@ -136,7 +136,7 @@ final class TypeTest extends TestCase
     {
         yield 'Struct' => [
             Type::struct(['name' => Type::string(), 'age' => Type::int()]),
-            '{name: string, age: int}',
+            '{ name: string, age: int }',
         ];
     }
 

@@ -6,7 +6,10 @@ namespace Eventjet\Ausdruck\Test\Unit\Parser;
 
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\SyntaxError;
+use Eventjet\Ausdruck\Parser\TypeNode;
 use Eventjet\Ausdruck\Parser\TypeParser;
+use Eventjet\Ausdruck\Parser\Types;
+use Eventjet\Ausdruck\Type;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 
@@ -56,6 +59,104 @@ final class TypeParserTest extends TestCase
     }
 
     /**
+     * @return iterable<string, array{string, Type}>
+     */
+    public static function parseStringCases(): iterable
+    {
+        yield 'Empty struct' => ['{}', Type::struct([])];
+        yield 'Empty struct with newline' => ["{\n}", Type::struct([])];
+        yield 'Empty struct with blank line' => ["{\n\n}", Type::struct([])];
+        yield 'Struct with a single field' => ['{name: string}', Type::struct(['name' => Type::string()])];
+        yield 'Struct with a single field and whitespace around it' => [
+            '{ name: string }',
+            Type::struct(['name' => Type::string()]),
+        ];
+        yield 'Struct: whitespace after colon' => [
+            '{name : string}',
+            Type::struct(['name' => Type::string()]),
+        ];
+        yield 'Struct: no whitespace after colon' => [
+            '{name:string}',
+            Type::struct(['name' => Type::string()]),
+        ];
+        yield 'Struct with a single field on a separate line' => [
+            <<<EOF
+                {
+                name: string
+                }
+                EOF,
+            Type::struct(['name' => Type::string()]),
+        ];
+        yield 'Struct with a single field on a separate line with indent' => [
+            <<<EOF
+                {
+                    name: string
+                }
+                EOF,
+            Type::struct(['name' => Type::string()]),
+        ];
+        yield 'Trailing comma after struct field' => ['{name: string,}', Type::struct(['name' => Type::string()])];
+        yield 'Trailing comma and whitespace after struct field' => [
+            '{name: string, }',
+            Type::struct(['name' => Type::string()]),
+        ];
+        yield 'Struct field on separate line with trailing comma' => [
+            <<<EOF
+                {
+                name: string,
+                }
+                EOF,
+            Type::struct(['name' => Type::string()]),
+        ];
+        yield 'Struct with multiple fields and no trailing comma' => [
+            '{name: string, age: int}',
+            Type::struct(['name' => Type::string(), 'age' => Type::int()]),
+        ];
+        yield 'Struct with multiple fields, each on a separate line, with no trailing comma' => [
+            <<<EOF
+                {
+                name: string,
+                age: int
+                }
+                EOF,
+            Type::struct(['name' => Type::string(), 'age' => Type::int()]),
+        ];
+        yield 'Struct with multiple fields, each on a separate line, with trailing comma' => [
+            <<<EOF
+                {
+                name: string,
+                age: int,
+                }
+                EOF,
+            Type::struct(['name' => Type::string(), 'age' => Type::int()]),
+        ];
+        yield 'Struct with multiple fields, all on one separate line' => [
+            <<<'EOF'
+                {
+                    name: string, age: int
+                }
+                EOF,
+            Type::struct(['name' => Type::string(), 'age' => Type::int()]),
+        ];
+        yield 'Struct with multiple fields, all on one separate line and a trailing comma' => [
+            <<<'EOF'
+                {
+                    name: string, age: int,
+                }
+                EOF,
+            Type::struct(['name' => Type::string(), 'age' => Type::int()]),
+        ];
+        yield 'Struct nested inside another struct' => [
+            '{name: {first: string}}',
+            Type::struct(['name' => Type::struct(['first' => Type::string()])]),
+        ];
+        yield 'Comma after nested struct' => [
+            '{name: {first: string},}',
+            Type::struct(['name' => Type::struct(['first' => Type::string()])]),
+        ];
+    }
+
+    /**
      * @dataProvider syntaxErrorCases
      */
     public function testSyntaxErrors(string $type, string $expectedMessage): void
@@ -93,5 +194,22 @@ final class TypeParserTest extends TestCase
         if ($expectedSpan !== null) {
             self::assertSame((string)$expectedSpan, (string)$error->location);
         }
+    }
+
+    /**
+     * @dataProvider parseStringCases
+     */
+    public function testParseString(string $typeString, Type $expected): void
+    {
+        /**
+         * @psalm-suppress InternalMethod
+         * @psalm-suppress InternalClass
+         */
+        $node = TypeParser::parseString($typeString);
+        assert($node instanceof TypeNode);
+        $actual = (new Types())->resolve($node);
+
+        self::assertInstanceOf(Type::class, $actual);
+        self::assertTrue($actual->equals($expected));
     }
 }

@@ -42,6 +42,9 @@ final class TypeParser
         if ($parsedToken === null) {
             return null;
         }
+        if ($parsedToken->token === Token::OpenBrace) {
+            return self::parseStruct($tokens, $parsedToken->location());
+        }
         $name = $parsedToken->token;
         if (!is_string($name)) {
             return $parsedToken;
@@ -125,5 +128,49 @@ final class TypeParser
             );
         }
         return new TypeNode('fn', array_merge($params, [$returnType]), $fnLocation->to($returnType->location));
+    }
+
+    /**
+     * @param Peekable<ParsedToken> $tokens
+     */
+    private static function parseStruct(Peekable $tokens, Span $location): TypeNode
+    {
+        $openBrace = $tokens->peek()?->location();
+        assert($openBrace !== null);
+        $tokens->next();
+        $fields = [];
+        while (true) {
+            $nameToken = $tokens->peek();
+            if ($nameToken === null) {
+                break;
+            }
+            $name = $nameToken->token;
+            if (!is_string($name)) {
+                break;
+            }
+            $tokens->next();
+            self::expect($tokens, Token::Colon);
+            $type = self::parse($tokens);
+            if ($type === null) {
+                break;
+            }
+            if (!$type instanceof TypeNode) {
+                throw SyntaxError::create(
+                    sprintf('Expected type, got %s', Token::print($type->token)),
+                    $type->location(),
+                );
+            }
+            $fields[] = TypeNode::keyValue(new TypeNode($name, [], $nameToken->location()), $type);
+            $token = $tokens->peek();
+            if ($token === null) {
+                break;
+            }
+            if ($token->token !== Token::Comma) {
+                break;
+            }
+            $tokens->next();
+        }
+        $closeBrace = self::expect($tokens, Token::CloseBrace)->location();
+        return TypeNode::struct($fields, $location->to($closeBrace));
     }
 }

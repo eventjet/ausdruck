@@ -45,6 +45,8 @@ final class Tokenizer
                 ',' => Token::Comma,
                 '[' => Token::OpenBracket,
                 ']' => Token::CloseBracket,
+                '{' => Token::OpenBrace,
+                '}' => Token::CloseBrace,
                 default => null,
             };
             if ($singleCharToken !== null) {

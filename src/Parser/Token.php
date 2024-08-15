@@ -19,6 +19,8 @@ enum Token: string
     case CloseBracket = ']';
     case OpenAngle = '<';
     case CloseAngle = '>';
+    case OpenBrace = '{';
+    case CloseBrace = '}';
     case Or = '||';
     case And = '&&';
     case Pipe = '|';

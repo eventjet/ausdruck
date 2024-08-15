@@ -164,7 +164,7 @@ final class Type implements Stringable
                 /** @psalm-suppress ImplicitToStringCast */
                 $fields[] = $name . ': ' . $fieldType;
             }
-            return '{' . implode(', ', $fields) . '}';
+            return '{ ' . implode(', ', $fields) . ' }';
         }
         if ($this->name === 'Func') {
             $args = $this->args;
