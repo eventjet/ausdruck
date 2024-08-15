@@ -168,10 +168,7 @@ final class TypeParser
             }
             $fields[] = TypeNode::keyValue(new TypeNode($name, [], $nameToken->location()), $type);
             $token = $tokens->peek();
-            if ($token === null) {
-                break;
-            }
-            if ($token->token !== Token::Comma) {
+            if ($token?->token !== Token::Comma) {
                 break;
             }
             $tokens->next();
