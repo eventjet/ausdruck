@@ -17,24 +17,18 @@ use function sprintf;
 final class Types
 {
     /**
-     * @param array<string, Type<mixed>> $aliases
+     * @param array<string, Type> $aliases
      */
     public function __construct(private readonly array $aliases = [])
     {
     }
 
-    /**
-     * @template T
-     * @param Type<T> $type
-     * @return Type<T> | TypeError
-     */
     private static function noArgs(Type $type, TypeNode $node): Type|TypeError
     {
         if ($node->args === []) {
             return $type;
         }
         $location = $node->args[0]->location->to($node->args[count($node->args) - 1]->location);
-        /** @psalm-suppress ImplicitToStringCast */
         return TypeError::create(sprintf('Invalid type "%s": %s does not accept arguments', $node, $type), $location);
     }
 
@@ -44,9 +38,6 @@ final class Types
         return Span::char(1, 1);
     }
 
-    /**
-     * @return Type<mixed> | TypeError
-     */
     public function resolve(TypeNode $node): Type|TypeError
     {
         return match ($node->name) {
@@ -60,6 +51,7 @@ final class Types
             'list' => $this->resolveList($node),
             'Option' => $this->resolveOption($this->exactlyOneTypeArg($node)),
             'Some' => $this->resolveSome($this->exactlyOneTypeArg($node)),
+            'None' => self::noArgs(Type::none(), $node),
             default => $this->resolveAlias($node->name) ?? TypeError::create(
                 sprintf('Unknown type %s', $node->name),
                 $node->location,
@@ -67,9 +59,6 @@ final class Types
         };
     }
 
-    /**
-     * @return Type<mixed> | TypeError
-     */
     private function exactlyOneTypeArg(TypeNode $node): Type|TypeError
     {
         if ($node->args === []) {
@@ -92,9 +81,6 @@ final class Types
         return $this->resolve($node->args[0]);
     }
 
-    /**
-     * @return Type<list<mixed>> | TypeError
-     */
     private function resolveList(TypeNode $node): Type|TypeError
     {
         $args = $node->args;
@@ -104,7 +90,6 @@ final class Types
         $nArgs = count($args);
         if ($nArgs > 1) {
             $location = $args[0]->location->to($args[count($args) - 1]->location);
-            /** @psalm-suppress ImplicitToStringCast */
             return TypeError::create(
                 sprintf(
                     'Invalid type "%s": list expects exactly one argument, got %d',
@@ -121,9 +106,6 @@ final class Types
         return Type::listOf($valueType);
     }
 
-    /**
-     * @return Type<array<array-key, mixed>> | TypeError
-     */
     private function resolveMap(TypeNode $node): Type|TypeError
     {
         $args = $node->args;
@@ -132,9 +114,7 @@ final class Types
         }
         $nArgs = count($args);
         if ($nArgs !== 2) {
-            /** @psalm-suppress TypeDoesNotContainNull False positive */
             $location = $args[0]->location->to($args[count($args) - 1]->location);
-            /** @psalm-suppress ImplicitToStringCast */
             return TypeError::create(
                 sprintf(
                     'Invalid type "%s": map expects exactly two arguments, got %d',
@@ -149,7 +129,6 @@ final class Types
             return $keyType;
         }
         if (!$keyType->equals(Type::int()) && !$keyType->equals(Type::string())) {
-            /** @psalm-suppress ImplicitToStringCast */
             return TypeError::create(
                 sprintf(
                     'Invalid type "%s": map expects the key type to be int or string, got %s',
@@ -163,13 +142,9 @@ final class Types
         if ($valueType instanceof TypeError) {
             return $valueType;
         }
-        /** @phpstan-ignore-next-line False positive */
         return Type::mapOf($keyType, $valueType);
     }
 
-    /**
-     * @return Type<mixed> | null
-     */
     private function resolveAlias(string $name): Type|null
     {
         $type = $this->aliases[$name] ?? null;
@@ -179,27 +154,16 @@ final class Types
         return Type::alias($name, $type);
     }
 
-    /**
-     * @param Type<mixed> | TypeError $arg
-     * @return Type<mixed> | TypeError
-     */
     private function resolveOption(Type|TypeError $arg): Type|TypeError
     {
         return $arg instanceof TypeError ? $arg : Type::option($arg);
     }
 
-    /**
-     * @param Type<mixed> | TypeError $arg
-     * @return Type<mixed> | TypeError
-     */
     private function resolveSome(Type|TypeError $arg): Type|TypeError
     {
         return $arg instanceof TypeError ? $arg : Type::some($arg);
     }
 
-    /**
-     * @return Type<mixed> | TypeError
-     */
     private function resolveFunction(TypeNode $node): Type|TypeError
     {
         $args = $node->args;

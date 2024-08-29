@@ -22,34 +22,22 @@ final class Expr
     {
     }
 
-    /**
-     * @template T
-     * @param Expression<T> $left
-     * @param Expression<T> $right
-     * @return Expression<bool>
-     */
     public static function eq(Expression $left, Expression $right): Expression
     {
         return Call::infix('===', $left, $right, Type::bool());
     }
 
     /**
-     * @template T
-     * @param Type<T> | class-string<T> | TypeHint<T> $type
-     * @return Get<T>
+     * @param Type | class-string | TypeHint $type
      */
     public static function get(string $name, TypeHint|Type|string $type, Span|null $location = null): Get
     {
-        /** @phpstan-ignore-next-line Must be a PHPStan bug */
         $type = is_string($type) ? Type::object($type) : $type;
-        /** @phpstan-ignore-next-line False positive */
         return new Get($name, $type, $location ?? self::dummySpan());
     }
 
     /**
-     * @template T of string | int | float | bool | null | array<array-key, mixed>
-     * @param T $value
-     * @return Literal<T>
+     * @param string | int | float | bool | null | array<array-key, mixed> $value
      */
     public static function literal(mixed $value, Span|null $location = null): Literal
     {
@@ -57,9 +45,7 @@ final class Expr
     }
 
     /**
-     * @template T
-     * @param list<Expression<T>> $elements
-     * @return ListLiteral<T>
+     * @param list<Expression> $elements
      */
     public static function listLiteral(array $elements, Span $location): ListLiteral
     {
@@ -67,32 +53,25 @@ final class Expr
     }
 
     /**
-     * @template T
-     * @param Expression<mixed> $target
-     * @param list<Expression<mixed>> $arguments
-     * @param Type<T> $type
-     * @return Call<T>
+     * @param list<Expression> $arguments
      */
     public static function call(Expression $target, string $name, Type $type, array $arguments, Span|null $location = null): Call
     {
         return new Call($target, $name, $type, $arguments, $location ?? self::dummySpan());
     }
 
-    /**
-     * @param Expression<bool> $left
-     * @param Expression<bool> $right
-     * @return Expression<bool>
-     */
     public static function or_(Expression $left, Expression $right): Expression
     {
         return Call::infix('||', $left, $right, Type::bool());
     }
 
+    public static function and_(Expression $left, Expression $right): And_
+    {
+        return new And_($left, $right);
+    }
+
     /**
-     * @template T
-     * @param Expression<T> $body
      * @param list<string> $parameters
-     * @return Expression<callable(Scope): T>
      */
     public static function lambda(Expression $body, array $parameters = [], Span|null $location = null): Expression
     {
@@ -101,33 +80,16 @@ final class Expr
         return new Lambda($body, $parameters, $location);
     }
 
-    /**
-     * @template T of int | float
-     * @param Expression<T> $minuend
-     * @param Expression<T> $subtrahend
-     * @return Expression<T>
-     */
     public static function subtract(Expression $minuend, Expression $subtrahend): Expression
     {
         return Call::infix('-', $minuend, $subtrahend, $minuend->getType());
     }
 
-    /**
-     * @template T of int | float
-     * @param Expression<T> $left
-     * @param Expression<T> $right
-     * @return Expression<bool>
-     */
     public static function gt(Expression $left, Expression $right): Expression
     {
         return Call::infix('>', $left, $right, Type::bool());
     }
 
-    /**
-     * @template T of int | float
-     * @param Expression<T> $expression
-     * @return Expression<T>
-     */
     public static function negative(Expression $expression, Span|null $location = null): Expression
     {
         return Call::prefix('-', $expression, $expression->getType(), $location ?? self::dummySpan());

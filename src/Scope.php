@@ -48,10 +48,12 @@ final class Scope
             'contains' => self::contains(...),
             'count' => self::count(...),
             'filter' => self::filter(...),
+            'head' => self::head(...),
             'isSome' => self::isSome(...),
             'map' => self::map(...),
             'some' => self::some(...),
             'substr' => substr(...),
+            'tail' => self::tail(...),
             'take' => self::take(...),
             'unique' => self::unique(...),
             'unwrap' => self::identity(...),
@@ -109,6 +111,16 @@ final class Scope
 
     /**
      * @template T
+     * @param list<T> $items
+     * @return list<T>
+     */
+    private static function tail(array $items): array
+    {
+        return array_slice($items, 1);
+    }
+
+    /**
+     * @template T
      * @param array<array-key, T> $haystack
      * @param T $needle
      */
@@ -148,6 +160,16 @@ final class Scope
             $out[$key] = $item;
         }
         return array_is_list($items) ? array_values($out) : $out;
+    }
+
+    /**
+     * @template T
+     * @param list<T> $items
+     * @return T | null
+     */
+    private static function head(array $items): mixed
+    {
+        return $items[0] ?? null;
     }
 
     /**

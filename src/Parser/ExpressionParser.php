@@ -9,12 +9,12 @@ use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\ListLiteral;
-use Eventjet\Ausdruck\Scope;
 use Eventjet\Ausdruck\Type;
 
 use function array_shift;
 use function assert;
 use function count;
+use function in_array;
 use function is_string;
 use function sprintf;
 use function str_split;
@@ -25,9 +25,6 @@ use function str_split;
  */
 final class ExpressionParser
 {
-    /**
-     * @return Expression<mixed>
-     */
     public static function parse(string $expression, Declarations|Types|null $types = null): Expression
     {
         if ($types === null) {
@@ -46,15 +43,9 @@ final class ExpressionParser
         return self::parseExpression(new Peekable(Tokenizer::tokenize($chars)), $declarations);
     }
 
-    /**
-     * @template T
-     * @param Type<T> $type
-     * @return Expression<T>
-     */
     public static function parseTyped(string $expression, Type $type, Declarations|Types|null $types = null): Expression
     {
         $expr = self::parse($expression, $types);
-        /** @psalm-suppress ImplicitToStringCast */
         return self::assertExpressionType($expr, $type, sprintf(
             'Expected parsed expression to be of type %s, got %s',
             $type,
@@ -64,11 +55,10 @@ final class ExpressionParser
 
     /**
      * @param Peekable<ParsedToken> $tokens
-     * @return Expression<mixed>
      */
     private static function parseExpression(Peekable $tokens, Declarations $declarations): Expression
     {
-        /** @var Expression<mixed> | null $expr */
+        /** @var Expression | null $expr */
         $expr = null;
         while (true) {
             $newExpr = self::parseLazy($expr, $tokens, $declarations);
@@ -90,9 +80,7 @@ final class ExpressionParser
     }
 
     /**
-     * @param Expression<mixed> | null $left
      * @param Peekable<ParsedToken> $tokens
-     * @return Expression<mixed> | null
      */
     private static function parseLazy(Expression|null $left, Peekable $tokens, Declarations $declarations): Expression|null
     {
@@ -126,7 +114,6 @@ final class ExpressionParser
                 self::unexpectedToken($parsedToken);
             }
             $right = self::parseExpression($tokens, $declarations);
-            /** @psalm-suppress ImplicitToStringCast */
             $right = self::assertExpressionType($right, $left->getType(), sprintf(
                 'The expressions of both sides of === must be of the same type. Left: %s, right: %s',
                 $left->getType(),
@@ -134,25 +121,23 @@ final class ExpressionParser
             ));
             return $left->eq($right);
         }
-        if ($token === Token::Or) {
+        if (in_array($token, [Token::Or, Token::And], true)) {
             $tokens->next();
             if ($left === null) {
                 self::unexpectedToken($parsedToken);
             }
-            /** @psalm-suppress ImplicitToStringCast */
             $left = self::assertExpressionType($left, Type::bool(), sprintf(
                 'The expression on the left side of %s must be boolean, got %s',
                 Token::print($token),
                 $left->getType(),
             ));
             $right = self::parseExpression($tokens, $declarations);
-            /** @psalm-suppress ImplicitToStringCast */
             $right = self::assertExpressionType($right, Type::bool(), sprintf(
                 'The expression on the right side of %s must be boolean, got %s',
                 Token::print($token),
                 $right->getType(),
             ));
-            return $left->or_($right);
+            return $token === Token::Or ? $left->or_($right) : $left->and_($right);
         }
         if ($token === Token::Pipe) {
             return self::lambda($tokens, $declarations);
@@ -163,9 +148,7 @@ final class ExpressionParser
             if ($right === null) {
                 throw SyntaxError::create('Unexpected end of input', Span::char($parsedToken->line, $parsedToken->column + 1));
             }
-            /** @phpstan-ignore-next-line False positive */
             if (!$right->matchesType(Type::int()) && !$right->matchesType(Type::float())) {
-                /** @psalm-suppress ImplicitToStringCast */
                 throw TypeError::create(
                     $left === null
                         ? sprintf('Can\'t negate %s', $right->getType())
@@ -174,17 +157,14 @@ final class ExpressionParser
                 );
             }
             if ($left === null) {
-                /** @phpstan-ignore-next-line False positive */
                 return Expr::negative($right, $parsedToken->location()->to($right->location()));
             }
             if (!$left->getType()->equals($right->getType())) {
-                /** @psalm-suppress ImplicitToStringCast */
                 throw TypeError::create(
                     sprintf('Can\'t subtract %s from %s', $right->getType(), $left->getType()),
                     $left->location(),
                 );
             }
-            /** @phpstan-ignore-next-line False positive */
             return $left->subtract($right);
         }
         if ($token === Token::CloseAngle) {
@@ -193,16 +173,12 @@ final class ExpressionParser
             }
             $tokens->next();
             $right = self::parseExpression($tokens, $declarations);
-            /** @phpstan-ignore-next-line False positive */
             if (!$right->matchesType(Type::int()) && !$right->matchesType(Type::float())) {
-                /** @psalm-suppress ImplicitToStringCast */
                 throw TypeError::create(sprintf('Can\'t compare %s to %s', $right->getType(), $left->getType()), $right->location());
             }
             if (!$left->matchesType($right->getType())) {
-                /** @psalm-suppress ImplicitToStringCast */
                 throw TypeError::create(sprintf('Can\'t compare %s to %s', $left->getType(), $right->getType()), $left->location()->to($right->location()));
             }
-            /** @phpstan-ignore-next-line False positive */
             return $left->gt($right);
         }
         if ($token === Token::OpenBracket) {
@@ -216,7 +192,6 @@ final class ExpressionParser
      * ===========
      *
      * @param Peekable<ParsedToken> $tokens
-     * @return Get<mixed>
      */
     private static function variable(string $name, Peekable $tokens, Declarations $declarations): Get
     {
@@ -288,7 +263,7 @@ final class ExpressionParser
      *      ===================================================
      *
      * @param Peekable<ParsedToken> $tokens
-     * @return list<Expression<mixed>>
+     * @return list<Expression>
      */
     private static function parseArgs(Peekable $tokens, Declarations $declarations): array
     {
@@ -308,7 +283,6 @@ final class ExpressionParser
      *      ==================
      *
      * @param Peekable<ParsedToken> $tokens
-     * @return Expression<mixed> | null
      */
     private static function parseArg(Peekable $tokens, Declarations $declarations): Expression|null
     {
@@ -332,7 +306,6 @@ final class ExpressionParser
      * =======================================
      *
      * @param Peekable<ParsedToken> $tokens
-     * @return Expression<callable(Scope): mixed>
      */
     private static function lambda(Peekable $tokens, Declarations $declarations): Expression
     {
@@ -381,22 +354,11 @@ final class ExpressionParser
         return $token;
     }
 
-    /**
-     * @template T
-     * @param Expression<mixed> $expr
-     * @param Type<T> $type
-     * @return Expression<T>
-     */
     private static function assertExpressionType(Expression $expr, Type $type, string $errorMessage): Expression
     {
-        /** @psalm-suppress RedundantCondition False positive. This check is _not_ redundant. */
         if ($expr->matchesType($type)) {
             return $expr;
         }
-        /**
-         * @psalm-suppress MixedArgument False positive
-         * @psalm-suppress MixedMethodCall False positive
-         */
         throw TypeError::create($errorMessage, $expr->location());
     }
 
@@ -409,10 +371,7 @@ final class ExpressionParser
      * list<string>.some:bool(|item| item:string === needle:string)
      *             ================================================
      *
-     * @template T
-     * @param Expression<T> $target
      * @param Peekable<ParsedToken> $tokens
-     * @return Call<mixed>
      */
     private static function call(Expression $target, Peekable $tokens, Declarations $declarations): Call
     {
@@ -545,7 +504,6 @@ final class ExpressionParser
 
     /**
      * @param Peekable<ParsedToken> $tokens
-     * @return ListLiteral<mixed>
      */
     private static function parseListLiteral(Peekable $tokens, Declarations $declarations): ListLiteral
     {

@@ -22,7 +22,7 @@ use function strlen;
 final class ExpressionParserTest extends TestCase
 {
     /**
-     * @return iterable<array-key, array{string, Expression<mixed>}>
+     * @return iterable<array-key, array{string, Expression}>
      */
     public static function parseCases(): iterable
     {
@@ -68,7 +68,7 @@ final class ExpressionParserTest extends TestCase
     }
 
     /**
-     * @return iterable<array-key, array{string, Expression<mixed>}>
+     * @return iterable<array-key, array{string, Expression}>
      */
     public static function nonCanonicalParseCases(): iterable
     {
@@ -139,6 +139,7 @@ final class ExpressionParserTest extends TestCase
         yield 'end of string after function name' => ['foo:string.substr'];
         yield 'list literal: missing closing bracket' => ['[1, 2'];
         yield 'empty pair or curly braces' => ['{}'];
+        yield 'single ampersand' => ['foo:bool & bar:bool'];
     }
 
     /**
@@ -314,6 +315,14 @@ final class ExpressionParserTest extends TestCase
                 '|x, "test"| x:string',
                 '    ======          ',
             ],
+            [
+                'foo:bool & bar:bool',
+                '         =         ',
+            ],
+            [
+                'foo:bool && bar::bool',
+                '                =    ',
+            ],
         ];
         foreach ($cases as [$expression, $location]) {
             preg_match('/^(?<spaces> *)(?<underline>=+)/', $location, $matches);
@@ -415,7 +424,6 @@ final class ExpressionParserTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> $expected
      * @dataProvider parseCases
      * @dataProvider nonCanonicalParseCases
      */
@@ -423,7 +431,6 @@ final class ExpressionParserTest extends TestCase
     {
         $actual = ExpressionParser::parse($str);
 
-        /** @psalm-suppress ImplicitToStringCast */
         self::assertTrue($actual->equals($expected), sprintf(
             "Expected:\n%s\nActual:\n%s",
             $expected,
@@ -432,7 +439,6 @@ final class ExpressionParserTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> $expr
      * @dataProvider parseCases
      */
     public function testToString(string $expected, Expression $expr): void

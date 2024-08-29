@@ -12,12 +12,12 @@ use function sprintf;
 
 final class Declarations
 {
-    /** @var array<string, Type<callable(mixed...): mixed>> */
+    /** @var array<string, Type> */
     public readonly array $functions;
 
     /**
-     * @param array<string, Type<mixed>> $variables
-     * @param array<string, Type<callable(mixed...): mixed>> $functions
+     * @param array<string, Type> $variables
+     * @param array<string, Type> $functions
      */
     public function __construct(
         public readonly Types $types = new Types(),

@@ -14,8 +14,6 @@ use function implode;
 use function sprintf;
 
 /**
- * @template T
- * @extends Expression<T>
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
@@ -24,9 +22,7 @@ final class Call extends Expression
     use LocationTrait;
 
     /**
-     * @param Expression<mixed> $target
-     * @param list<Expression<mixed>> $arguments
-     * @param Type<T> $type
+     * @param list<Expression> $arguments
      */
     public function __construct(
         public readonly Expression $target,
@@ -63,8 +59,8 @@ final class Call extends Expression
     }
 
     /**
-     * @param list<Expression<mixed>> $a
-     * @param list<Expression<mixed>> $b
+     * @param list<Expression> $a
+     * @param list<Expression> $b
      */
     private static function compareArguments(array $a, array $b): bool
     {
@@ -85,7 +81,6 @@ final class Call extends Expression
         return match ($this->callType) {
             CallType::Infix => sprintf('%s %s %s', $this->target, $this->name, $this->arguments[0]),
             CallType::Prefix => sprintf('%s%s', $this->name, $this->target),
-            /** @psalm-suppress ImplicitToStringCast */
             CallType::Method => sprintf('%s.%s:%s(%s)', $this->target, $this->name, $this->type, implode(', ', $this->arguments)),
         };
     }
@@ -107,7 +102,6 @@ final class Call extends Expression
 
     public function equals(Expression $other): bool
     {
-        /** @psalm-suppress RedundantConditionGivenDocblockType False positive */
         return $other instanceof self
             && $this->target->equals($other->target)
             && $this->name === $other->name

@@ -8,80 +8,56 @@ use Eventjet\Ausdruck\Parser\Span;
 use Stringable;
 
 /**
- * @template-covariant T
  * @api
  */
 abstract class Expression implements Stringable
 {
-    /**
-     * @param self<mixed> $other
-     * @return Expression<bool>
-     */
-    public function eq(self $other): self
+    public function eq(self $other): Expression
     {
         return Expr::eq($this, $other);
     }
 
-    /**
-     * @template U of int | float
-     * @param Expression<U> $subtrahend
-     * @return Expression<U>
-     */
-    public function subtract(self $subtrahend): self
+    public function subtract(self $subtrahend): Expression
     {
-        /** @var self<U> $self */
+        /** @var self $self */
         $self = $this;
         return Expr::subtract($self, $subtrahend);
     }
 
-    /**
-     * @template U of int | float
-     * @param Expression<U> $right
-     * @return Expression<bool>
-     */
-    public function gt(self $right): self
+    public function gt(self $right): Expression
     {
-        /** @var self<U> $self */
+        /** @var self $self */
         $self = $this;
         return Expr::gt($self, $right);
     }
 
-    /**
-     * @param self<bool> $other
-     * @return Expression<bool>
-     */
-    public function or_(self $other): self
+    public function or_(self $other): Expression
     {
-        /** @var self<bool> $self */
+        /** @var self $self */
         $self = $this;
         return Expr::or_($self, $other);
     }
 
+    public function and_(self $other): self
+    {
+        /** @var self $self */
+        $self = $this;
+        return Expr::and_($self, $other);
+    }
+
     /**
-     * @template U
-     * @param list<Expression<mixed>> $arguments
-     * @param Type<U> $type
-     * @return Call<U>
+     * @param list<Expression> $arguments
      */
     public function call(string $name, Type $type, array $arguments, Span|null $location = null): Call
     {
         return Expr::call($this, $name, $type, $arguments, $location);
     }
 
-    /**
-     * @template U
-     * @param Type<U> $type
-     * @psalm-assert-if-true self<U> $this
-     * @phpstan-assert-if-true self<U> $this
-     */
     public function matchesType(Type $type): bool
     {
         return $this->getType()->equals($type);
     }
 
-    /**
-     * @param Type<mixed> $type
-     */
     public function isSubtypeOf(Type $type): bool
     {
         return $this->getType()->isSubtypeOf($type);
@@ -90,18 +66,11 @@ abstract class Expression implements Stringable
     abstract public function location(): Span;
 
     /**
-     * @return T
      * @throws EvaluationError
      */
     abstract public function evaluate(Scope $scope): mixed;
 
-    /**
-     * @param Expression<mixed> $other
-     */
     abstract public function equals(self $other): bool;
 
-    /**
-     * @return Type<T>
-     */
     abstract public function getType(): Type;
 }

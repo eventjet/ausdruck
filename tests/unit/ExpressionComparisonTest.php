@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
+use Eventjet\Ausdruck\And_;
 use Eventjet\Ausdruck\Call;
 use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
@@ -18,7 +19,7 @@ use PHPUnit\Framework\TestCase;
 final class ExpressionComparisonTest extends TestCase
 {
     /**
-     * @return iterable<array-key, array{Expression<mixed>, Expression<mixed>}>
+     * @return iterable<array-key, array{Expression, Expression}>
      */
     public static function equalsCases(): iterable
     {
@@ -54,10 +55,14 @@ final class ExpressionComparisonTest extends TestCase
             Expr::listLiteral([Expr::literal(1), Expr::literal(2), Expr::literal(3)], Span::char(1, 1)),
             Expr::listLiteral([Expr::literal(1), Expr::literal(2), Expr::literal(3)], Span::char(1, 1)),
         ];
+        yield [
+            Expr::and_(Expr::literal(true), Expr::literal(false)),
+            Expr::and_(Expr::literal(true), Expr::literal(false)),
+        ];
     }
 
     /**
-     * @return iterable<string, array{Expression<mixed>, Expression<mixed>}>
+     * @return iterable<string, array{Expression, Expression}>
      */
     public static function notEqualsCases(): iterable
     {
@@ -124,6 +129,30 @@ final class ExpressionComparisonTest extends TestCase
         yield '||: different type' => [
             Expr::or_(Expr::literal(true), Expr::literal(false)),
             Expr::eq(Expr::literal(true), Expr::literal(false)),
+        ];
+        yield And_::class . ': left is different' => [
+            Expr::and_(Expr::literal(true), Expr::literal(false)),
+            Expr::and_(Expr::literal(false), Expr::literal(false)),
+        ];
+        yield And_::class . ': right is different' => [
+            Expr::and_(Expr::literal(true), Expr::literal(false)),
+            Expr::and_(Expr::literal(true), Expr::literal(true)),
+        ];
+        yield And_::class . ': both are different' => [
+            Expr::and_(Expr::literal(true), Expr::literal(false)),
+            Expr::and_(Expr::literal(false), Expr::literal(true)),
+        ];
+        yield And_::class . ': different type' => [
+            Expr::and_(Expr::literal(true), Expr::literal(false)),
+            Expr::eq(Expr::literal(true), Expr::literal(false)),
+        ];
+        yield And_::class . ' and ' . Or_::class => [
+            Expr::and_(Expr::literal(false), Expr::literal(false)),
+            Expr::or_(Expr::literal(false), Expr::literal(false)),
+        ];
+        yield And_::class . ' and ' . Or_::class . ' with different operands' => [
+            Expr::and_(Expr::literal(false), Expr::literal(false)),
+            Expr::or_(Expr::literal(true), Expr::literal(true)),
         ];
         yield '-: minuend is different' => [
             Expr::subtract(Expr::literal(1), Expr::literal(2)),
@@ -200,8 +229,6 @@ final class ExpressionComparisonTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> $a
-     * @param Expression<mixed> $b
      * @dataProvider equalsCases
      */
     public function testEquals(Expression $a, Expression $b): void
@@ -211,8 +238,6 @@ final class ExpressionComparisonTest extends TestCase
     }
 
     /**
-     * @param Expression<mixed> $a
-     * @param Expression<mixed> $b
      * @dataProvider notEqualsCases
      */
     public function testNotEquals(Expression $a, Expression $b): void

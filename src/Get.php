@@ -6,14 +6,11 @@ namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\TypeHint;
-use TypeError;
 
 use function get_debug_type;
 use function sprintf;
 
 /**
- * @template T
- * @extends Expression<T>
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
@@ -21,12 +18,8 @@ final class Get extends Expression
 {
     use LocationTrait;
 
-    /** @var TypeHint<T> */
     private readonly TypeHint $typeHint;
 
-    /**
-     * @param Type<T> | TypeHint<T> $type
-     */
     public function __construct(public readonly string $name, Type|TypeHint $type, Span $location)
     {
         $this->location = $location;
@@ -41,9 +34,6 @@ final class Get extends Expression
         return sprintf('%s%s', $this->name, $this->typeHint);
     }
 
-    /**
-     * @return T
-     */
     public function evaluate(Scope $scope): mixed
     {
         /** @psalm-suppress MixedAssignment */
@@ -53,8 +43,7 @@ final class Get extends Expression
         }
         try {
             return $this->typeHint->type->assert($value);
-        } catch (TypeError $e) {
-            /** @psalm-suppress ImplicitToStringCast */
+        } catch (Parser\TypeError $e) {
             throw new EvaluationError(
                 sprintf(
                     'Expected variable "%s" to be of type %s, got %s: %s',
