@@ -22,9 +22,9 @@ final class Expr
     {
     }
 
-    public static function eq(Expression $left, Expression $right): Eq
+    public static function eq(Expression $left, Expression $right): Expression
     {
-        return new Eq($left, $right);
+        return Call::infix('===', $left, $right, Type::bool());
     }
 
     /**
@@ -60,9 +60,9 @@ final class Expr
         return new Call($target, $name, $type, $arguments, $location ?? self::dummySpan());
     }
 
-    public static function or_(Expression $left, Expression $right): Or_
+    public static function or_(Expression $left, Expression $right): Expression
     {
-        return new Or_($left, $right);
+        return Call::infix('||', $left, $right, Type::bool());
     }
 
     public static function and_(Expression $left, Expression $right): And_
@@ -80,19 +80,19 @@ final class Expr
         return new Lambda($body, $parameters, $location);
     }
 
-    public static function subtract(Expression $minuend, Expression $subtrahend): Subtract
+    public static function subtract(Expression $minuend, Expression $subtrahend): Expression
     {
-        return new Subtract($minuend, $subtrahend);
+        return Call::infix('-', $minuend, $subtrahend, $minuend->getType());
     }
 
-    public static function gt(Expression $left, Expression $right): Gt
+    public static function gt(Expression $left, Expression $right): Expression
     {
-        return new Gt($left, $right);
+        return Call::infix('>', $left, $right, Type::bool());
     }
 
-    public static function negative(Expression $expression, Span|null $location = null): Negative
+    public static function negative(Expression $expression, Span|null $location = null): Expression
     {
-        return new Negative($expression, $location ?? self::dummySpan());
+        return Call::prefix('-', $expression, $expression->getType(), $location ?? self::dummySpan());
     }
 
     private static function dummySpan(): Span

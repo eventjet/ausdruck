@@ -6,18 +6,13 @@ namespace Eventjet\Ausdruck\Test\Unit;
 
 use Eventjet\Ausdruck\And_;
 use Eventjet\Ausdruck\Call;
-use Eventjet\Ausdruck\Eq;
 use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\Get;
-use Eventjet\Ausdruck\Gt;
 use Eventjet\Ausdruck\Lambda;
 use Eventjet\Ausdruck\ListLiteral;
 use Eventjet\Ausdruck\Literal;
-use Eventjet\Ausdruck\Negative;
-use Eventjet\Ausdruck\Or_;
 use Eventjet\Ausdruck\Parser\Span;
-use Eventjet\Ausdruck\Subtract;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\TestCase;
 
@@ -71,15 +66,15 @@ final class ExpressionComparisonTest extends TestCase
      */
     public static function notEqualsCases(): iterable
     {
-        yield Eq::class . ': left is different' => [
+        yield '===: left is different' => [
             Expr::eq(Expr::literal('a'), Expr::literal('a')),
             Expr::eq(Expr::literal('b'), Expr::literal('a')),
         ];
-        yield Eq::class . ': right is different' => [
+        yield '===: right is different' => [
             Expr::eq(Expr::literal('a'), Expr::literal('a')),
             Expr::eq(Expr::literal('a'), Expr::literal('b')),
         ];
-        yield Eq::class . ': different type' => [
+        yield '===: different type' => [
             Expr::eq(Expr::literal('a'), Expr::literal('a')),
             Expr::or_(Expr::literal(true), Expr::literal(false)),
         ];
@@ -119,19 +114,19 @@ final class ExpressionComparisonTest extends TestCase
             Expr::literal('foo'),
             Expr::get('foo', Type::string()),
         ];
-        yield Or_::class . ': left is different' => [
+        yield '||: left is different' => [
             Expr::or_(Expr::literal(true), Expr::literal(false)),
             Expr::or_(Expr::literal(false), Expr::literal(false)),
         ];
-        yield Or_::class . ': right is different' => [
+        yield '||: right is different' => [
             Expr::or_(Expr::literal(true), Expr::literal(false)),
             Expr::or_(Expr::literal(true), Expr::literal(true)),
         ];
-        yield Or_::class . ': both are different' => [
+        yield '||: both are different' => [
             Expr::or_(Expr::literal(true), Expr::literal(false)),
             Expr::or_(Expr::literal(false), Expr::literal(true)),
         ];
-        yield Or_::class . ': different type' => [
+        yield '||: different type' => [
             Expr::or_(Expr::literal(true), Expr::literal(false)),
             Expr::eq(Expr::literal(true), Expr::literal(false)),
         ];
@@ -139,39 +134,39 @@ final class ExpressionComparisonTest extends TestCase
             Expr::and_(Expr::literal(true), Expr::literal(false)),
             Expr::and_(Expr::literal(false), Expr::literal(false)),
         ];
-        yield And_::class . ': right is different' => [
+        yield '&&: right is different' => [
             Expr::and_(Expr::literal(true), Expr::literal(false)),
             Expr::and_(Expr::literal(true), Expr::literal(true)),
         ];
-        yield And_::class . ': both are different' => [
+        yield '&&: both are different' => [
             Expr::and_(Expr::literal(true), Expr::literal(false)),
             Expr::and_(Expr::literal(false), Expr::literal(true)),
         ];
-        yield And_::class . ': different type' => [
+        yield '&&: different type' => [
             Expr::and_(Expr::literal(true), Expr::literal(false)),
             Expr::eq(Expr::literal(true), Expr::literal(false)),
         ];
-        yield And_::class . ' and ' . Or_::class => [
+        yield '&& and ||' => [
             Expr::and_(Expr::literal(false), Expr::literal(false)),
             Expr::or_(Expr::literal(false), Expr::literal(false)),
         ];
-        yield And_::class . ' and ' . Or_::class . ' with different operands' => [
+        yield '&& and || with different operands' => [
             Expr::and_(Expr::literal(false), Expr::literal(false)),
             Expr::or_(Expr::literal(true), Expr::literal(true)),
         ];
-        yield Subtract::class . ': minuend is different' => [
+        yield '-: minuend is different' => [
             Expr::subtract(Expr::literal(1), Expr::literal(2)),
             Expr::subtract(Expr::literal(2), Expr::literal(2)),
         ];
-        yield Subtract::class . ': subtrahend is different' => [
+        yield '-: subtrahend is different' => [
             Expr::subtract(Expr::literal(1), Expr::literal(2)),
             Expr::subtract(Expr::literal(1), Expr::literal(1)),
         ];
-        yield Subtract::class . ': subtrahend and minuend are different' => [
+        yield '-: subtrahend and minuend are different' => [
             Expr::subtract(Expr::literal(1), Expr::literal(2)),
             Expr::subtract(Expr::literal(2), Expr::literal(1)),
         ];
-        yield Subtract::class . ': different type' => [
+        yield '-: different type' => [
             Expr::subtract(Expr::literal(1), Expr::literal(2)),
             Expr::literal(1),
         ];
@@ -199,27 +194,27 @@ final class ExpressionComparisonTest extends TestCase
             Expr::call(Expr::literal(1), 'foo', Type::int(), []),
             Expr::literal(1),
         ];
-        yield Gt::class . ': left is different' => [
+        yield '>: left is different' => [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
             Expr::gt(Expr::literal(2), Expr::literal(2)),
         ];
-        yield Gt::class . ': right is different' => [
+        yield '>: right is different' => [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
             Expr::gt(Expr::literal(1), Expr::literal(1)),
         ];
-        yield Gt::class . ': both are different' => [
+        yield '>: both are different' => [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
             Expr::gt(Expr::literal(2), Expr::literal(1)),
         ];
-        yield Gt::class . ': different type' => [
+        yield '>: different type' => [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
             Expr::eq(Expr::literal(1), Expr::literal(2)),
         ];
-        yield Negative::class . ': different type' => [
+        yield 'Negative: different type' => [
             Expr::negative(Expr::literal(1)),
             Expr::literal(1),
         ];
-        yield Negative::class . ': different expression' => [
+        yield 'Negative: different expression' => [
             Expr::negative(Expr::literal(1)),
             Expr::negative(Expr::literal(2)),
         ];

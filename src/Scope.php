@@ -41,6 +41,10 @@ final class Scope
     public function __construct(private readonly array $vars = [], array $funcs = [], private readonly Scope|null $parent = null)
     {
         $predefinedFuncs = $this->parent === null ? [
+            '||' => self::or(...),
+            '===' => self::eq(...),
+            '-' => self::subtract(...),
+            '>' => self::gt(...),
             'contains' => self::contains(...),
             'count' => self::count(...),
             'filter' => self::filter(...),
@@ -213,6 +217,33 @@ final class Scope
     private static function identity(mixed $value): mixed
     {
         return $value;
+    }
+
+    private static function or(bool $left, bool $right): bool
+    {
+        return $left || $right;
+    }
+
+    private static function eq(mixed $left, mixed $right): bool
+    {
+        return $left === $right;
+    }
+
+    /**
+     * @return ($minuend is float ? float : ($subtrahend is float ? float : int))
+     */
+    private static function subtract(int|float $minuend, int|float|null $subtrahend = null): int|float
+    {
+        if ($subtrahend === null) {
+            return -$minuend;
+        }
+        /** @psalm-suppress InvalidOperand */
+        return $minuend - $subtrahend;
+    }
+
+    private static function gt(int|float $left, int|float $right): bool
+    {
+        return $left > $right;
     }
 
     /**
