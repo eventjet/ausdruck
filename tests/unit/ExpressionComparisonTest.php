@@ -134,23 +134,23 @@ final class ExpressionComparisonTest extends TestCase
             Expr::and_(Expr::literal(true), Expr::literal(false)),
             Expr::and_(Expr::literal(false), Expr::literal(false)),
         ];
-        yield And_::class . ': right is different' => [
+        yield '&&: right is different' => [
             Expr::and_(Expr::literal(true), Expr::literal(false)),
             Expr::and_(Expr::literal(true), Expr::literal(true)),
         ];
-        yield And_::class . ': both are different' => [
+        yield '&&: both are different' => [
             Expr::and_(Expr::literal(true), Expr::literal(false)),
             Expr::and_(Expr::literal(false), Expr::literal(true)),
         ];
-        yield And_::class . ': different type' => [
+        yield '&&: different type' => [
             Expr::and_(Expr::literal(true), Expr::literal(false)),
             Expr::eq(Expr::literal(true), Expr::literal(false)),
         ];
-        yield And_::class . ' and ' . Or_::class => [
+        yield '&& and ||' => [
             Expr::and_(Expr::literal(false), Expr::literal(false)),
             Expr::or_(Expr::literal(false), Expr::literal(false)),
         ];
-        yield And_::class . ' and ' . Or_::class . ' with different operands' => [
+        yield '&& and || with different operands' => [
             Expr::and_(Expr::literal(false), Expr::literal(false)),
             Expr::or_(Expr::literal(true), Expr::literal(true)),
         ];

@@ -12,26 +12,26 @@ use Stringable;
  */
 abstract class Expression implements Stringable
 {
-    public function eq(self $other): Expression
+    public function eq(self $other): self
     {
         return Expr::eq($this, $other);
     }
 
-    public function subtract(self $subtrahend): Expression
+    public function subtract(self $subtrahend): self
     {
         /** @var self $self */
         $self = $this;
         return Expr::subtract($self, $subtrahend);
     }
 
-    public function gt(self $right): Expression
+    public function gt(self $right): self
     {
         /** @var self $self */
         $self = $this;
         return Expr::gt($self, $right);
     }
 
-    public function or_(self $other): Expression
+    public function or_(self $other): self
     {
         /** @var self $self */
         $self = $this;

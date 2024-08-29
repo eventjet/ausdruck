@@ -35,24 +35,11 @@ final class Call extends Expression
         $this->location = $location;
     }
 
-    /**
-     * @template U
-     * @param Expression<mixed> $left
-     * @param Expression<mixed> $right
-     * @param Type<U> $type
-     * @return self<U>
-     */
     public static function infix(string $name, Expression $left, Expression $right, Type $type): self
     {
         return new self($left, $name, $type, [$right], $left->location()->to($right->location()), CallType::Infix);
     }
 
-    /**
-     * @template U
-     * @param Expression<mixed> $argument
-     * @param Type<U> $type
-     * @return self<U>
-     */
     public static function prefix(string $name, Expression $argument, Type $type, Span $location): self
     {
         return new self($argument, $name, $type, [], $location, CallType::Prefix);
