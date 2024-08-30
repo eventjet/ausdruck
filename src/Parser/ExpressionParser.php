@@ -10,6 +10,7 @@ use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\FieldAccess;
 use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\ListLiteral;
+use Eventjet\Ausdruck\StructLiteral;
 use Eventjet\Ausdruck\Type;
 
 use function array_key_exists;
@@ -185,6 +186,9 @@ final class ExpressionParser
         }
         if ($token === Token::OpenBracket) {
             return self::parseListLiteral($tokens, $declarations);
+        }
+        if ($token === Token::OpenBrace) {
+            return self::parseStructLiteral($tokens, $declarations);
         }
         return null;
     }
@@ -549,5 +553,50 @@ final class ExpressionParser
         }
         $close = self::expect($tokens, Token::CloseBracket);
         return Expr::listLiteral($items, $start->location()->to($close->location()));
+    }
+
+    /**
+     * @param Peekable<ParsedToken> $tokens
+     */
+    private static function parseStructLiteral(Peekable $tokens, Declarations $declarations): StructLiteral
+    {
+        $start = self::expect($tokens, Token::OpenBrace);
+        $fields = [];
+        while (true) {
+            $field = self::parseStructField($tokens, $declarations);
+            if ($field === null) {
+                break;
+            }
+            $fields[$field[0]] = $field[1];
+            $comma = $tokens->peek();
+            if ($comma?->token !== Token::Comma) {
+                break;
+            }
+            $tokens->next();
+        }
+        $close = self::expect($tokens, Token::CloseBrace);
+        return Expr::structLiteral($fields, $start->location()->to($close->location()));
+    }
+
+    /**
+     * @param Peekable<ParsedToken> $tokens
+     * @return array{string, Expression} | null
+     */
+    private static function parseStructField(Peekable $tokens, Declarations $declarations): array|null
+    {
+        $name = $tokens->peek();
+        if ($name === null) {
+            return null;
+        }
+        if (!is_string($name->token)) {
+            return null;
+        }
+        $tokens->next();
+        self::expect($tokens, Token::Colon);
+        $value = self::parseLazy(null, $tokens, $declarations);
+        if ($value === null) {
+            throw SyntaxError::create('Expected value after colon', self::nextSpan($tokens));
+        }
+        return [$name->token, $value];
     }
 }

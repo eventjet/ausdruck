@@ -47,6 +47,14 @@ final class Expr
     }
 
     /**
+     * @param array<string, Expression> $fields
+     */
+    public static function structLiteral(array $fields, Span $location): StructLiteral
+    {
+        return new StructLiteral($fields, $location);
+    }
+
+    /**
      * @param list<Expression> $arguments
      */
     public static function call(Expression $target, string $name, Type $type, array $arguments, Span|null $location = null): Call

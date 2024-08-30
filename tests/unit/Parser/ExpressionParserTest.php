@@ -137,7 +137,13 @@ final class ExpressionParserTest extends TestCase
         yield 'end of string after function dot' => ['foo:string.'];
         yield 'missing function name' => ['foo:string.:string()'];
         yield 'list literal: missing closing bracket' => ['[1, 2'];
-        yield 'empty pair or curly braces' => ['{}'];
+        yield 'end of string after curly brace' => ['{'];
+        yield 'struct literal in field name position' => ['{{name: "John"}: "John"}'];
+        yield 'missing colon in struct literal' => ['{name "John"}'];
+        yield 'end of string after struct field name' => ['{name'];
+        yield 'end of string after struct field colon' => ['{name:'];
+        yield 'end of string after struct field value' => ['{name: "John"'];
+        yield 'missing comma between struct fields' => ['{name: "John" age: 42}'];
         yield 'single ampersand' => ['foo:bool & bar:bool'];
         yield 'non-token, non-identifier symbol' => ['foo:bool € bar:bool'];
         yield 'identifier starting with a number' => ['42foo:bool', 'Unexpected identifier foo'];

@@ -245,6 +245,9 @@ final class ExpressionTest extends TestCase
                 new Scope(['foo' => self::struct(a: self::struct(b: 1)), 'bar' => self::struct(a: self::struct(b: 1))]),
                 true,
             ],
+            ['{name: "John"}.name', new Scope(), 'John'],
+            ['{name: "John", age: 37}.age', new Scope(), 37],
+            ['{name: "John", age: 37,}.age', new Scope(), 37],
         ];
         foreach ($cases as $tuple) {
             [$expr, $scope, $expected] = $tuple;
