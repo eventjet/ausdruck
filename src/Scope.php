@@ -15,16 +15,18 @@ use function array_slice;
 use function array_values;
 use function count;
 use function get_debug_type;
+use function get_object_vars;
 use function implode;
 use function in_array;
 use function is_bool;
 use function is_int;
+use function is_object;
 use function is_string;
 use function sprintf;
 
 /**
  * @phpstan-type Shape array{
- *     vars?: array<string, string | int | bool | null>,
+ *     vars?: array<string, string | int | bool | array<string, mixed> | null>,
  *     parent?: mixed,
  * }
  * @api
@@ -216,6 +218,18 @@ final class Scope
     }
 
     /**
+     * @return string|int|bool|array<string, mixed>|null
+     */
+    private static function printValue(mixed $var): string|int|bool|array|null
+    {
+        return match (true) {
+            $var === null || is_string($var) || is_int($var) || is_bool($var) => $var,
+            is_object($var) => array_map(self::printValue(...), get_object_vars($var)),
+            default => get_debug_type($var),
+        };
+    }
+
+    /**
      * @internal
      */
     public function debug(): string
@@ -254,12 +268,7 @@ final class Scope
     private function shape(): array
     {
         $shape = [];
-        $vars = array_map(static function (mixed $var): string|int|bool|null {
-            return match (true) {
-                $var === null || is_string($var) || is_int($var) || is_bool($var) => $var,
-                default => get_debug_type($var),
-            };
-        }, $this->vars);
+        $vars = array_map(self::printValue(...), $this->vars);
         if ($vars !== []) {
             $shape['vars'] = $vars;
         }

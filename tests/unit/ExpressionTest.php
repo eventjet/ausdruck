@@ -220,6 +220,31 @@ final class ExpressionTest extends TestCase
             ['abcdefghijklmnopqrstuvwxyz:bool', new Scope(['abcdefghijklmnopqrstuvwxyz' => false]), false],
             ['ABCDEFGHIJKLMNOPQRSTUVWXYZ:bool', new Scope(['ABCDEFGHIJKLMNOPQRSTUVWXYZ' => false]), false],
             ['x0123456789:bool', new Scope(['x0123456789' => false]), false],
+            [
+                'foo:{a: int} === bar:{a: int}',
+                new Scope(['foo' => self::struct(a: 1), 'bar' => self::struct(a: 1)]),
+                true,
+            ],
+            [
+                'foo:{a: int, b: int} === bar:{a: int, b: int}',
+                new Scope(['foo' => self::struct(a: 1, b: 1), 'bar' => self::struct(b: 1, a: 1)]),
+                true,
+            ],
+            [
+                'foo:{a: int} === bar:{a: int}',
+                new Scope(['foo' => self::struct(a: 1, b: 1), 'bar' => self::struct(a: 1)]),
+                false,
+            ],
+            [
+                'foo:{a: int} === bar:{a: int}',
+                new Scope(['foo' => self::struct(a: 1), 'bar' => self::struct(a: 1, b: 2)]),
+                false,
+            ],
+            [
+                'foo:{a: {b: int}} === bar:{a: {b: int}}',
+                new Scope(['foo' => self::struct(a: self::struct(b: 1)), 'bar' => self::struct(a: self::struct(b: 1))]),
+                true,
+            ],
         ];
         foreach ($cases as $tuple) {
             [$expr, $scope, $expected] = $tuple;
@@ -434,6 +459,11 @@ final class ExpressionTest extends TestCase
     private static function span(): Span
     {
         return Span::char(1, 1);
+    }
+
+    private static function struct(mixed ...$fields): object
+    {
+        return (object)$fields;
     }
 
     /**
