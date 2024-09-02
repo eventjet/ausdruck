@@ -143,6 +143,7 @@ final class ExpressionParserTest extends TestCase
         yield 'end of string after struct field name' => ['{name'];
         yield 'end of string after struct field colon' => ['{name:'];
         yield 'end of string after struct field value' => ['{name: "John"'];
+        yield 'missing value in struct literal' => ['{name: }'];
         yield 'missing comma between struct fields' => ['{name: "John" age: 42}'];
         yield 'single ampersand' => ['foo:bool & bar:bool'];
         yield 'non-token, non-identifier symbol' => ['foo:bool € bar:bool'];

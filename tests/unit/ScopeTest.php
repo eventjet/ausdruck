@@ -29,6 +29,10 @@ final class ScopeTest extends TestCase
         yield [new Scope(['foo' => 1]), '{"vars": {"foo": 1}}'];
         yield [new Scope(['foo' => null]), '{"vars": {"foo": null}}'];
         yield [new Scope(['foo' => (object)['name' => 'John']]), '{"vars": {"foo": {"name": "John"}}}'];
+        yield [
+            new Scope(['foo' => (object)['nested' => (object)['name' => 'John']]]),
+            '{"vars": {"foo": {"nested": {"name": "John"}}}}',
+        ];
         yield [new Scope(['foo' => fopen('php://temp', 'r')]), '{"vars": {"foo": "resource (stream)"}}'];
     }
 

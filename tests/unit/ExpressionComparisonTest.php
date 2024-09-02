@@ -18,6 +18,7 @@ use Eventjet\Ausdruck\Literal;
 use Eventjet\Ausdruck\Negative;
 use Eventjet\Ausdruck\Or_;
 use Eventjet\Ausdruck\Parser\Span;
+use Eventjet\Ausdruck\StructLiteral;
 use Eventjet\Ausdruck\Subtract;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\TestCase;
@@ -68,6 +69,14 @@ final class ExpressionComparisonTest extends TestCase
         yield [
             Expr::fieldAccess(Expr::get('person', Type::struct(['name' => Type::string()])), 'name', self::location()),
             Expr::fieldAccess(Expr::get('person', Type::struct(['name' => Type::string()])), 'name', self::location()),
+        ];
+        yield [
+            Expr::structLiteral(['foo' => Expr::literal('bar')], self::location()),
+            Expr::structLiteral(['foo' => Expr::literal('bar')], self::location()),
+        ];
+        yield [
+            Expr::structLiteral(['foo' => Expr::literal('bar'), 'bar' => Expr::literal('baz')], self::location()),
+            Expr::structLiteral(['bar' => Expr::literal('baz'), 'foo' => Expr::literal('bar')], self::location()),
         ];
     }
 
@@ -248,6 +257,26 @@ final class ExpressionComparisonTest extends TestCase
         yield FieldAccess::class . ': different type' => [
             Expr::fieldAccess(Expr::get('person', $personType), 'name', self::location()),
             Expr::call(Expr::get('person', $personType), 'name', Type::string(), []),
+        ];
+        yield StructLiteral::class . ': different type' => [
+            new StructLiteral(['foo' => Expr::literal('bar')], self::location()),
+            Expr::literal('bar'),
+        ];
+        yield StructLiteral::class . ': different field name' => [
+            new StructLiteral(['foo' => Expr::literal('bar')], self::location()),
+            new StructLiteral(['bar' => Expr::literal('bar')], self::location()),
+        ];
+        yield StructLiteral::class . ': different field value' => [
+            new StructLiteral(['foo' => Expr::literal('bar')], self::location()),
+            new StructLiteral(['foo' => Expr::literal('baz')], self::location()),
+        ];
+        yield StructLiteral::class . ': additional field' => [
+            new StructLiteral(['foo' => Expr::literal('bar')], self::location()),
+            new StructLiteral(['foo' => Expr::literal('bar'), 'bar' => Expr::literal('baz')], self::location()),
+        ];
+        yield StructLiteral::class . ': different field value in second field' => [
+            new StructLiteral(['foo' => Expr::literal('bar'), 'bar' => Expr::literal('a')], self::location()),
+            new StructLiteral(['foo' => Expr::literal('bar'), 'bar' => Expr::literal('b')], self::location()),
         ];
     }
 

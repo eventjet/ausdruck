@@ -53,9 +53,10 @@ final class StructLiteral extends Expression
             return false;
         }
         foreach ($this->fields as $name => $value) {
-            if (!array_key_exists($name, $other->fields) || !$value->equals($other->fields[$name])) {
-                return false;
+            if (array_key_exists($name, $other->fields) && $value->equals($other->fields[$name])) {
+                continue;
             }
+            return false;
         }
         return true;
     }

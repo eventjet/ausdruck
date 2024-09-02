@@ -248,6 +248,33 @@ final class ExpressionTest extends TestCase
             ['{name: "John"}.name', new Scope(), 'John'],
             ['{name: "John", age: 37}.age', new Scope(), 37],
             ['{name: "John", age: 37,}.age', new Scope(), 37],
+            [
+                Expr::eq(Expr::structLiteral(['name' => Expr::literal('John')], self::span()), Expr::literal('John')),
+                new Scope(),
+                false,
+            ],
+            [
+                Expr::eq(Expr::literal('John'), Expr::structLiteral(['name' => Expr::literal('John')], self::span())),
+                new Scope(),
+                false,
+            ],
+            ['{name: "John"} === {name: "Jane"}', new Scope(), false],
+            [
+                Expr::eq(
+                    Expr::structLiteral(['a' => Expr::literal('A'), 'b' => Expr::literal('B')], self::span()),
+                    Expr::structLiteral(['a' => Expr::literal('A'), 'c' => Expr::literal('C')], self::span()),
+                ),
+                new Scope(),
+                false,
+            ],
+            [
+                Expr::eq(
+                    Expr::structLiteral(['a' => Expr::literal('A'), 'c' => Expr::literal('C')], self::span()),
+                    Expr::structLiteral(['a' => Expr::literal('A'), 'b' => Expr::literal('B')], self::span()),
+                ),
+                new Scope(),
+                false,
+            ],
         ];
         foreach ($cases as $tuple) {
             [$expr, $scope, $expected] = $tuple;
@@ -278,6 +305,7 @@ final class ExpressionTest extends TestCase
         ];
         yield 'Any type' => ['myval:any', 'myval:any'];
         yield 'List literal' => ['["foo", "bar"]', '["foo", "bar"]'];
+        yield 'Struct literal' => ['{name: "John", age: 37}', '{name: "John", age: 37}'];
     }
 
     /**
