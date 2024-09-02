@@ -7,7 +7,6 @@ namespace Eventjet\Ausdruck\Test\Unit;
 use Eventjet\Ausdruck\Scope;
 use LogicException;
 use PHPUnit\Framework\TestCase;
-use stdClass;
 
 use function fopen;
 
@@ -29,7 +28,11 @@ final class ScopeTest extends TestCase
         yield [new Scope(['foo' => false]), '{"vars": {"foo": false}}'];
         yield [new Scope(['foo' => 1]), '{"vars": {"foo": 1}}'];
         yield [new Scope(['foo' => null]), '{"vars": {"foo": null}}'];
-        yield [new Scope(['foo' => new stdClass()]), '{"vars": {"foo": "stdClass"}}'];
+        yield [new Scope(['foo' => (object)['name' => 'John']]), '{"vars": {"foo": {"name": "John"}}}'];
+        yield [
+            new Scope(['foo' => (object)['nested' => (object)['name' => 'John']]]),
+            '{"vars": {"foo": {"nested": {"name": "John"}}}}',
+        ];
         yield [new Scope(['foo' => fopen('php://temp', 'r')]), '{"vars": {"foo": "resource (stream)"}}'];
     }
 

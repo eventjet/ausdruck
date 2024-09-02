@@ -8,9 +8,13 @@ use InvalidArgumentException;
 use Stringable;
 
 use function array_is_list;
+use function array_key_exists;
 use function array_key_first;
+use function array_map;
 use function array_shift;
 use function array_slice;
+use function count;
+use function get_object_vars;
 use function gettype;
 use function implode;
 use function in_array;
@@ -24,9 +28,14 @@ final class Type implements Stringable
 {
     /**
      * @param list<self> $args
+     * @param array<string, Type> $fields
      */
-    private function __construct(public readonly string $name, public readonly array $args = [], public readonly self|null $aliasFor = null)
-    {
+    private function __construct(
+        public readonly string $name,
+        public readonly array $args = [],
+        public readonly self|null $aliasFor = null,
+        public readonly array $fields = [],
+    ) {
     }
 
     public static function string(): self
@@ -57,11 +66,6 @@ final class Type implements Stringable
     public static function mapOf(self $keys, self $values): self
     {
         return new self('map', [$keys, $values]);
-    }
-
-    public static function object(string $class): self
-    {
-        return new self($class);
     }
 
     public static function alias(string $name, self $type): self
@@ -96,6 +100,7 @@ final class Type implements Stringable
             'integer' => self::int(),
             'boolean' => self::bool(),
             'double' => self::float(),
+            'object' => self::struct(array_map(self::fromValue(...), get_object_vars($value))),
             default => throw new InvalidArgumentException(sprintf('Unsupported type %s', gettype($value))),
         };
     }
@@ -113,6 +118,14 @@ final class Type implements Stringable
     public static function none(): self
     {
         return new self('None');
+    }
+
+    /**
+     * @param array<string, self> $fields
+     */
+    public static function struct(array $fields): self
+    {
+        return new self('Struct', fields: $fields);
     }
 
     private static function never(): self
@@ -135,6 +148,14 @@ final class Type implements Stringable
 
     public function __toString(): string
     {
+        if ($this->name === 'Struct') {
+            $fields = [];
+            foreach ($this->fields as $name => $fieldType) {
+                /** @psalm-suppress ImplicitToStringCast */
+                $fields[] = $name . ': ' . $fieldType;
+            }
+            return '{ ' . implode(', ', $fields) . ' }';
+        }
         if ($this->name === 'Func') {
             $args = $this->args;
             $returnType = array_shift($args);
@@ -159,7 +180,7 @@ final class Type implements Stringable
         if (($this->aliasFor ?? $this)->name !== ($type->aliasFor ?? $type)->name) {
             return false;
         }
-        if (!in_array($this->name, ['Func', 'list'], true)) {
+        if (!in_array($this->name, ['Func', 'list', 'Struct'], true)) {
             return true;
         }
         foreach ($this->args as $i => $arg) {
@@ -167,6 +188,17 @@ final class Type implements Stringable
                 continue;
             }
             return false;
+        }
+        if (count($type->fields) !== count($this->fields)) {
+            return false;
+        }
+        foreach ($this->fields as $name => $fieldType) {
+            if (!array_key_exists($name, $type->fields)) {
+                return false;
+            }
+            if (!$type->fields[$name]->equals($fieldType)) {
+                return false;
+            }
         }
         return true;
     }
@@ -223,6 +255,16 @@ final class Type implements Stringable
                 }
             }
         }
+        if ($this->name === 'Struct') {
+            foreach ($other->fields as $name => $fieldType) {
+                if (!array_key_exists($name, $self->fields)) {
+                    return false;
+                }
+                if (!$self->fields[$name]->isSubtypeOf($fieldType)) {
+                    return false;
+                }
+            }
+        }
         return true;
     }
 
@@ -234,6 +276,11 @@ final class Type implements Stringable
     public function returnType(): self
     {
         return $this->args[0];
+    }
+
+    public function isStruct(): bool
+    {
+        return $this->name === 'Struct';
     }
 
     /**

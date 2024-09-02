@@ -47,6 +47,14 @@ final class Expr
     }
 
     /**
+     * @param array<string, Expression> $fields
+     */
+    public static function structLiteral(array $fields, Span $location): StructLiteral
+    {
+        return new StructLiteral($fields, $location);
+    }
+
+    /**
      * @param list<Expression> $arguments
      */
     public static function call(Expression $target, string $name, Type $type, array $arguments, Span|null $location = null): Call
@@ -87,6 +95,11 @@ final class Expr
     public static function negative(Expression $expression, Span|null $location = null): Negative
     {
         return new Negative($expression, $location ?? self::dummySpan());
+    }
+
+    public static function fieldAccess(Expression $struct, string $field, Span $location): FieldAccess
+    {
+        return new FieldAccess($struct, $field, $location);
     }
 
     private static function dummySpan(): Span

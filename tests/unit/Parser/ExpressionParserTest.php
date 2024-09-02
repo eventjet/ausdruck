@@ -136,16 +136,25 @@ final class ExpressionParserTest extends TestCase
         yield 'end of string after function call and colon' => ['foo:string.substr:'];
         yield 'end of string after function dot' => ['foo:string.'];
         yield 'missing function name' => ['foo:string.:string()'];
-        yield 'end of string after function name' => ['foo:string.substr'];
         yield 'list literal: missing closing bracket' => ['[1, 2'];
-        yield 'empty pair or curly braces' => ['{}'];
+        yield 'end of string after curly brace' => ['{'];
+        yield 'struct literal in field name position' => ['{{name: "John"}: "John"}'];
+        yield 'missing colon in struct literal' => ['{name "John"}'];
+        yield 'end of string after struct field name' => ['{name'];
+        yield 'end of string after struct field colon' => ['{name:'];
+        yield 'end of string after struct field value' => ['{name: "John"'];
+        yield 'missing value in struct literal' => ['{name: }'];
+        yield 'missing comma between struct fields' => ['{name: "John" age: 42}'];
         yield 'single ampersand' => ['foo:bool & bar:bool'];
+        yield 'non-token, non-identifier symbol' => ['foo:bool € bar:bool'];
+        yield 'identifier starting with a number' => ['42foo:bool', 'Unexpected identifier foo'];
+        yield 'identifier starting with an underscore' => ['_foo:bool', 'Unexpected character _'];
     }
 
     /**
      * @return iterable<string, array{0: string, 1?: string, 2?: Declarations}>
      */
-    public static function invalidExpressions(): iterable
+    public static function typeErrorExpressions(): iterable
     {
         yield 'map type with bool key type' => ['foo:map<bool, string>'];
         yield 'or with string on the left' => ['foo:string || bar:bool'];
@@ -170,6 +179,10 @@ final class ExpressionParserTest extends TestCase
         yield 'map with an unknown value type' => ['foo:map<string, Foo>'];
         yield 'list with no type arguments' => ['foo:list', 'The list type requires one argument, none given'];
         yield 'list with two type arguments' => ['foo:list<string, string>', 'Invalid type "list<string, string>"'];
+        yield 'list with two type arguments, second is struct' => [
+            'foo:list<string, { name: string }>',
+            'Invalid type "list<string, { name: string }>"',
+        ];
         yield 'list with an unknown type argument' => ['foo:list<Foo>'];
         yield 'function call with unknown type' => ['foo:string.substr:Foo(0, 3)'];
         yield 'negating a string literal' => ['-"foo"', 'Can\'t negate string'];
@@ -227,6 +240,12 @@ final class ExpressionParserTest extends TestCase
             'Function foo is not declared and has no inline type',
         ];
         yield 'some with invalid type argument' => ['foo:Some<Foo>', 'Unknown type Foo'];
+        yield 'unknown type in struct field' => ['foo:{ name: Foo }', 'Unknown type Foo'];
+        yield 'access to unknown struct field' => [
+            'foo:{ name: string }.age',
+            'Unknown field "age" on type { name: string }',
+        ];
+        yield 'field access on string' => ['foo:string.age', 'Can\'t access field "age" on non-struct type string'];
     }
 
     /**
@@ -460,7 +479,7 @@ final class ExpressionParserTest extends TestCase
     }
 
     /**
-     * @dataProvider invalidExpressions
+     * @dataProvider typeErrorExpressions
      */
     public function testTypeError(string $expression, string|null $expectedMessage = null, Declarations|null $declarations = null): void
     {

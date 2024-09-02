@@ -42,6 +42,9 @@ final class TypeParser
         if ($parsedToken === null) {
             return null;
         }
+        if ($parsedToken->token === Token::OpenBrace) {
+            return self::parseStruct($tokens);
+        }
         $name = $parsedToken->token;
         if (!is_string($name)) {
             return $parsedToken;
@@ -125,5 +128,53 @@ final class TypeParser
             );
         }
         return new TypeNode('fn', array_merge($params, [$returnType]), $fnLocation->to($returnType->location));
+    }
+
+    /**
+     * @param Peekable<ParsedToken> $tokens
+     */
+    private static function parseStruct(Peekable $tokens): TypeNode
+    {
+        $openBraceToken = $tokens->peek();
+        assert($openBraceToken !== null);
+        $start = $openBraceToken->location();
+        $tokens->next();
+        $fields = [];
+        while (true) {
+            $nameToken = $tokens->peek();
+            if ($nameToken === null) {
+                break;
+            }
+            if ($nameToken->token === Token::CloseBrace) {
+                break;
+            }
+            $name = $nameToken->token;
+            if (!is_string($name)) {
+                throw SyntaxError::create(
+                    sprintf('Expected field name, got %s', Token::print($name)),
+                    $nameToken->location(),
+                );
+            }
+            $tokens->next();
+            self::expect($tokens, Token::Colon);
+            $type = self::parse($tokens);
+            if ($type === null) {
+                throw SyntaxError::create('Expected type, got end of input', $nameToken->location());
+            }
+            if (!$type instanceof TypeNode) {
+                throw SyntaxError::create(
+                    sprintf('Expected type, got %s', Token::print($type->token)),
+                    $type->location(),
+                );
+            }
+            $fields[] = TypeNode::keyValue(new TypeNode($name, [], $nameToken->location()), $type);
+            $token = $tokens->peek();
+            if ($token?->token !== Token::Comma) {
+                break;
+            }
+            $tokens->next();
+        }
+        $end = self::expect($tokens, Token::CloseBrace)->location();
+        return TypeNode::struct($fields, $start->to($end));
     }
 }
