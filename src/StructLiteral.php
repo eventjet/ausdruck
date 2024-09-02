@@ -41,7 +41,7 @@ final class StructLiteral extends Expression
 
     public function evaluate(Scope $scope): mixed
     {
-        return (object)array_map(static fn(Expression $value) => $value->evaluate($scope), $this->fields);
+        return (object)array_map(static fn(Expression $value): mixed => $value->evaluate($scope), $this->fields);
     }
 
     public function equals(Expression $other): bool
