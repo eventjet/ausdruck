@@ -10,6 +10,7 @@ use Eventjet\Ausdruck\Parser\TypeParser;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 
+use function assert;
 use function explode;
 use function implode;
 use function preg_match;
