@@ -34,13 +34,12 @@ final class ExpressionParser
             $types = new Declarations($types);
         }
         $declarations = $types;
-        $chars = $expression === '' ? [] : str_split($expression);
         /**
          * @infection-ignore-all Currently, there's no difference between str_split and its multibyte version. Multibyte
          *     string literals and identifiers are just put back together. If you encounter a case where it does matter,
          *     just change it to mb_str_split and add an appropriate test case.
          */
-        return self::parseExpression(new Peekable(Tokenizer::tokenize($chars)), $declarations);
+        return self::parseExpression(new Peekable(Tokenizer::tokenize($expression)), $declarations);
     }
 
     public static function parseTyped(string $expression, Type $type, Declarations|Types|null $types = null): Expression

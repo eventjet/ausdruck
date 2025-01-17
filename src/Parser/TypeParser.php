@@ -8,7 +8,6 @@ use function array_merge;
 use function assert;
 use function is_string;
 use function sprintf;
-use function str_split;
 
 /**
  * @phpstan-type AnyToken Token | string | Literal<string | int | float>
@@ -18,9 +17,8 @@ final class TypeParser
 {
     public static function parseString(string $str): TypeNode|SyntaxError
     {
-        $chars = $str === '' ? [] : str_split($str);
         try {
-            $node = self::parse(new Peekable(Tokenizer::tokenize($chars)));
+            $node = self::parse(new Peekable(Tokenizer::tokenize($str)));
         } catch (SyntaxError $e) {
             return $e;
         }

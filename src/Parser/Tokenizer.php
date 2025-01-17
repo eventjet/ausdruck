@@ -4,12 +4,20 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use function array_map;
+use function array_shift;
 use function assert;
+use function chr;
 use function ctype_space;
+use function current;
+use function implode;
+use function in_array;
 use function is_numeric;
+use function next;
+use function ord;
 use function sprintf;
 use function str_contains;
-use function substr;
+use function str_split;
 
 /**
  * @internal
@@ -17,201 +25,254 @@ use function substr;
  */
 final class Tokenizer
 {
-    public const NON_IDENTIFIER_CHARS = '.[]()"=|<>{}:, -';
+    public const NON_IDENTIFIER_CHARS = [
+        self::DOT,
+        self::OPEN_BRACKET,
+        self::CLOSE_BRACKET,
+        self::OPEN_PAREN,
+        self::CLOSE_PAREN,
+        self::DOUBLE_QUOTE,
+        self::EQUALS,
+        self::PIPE,
+        self::OPEN_ANGLE,
+        self::CLOSE_ANGLE,
+        self::OPEN_BRACE,
+        self::CLOSE_BRACE,
+        self::COLON,
+        self::COMMA,
+        self::SPACE,
+        self::MINUS,
+    ];
+
+    private const DOT = 0x2e;
+    private const OPEN_PAREN = 0x28;
+    private const CLOSE_PAREN = 0x29;
+    private const OPEN_ANGLE = 0x3c;
+    private const CLOSE_ANGLE = 0x3e;
+    private const COLON = 0x3a;
+    private const COMMA = 0x2c;
+    private const OPEN_BRACKET = 0x5b;
+    private const CLOSE_BRACKET = 0x5d;
+    private const DOUBLE_QUOTE = 0x22;
+    private const NEWLINE = 0x0a;
+    private const EQUALS = 0x3d;
+    private const PIPE = 0x7c;
+    private const AMPERSAND = 0x26;
+    private const OPEN_BRACE = 0x7b;
+    private const CLOSE_BRACE = 0x7d;
+    private const SPACE = 0x20;
+    private const MINUS = 0x2d;
+    private const ZERO = 0x30;
+    private const NINE = 0x39;
+
+    /** @var int<1, max> */
+    private int $line = 1;
+    /** @var int<1, max> */
+    private int $column = 1;
 
     /**
-     * @param iterable<mixed, string> $chars
+     * @param list<int> $chars
+     */
+    public function __construct(private array &$chars)
+    {
+    }
+
+    /**
      * @return iterable<ParsedToken>
      */
-    public static function tokenize(iterable $chars): iterable
+    public static function tokenize(string $src): iterable
     {
-        /** @var positive-int $line */
-        $line = 1;
-        /** @var positive-int $column */
-        $column = 1;
-        $chars = new Peekable($chars);
+        $chars = array_map(ord(...), str_split($src));
+        return (new self($chars))->doTokenize();
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function bytes(string $expected): array
+    {
+        return array_map(ord(...), str_split($expected));
+    }
+
+    /**
+     * @param list<int> $bytes
+     */
+    private static function bytesToString(array $bytes): string
+    {
+        return implode('', array_map(chr(...), $bytes));
+    }
+
+    /**
+     * @return iterable<ParsedToken>
+     */
+    private function doTokenize(): iterable
+    {
         while (true) {
-            $char = $chars->peek();
+            $char = $this->peek();
             if ($char === null) {
                 break;
             }
             $singleCharToken = match ($char) {
-                '.' => Token::Dot,
-                '(' => Token::OpenParen,
-                ')' => Token::CloseParen,
-                '<' => Token::OpenAngle,
-                '>' => Token::CloseAngle,
-                ':' => Token::Colon,
-                ',' => Token::Comma,
-                '[' => Token::OpenBracket,
-                ']' => Token::CloseBracket,
+                self::DOT => Token::Dot,
+                self::OPEN_PAREN => Token::OpenParen,
+                self::CLOSE_PAREN => Token::CloseParen,
+                self::OPEN_ANGLE => Token::OpenAngle,
+                self::CLOSE_ANGLE => Token::CloseAngle,
+                self::COLON => Token::Colon,
+                self::COMMA => Token::Comma,
+                self::OPEN_BRACKET => Token::OpenBracket,
+                self::CLOSE_BRACKET => Token::CloseBracket,
                 default => null,
             };
             if ($singleCharToken !== null) {
-                $chars->next();
-                yield new ParsedToken($singleCharToken, $line, $column);
-                $column++;
+                $this->next();
+                yield new ParsedToken($singleCharToken, $this->line, $this->column);
+                $this->column++;
                 continue;
             }
-            if (ctype_space($char)) {
-                $chars->next();
-                if ($char === "\n") {
-                    $line++;
-                    $column = 1;
+            if (ctype_space(chr($char))) {
+                $this->next();
+                if ($char === self::NEWLINE) {
+                    $this->line++;
+                    $this->column = 1;
                 } else {
-                    $column++;
+                    $this->column++;
                 }
                 continue;
             }
-            if ($char === '"') {
-                $startLine = $line;
-                $startCol = $column;
-                $chars->next();
-                $column++;
-                yield new ParsedToken(self::string($chars, $line, $column), $startLine, $startCol);
+            if ($char === self::DOUBLE_QUOTE) {
+                $startLine = $this->line;
+                $startCol = $this->column;
+                $this->next();
+                $this->column++;
+                yield new ParsedToken($this->string(), $startLine, $startCol);
                 continue;
             }
-            if ($char === '=') {
-                $startCol = $column;
-                $token = self::equals($chars, $line, $column);
-                yield new ParsedToken($token, $line, $startCol);
+            if ($char === self::EQUALS) {
+                $startCol = $this->column;
+                $token = $this->equals();
+                yield new ParsedToken($token, $this->line, $startCol);
                 continue;
             }
-            if ($char === '-' || is_numeric($char)) {
-                $startCol = $column;
-                yield new ParsedToken(self::numberOrArrow($chars, $column), $line, $startCol);
+            if ($char === self::MINUS || ($char >= self::ZERO && $char <= self::NINE)) {
+                $startCol = $this->column;
+                yield new ParsedToken($this->numberOrArrow(), $this->line, $startCol);
                 continue;
             }
-            if ($char === '|') {
-                $chars->next();
-                $char = $chars->peek();
-                if ($char === '|') {
-                    $chars->next();
-                    yield new ParsedToken(Token::Or, $line, $column);
-                    $column += 2;
+            if ($char === self::PIPE) {
+                $this->next();
+                $char = $this->peek();
+                if ($char === self::PIPE) {
+                    $this->next();
+                    yield new ParsedToken(Token::Or, $this->line, $this->column);
+                    $this->column += 2;
                 } else {
-                    yield new ParsedToken(Token::Pipe, $line, $column);
-                    $column++;
+                    yield new ParsedToken(Token::Pipe, $this->line, $this->column);
+                    $this->column++;
                 }
                 continue;
             }
-            if ($char === '&') {
-                $chars->next();
-                $char = $chars->peek();
-                if ($char === '&') {
-                    $chars->next();
-                    yield new ParsedToken(Token::And, $line, $column);
-                    $column += 2;
+            if ($char === self::AMPERSAND) {
+                $this->next();
+                $char = $this->peek();
+                if ($char === self::AMPERSAND) {
+                    $this->next();
+                    yield new ParsedToken(Token::And, $this->line, $this->column);
+                    $this->column += 2;
                 } else {
-                    throw SyntaxError::create('Unexpected character &', Span::char($line, $column));
+                    throw SyntaxError::create('Unexpected character &', Span::char($this->line, $this->column));
                 }
                 continue;
             }
-            if (!str_contains(self::NON_IDENTIFIER_CHARS, $char)) {
-                $startCol = $column;
-                yield new ParsedToken(self::identifier($chars, $line, $column), $line, $startCol);
+            if (!in_array($char, self::NON_IDENTIFIER_CHARS, true)) {
+                $startCol = $this->column;
+                yield new ParsedToken($this->identifier(), $this->line, $startCol);
                 continue;
             }
-            throw SyntaxError::create(sprintf('Unexpected character %s', $char), Span::char($line, $column));
+            throw SyntaxError::create(sprintf('Unexpected character %s', $char), Span::char($this->line, $this->column));
         }
     }
 
-    /**
-     * @param Peekable<string> $chars
-     * @param positive-int $line
-     * @param positive-int $column
-     */
-    private static function identifier(Peekable $chars, int $line, int &$column): string
+    private function identifier(): string
     {
         $identifier = '';
 
         while (true) {
-            $char = $chars->peek();
+            $char = $this->peek();
 
             if ($char === null) {
                 break;
             }
 
-            if (ctype_space($char) || str_contains(self::NON_IDENTIFIER_CHARS, $char)) {
+            if (ctype_space(chr($char)) || in_array($char, self::NON_IDENTIFIER_CHARS, true)) {
                 break;
             }
 
-            $identifier .= $char;
-            $chars->next();
-            $column++;
+            $identifier .= chr($char);
+            $this->next();
+            $this->column++;
         }
 
         return $identifier;
     }
 
-    /**
-     * @param Peekable<string> $chars
-     * @param positive-int $line
-     * @param positive-int $column
-     */
-    private static function equals(Peekable $chars, int $line, int &$column): Token
+    private function equals(): Token
     {
-        $chars->next();
-        $column++;
-        self::expect($chars, '==', $line, $column);
+        $this->next();
+        $this->column++;
+        $this->expect('==');
         return Token::TripleEquals;
     }
 
-    /**
-     * @param Peekable<string> $chars
-     * @param positive-int $line
-     * @param positive-int $column
-     */
-    private static function expect(Peekable $chars, string $expected, int $line, int &$column): void
+    private function expect(string $expected): void
     {
+        $expected = self::bytes($expected);
         $originalExpected = $expected;
         while (true) {
-            if ($expected === '') {
+            if ($expected === []) {
                 return;
             }
-            $actualChar = $chars->peek();
+            $actualChar = $this->peek();
             $expectedChar = $expected[0];
             if ($actualChar !== $expectedChar) {
                 throw SyntaxError::create(
                     $actualChar === null
-                        ? sprintf('Expected %s, got end of input', $originalExpected)
-                        : sprintf('Expected %s, got %s', $originalExpected, $actualChar),
-                    Span::char($line, $column),
+                        ? sprintf('Expected %s, got end of input', self::bytesToString($originalExpected))
+                        : sprintf('Expected %s, got %s', self::bytesToString($originalExpected), chr($actualChar)),
+                    Span::char($this->line, $this->column),
                 );
             }
-            $chars->next();
-            assert($actualChar !== "\n", 'We\'r never expecting newlines');
-            $column++;
-            $expected = substr($expected, 1);
+            $this->next();
+            assert($actualChar !== self::NEWLINE, 'We\'r never expecting newlines');
+            $this->column++;
+            array_shift($expected);
         }
     }
 
     /**
-     * @param Peekable<string> $chars
-     * @param positive-int $column
      * @return Literal<int | float> | Token
      */
-    private static function numberOrArrow(Peekable $chars, int &$column): Literal|Token
+    private function numberOrArrow(): Literal|Token
     {
         $number = '';
         while (true) {
-            $char = $chars->peek();
-            if ($number === '' && $char === '-') {
-                $number = $char;
-                $chars->next();
-                $column++;
+            $char = $this->peek();
+            if ($number === '' && $char === self::MINUS) {
+                $number = chr($char);
+                $this->next();
+                $this->column++;
                 continue;
             }
-            if ($number === '-' && $char === '>') {
-                $chars->next();
+            if ($number === '-' && $char === self::CLOSE_ANGLE) {
+                $this->next();
                 return Token::Arrow;
             }
-            if ($char === null || !is_numeric($number . $char)) {
+            if ($char === null || !is_numeric($number . chr($char))) {
                 break;
             }
-            $number .= $char;
-            $chars->next();
-            $column++;
+            $number .= chr($char);
+            $this->next();
+            $this->column++;
         }
         if ($number === '-') {
             return Token::Minus;
@@ -220,28 +281,43 @@ final class Tokenizer
     }
 
     /**
-     * @param Peekable<string> $chars
-     * @param positive-int $line
-     * @param positive-int $column
      * @return Literal<string>
      */
-    private static function string(Peekable $chars, int $line, int &$column): Literal
+    private function string(): Literal
     {
         $string = '';
         while (true) {
-            $char = $chars->peek();
+            $char = $this->peek();
             if ($char === null) {
-                throw SyntaxError::create('Expected closing quote', Span::char($line, $column));
+                throw SyntaxError::create('Expected closing quote', Span::char($this->line, $this->column));
             }
-            if ($char === '"') {
-                $chars->next();
-                $column++;
+            if ($char === self::DOUBLE_QUOTE) {
+                $this->next();
+                $this->column++;
                 break;
             }
-            $string .= $char;
-            $chars->next();
-            $column++;
+            $string .= chr($char);
+            $this->next();
+            $this->column++;
         }
         return new Literal($string);
+    }
+
+    private function peek(): int|null
+    {
+        $char = current($this->chars);
+        if ($char === false) {
+            return null;
+        }
+        return $char;
+    }
+
+    private function next(): void
+    {
+        $char = current($this->chars);
+        if ($char === false) {
+            return;
+        }
+        next($this->chars);
     }
 }
