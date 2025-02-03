@@ -274,6 +274,13 @@ final class ExpressionTest extends TestCase
                     ['myitem' => Type::struct(['name' => Type::string()])],
                 ),
             ],
+            [
+                // Inline type can be smaller than the declared variable type
+                'user:{name: string}.name',
+                new Scope(['user' => (object)['name' => 'John', 'age' => 37]]),
+                'John',
+                new Declarations(variables: ['user' => Type::struct(['name' => Type::string(), 'age' => Type::int()])]),
+            ],
         ];
         foreach ($cases as $tuple) {
             [$expr, $scope, $expected] = $tuple;
