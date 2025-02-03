@@ -265,6 +265,15 @@ final class ExpressionTest extends TestCase
                 new Scope(),
                 false,
             ],
+            [
+                'myitem:Item.name',
+                new Scope(['myitem' => (object)['name' => 'Test']]),
+                'Test',
+                new Declarations(
+                    new Types(['Item' => Type::struct(['name' => Type::string()])]),
+                    ['myitem' => Type::struct(['name' => Type::string()])],
+                ),
+            ],
         ];
         foreach ($cases as $tuple) {
             [$expr, $scope, $expected] = $tuple;
