@@ -15,6 +15,7 @@ use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Scope;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\TestCase;
+
 use function is_array;
 use function is_callable;
 use function is_string;
