@@ -8,7 +8,9 @@ use Eventjet\Ausdruck\Parser\Span;
 
 use function array_is_list;
 use function array_map;
+use function get_debug_type;
 use function implode;
+use function is_array;
 use function is_bool;
 use function is_float;
 use function is_int;
@@ -32,9 +34,6 @@ final class Literal extends Expression
         $this->location = $location;
     }
 
-    /**
-     * @param string | int | float | bool | null | array<array-key, mixed> $value
-     */
     private static function dumpValue(mixed $value): string
     {
         if (is_string($value)) {
@@ -48,6 +47,9 @@ final class Literal extends Expression
         }
         if (is_int($value) || is_float($value)) {
             return (string)$value;
+        }
+        if (!is_array($value)) {
+            return get_debug_type($value);
         }
         if (array_is_list($value)) {
             return sprintf('[%s]', implode(', ', array_map(self::dumpValue(...), $value)));

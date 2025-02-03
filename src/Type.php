@@ -13,6 +13,7 @@ use function array_key_first;
 use function array_map;
 use function array_shift;
 use function array_slice;
+use function assert;
 use function count;
 use function get_object_vars;
 use function gettype;
@@ -159,6 +160,7 @@ final class Type implements Stringable
         if ($this->name === 'Func') {
             $args = $this->args;
             $returnType = array_shift($args);
+            assert($returnType !== null);
             return sprintf('func(%s): %s', implode(', ', $args), $returnType);
         }
         return $this->name . ($this->args === [] ? '' : sprintf('<%s>', implode(', ', $this->args)));
