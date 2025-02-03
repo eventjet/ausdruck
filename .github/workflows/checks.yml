@@ -166,7 +166,7 @@ jobs:
             --coverage-clover=build/coverage/clover.xml
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.php }}
           path: build/coverage/
@@ -225,7 +225,7 @@ jobs:
             -jmax
 
       - name: Save Infection result
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: infection-log-${{ matrix.php }}.txt
