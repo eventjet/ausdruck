@@ -226,7 +226,7 @@ final class ExpressionParser
         if ($type instanceof TypeError) {
             throw $type;
         }
-        if ($declaredType !== null && !$declaredType->equals($type)) {
+        if ($declaredType !== null && !$declaredType->isSubtypeOf($type)) {
             throw TypeError::create(
                 sprintf(
                     'Variable %s is declared as %s, but used as %s',

@@ -15,7 +15,6 @@ use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Scope;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\TestCase;
-
 use function is_array;
 use function is_callable;
 use function is_string;
@@ -273,6 +272,13 @@ final class ExpressionTest extends TestCase
                     new Types(['Item' => Type::struct(['name' => Type::string()])]),
                     ['myitem' => Type::struct(['name' => Type::string()])],
                 ),
+            ],
+            [
+                // Inline type can be smaller than the declared variable type
+                'user:{name: string}.name',
+                new Scope(['user' => (object)['name' => 'John', 'age' => 37]]),
+                'John',
+                new Declarations(variables: ['user' => Type::struct(['name' => Type::string(), 'age' => Type::int()])]),
             ],
         ];
         foreach ($cases as $tuple) {
