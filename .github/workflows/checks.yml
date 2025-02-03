@@ -242,5 +242,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      - run: git config --global --add safe.directory /github/workspace
+
       - name: "Check for BC breaks"
         uses: docker://nyholm/roave-bc-check-ga
