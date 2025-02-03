@@ -205,7 +205,7 @@ jobs:
         run: composer update --no-progress --no-interaction ${{ matrix.dependencies }}
 
       - name: Download coverage
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: coverage-${{ matrix.php }}-${{ matrix.dependencies }}
           path: build/coverage/
