@@ -171,6 +171,9 @@ final class Type implements Stringable
      */
     public function assert(mixed $value): mixed
     {
+        if ($value === [] && $this->name === 'map') {
+            return $value;
+        }
         $valueType = self::fromValue($value);
         return $valueType->isSubtypeOf($this)
             ? $value

@@ -94,6 +94,8 @@ final class TypeTest extends TestCase
                 }
             },
         ];
+        yield 'Map and empty array' => [Type::mapOf(Type::string(), Type::int()), []];
+        yield 'List and empty array' => [Type::listOf(Type::string()), []];
     }
 
     /**
