@@ -177,7 +177,13 @@ final class Type implements Stringable
 
     public function equals(self $type): bool
     {
-        if (($this->aliasFor ?? $this)->name !== ($type->aliasFor ?? $type)->name) {
+        if ($type->aliasFor !== null) {
+            $type = $type->canonical();
+        }
+        if ($this->aliasFor !== null) {
+            return $this->canonical()->equals($type);
+        }
+        if ($this->name !== $type->name) {
             return false;
         }
         if (!in_array($this->name, ['Func', 'list', 'Struct'], true)) {
@@ -280,7 +286,12 @@ final class Type implements Stringable
 
     public function isStruct(): bool
     {
-        return $this->name === 'Struct';
+        return $this->canonical()->name === 'Struct';
+    }
+
+    public function getFieldType(string $name): self|null
+    {
+        return $this->canonical()->fields[$name] ?? null;
     }
 
     /**
