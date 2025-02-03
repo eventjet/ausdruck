@@ -19,30 +19,22 @@ abstract class Expression implements Stringable
 
     public function subtract(self $subtrahend): Subtract
     {
-        /** @var self $self */
-        $self = $this;
-        return Expr::subtract($self, $subtrahend);
+        return Expr::subtract($this, $subtrahend);
     }
 
     public function gt(self $right): Gt
     {
-        /** @var self $self */
-        $self = $this;
-        return Expr::gt($self, $right);
+        return Expr::gt($this, $right);
     }
 
     public function or_(self $other): Or_
     {
-        /** @var self $self */
-        $self = $this;
-        return Expr::or_($self, $other);
+        return Expr::or_($this, $other);
     }
 
     public function and_(self $other): self
     {
-        /** @var self $self */
-        $self = $this;
-        return Expr::and_($self, $other);
+        return Expr::and_($this, $other);
     }
 
     /**

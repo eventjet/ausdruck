@@ -167,23 +167,13 @@ final class ExpressionTest extends TestCase
             (static function () {
                 $itemType = Type::listOf(Type::string());
                 $bagType = Type::listOf(Type::listOf($itemType));
-                /**
-                * @param array{list<array{string}>} $bag
-                * @return list<array{string}>
-                * @psalm-suppress MixedReturnStatement
-                * @psalm-suppress MixedInferredReturnType
-                */
-                $getItems = static fn(array $bag): array => $bag[0];
-                /**
-                * @param array{string} $item
-                * @psalm-suppress MixedReturnStatement
-                * @psalm-suppress MixedInferredReturnType
-                */
-                $getName = static fn(array $item): string => $item[0];
                 return
                     [
                         'bag.items().map:list<string>(|i| i:Item.name())',
-                        new Scope(['bag' => [[['a'], ['b']]]], ['items' => $getItems, 'name' => $getName]),
+                        new Scope(
+                            ['bag' => [[['a'], ['b']]]],
+                            ['items' => self::firstElement(...), 'name' => self::firstElement(...)],
+                        ),
                         ['a', 'b'],
                         new Declarations(
                             types: new Types(['Bag' => $bagType, 'Item' => $itemType]),
@@ -487,6 +477,16 @@ final class ExpressionTest extends TestCase
         yield 'Empty list literal' => ['[]', Type::listOf(Type::any())];
     }
 
+    /**
+     * @template T
+     * @param array{T} $array
+     * @return T
+     */
+    private static function firstElement(array $array): mixed
+    {
+        return $array[0];
+    }
+
     private static function span(): Span
     {
         return Span::char(1, 1);
@@ -503,12 +503,14 @@ final class ExpressionTest extends TestCase
      */
     public function testEvaluate(Expression|string|callable $expression, Scope $scope, Declarations|null $declarations, mixed $expected): void
     {
-        if (is_callable($expression)) {
-            $expression = $expression();
-        } elseif (is_string($expression)) {
-            $expression = ExpressionParser::parse($expression, $declarations);
+        if (!$expression instanceof Expression) {
+            /** @psalm-suppress MixedAssignment False positive */
+            $expression = is_string($expression)
+                ? ExpressionParser::parse($expression, $declarations)
+                : $expression();
         }
 
+        /** @psalm-suppress MixedMethodCall False positive */
         self::assertSame($expected, $expression->evaluate($scope));
     }
 

@@ -248,14 +248,5 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: 8.2
-          extensions: ctype
-
-      - name: Install dependencies
-        run: composer update --no-progress --no-interaction
-
       - name: "Check for BC breaks"
-        run: vendor/bin/roave-backward-compatibility-check
+        uses: docker://nyholm/roave-bc-check-ga

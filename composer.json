@@ -8,17 +8,15 @@
         "ext-ctype": "*"
     },
     "require-dev": {
-        "eventjet/coding-standard": "^3.12",
-        "infection/infection": "^0.27.0",
-        "maglnet/composer-require-checker": "^4.6",
-        "phpstan/extension-installer": "^1.3",
-        "phpstan/phpstan": "^1.12",
-        "phpstan/phpstan-phpunit": "^1.3",
-        "phpstan/phpstan-strict-rules": "^1.5",
-        "phpunit/phpunit": "^10.2",
-        "psalm/plugin-phpunit": "^0.18.4",
-        "roave/backward-compatibility-check": "^8.3",
-        "vimeo/psalm": "^5.16"
+        "eventjet/coding-standard": "^3.18",
+        "infection/infection": "^0.29.10",
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpstan": "^2.1",
+        "phpstan/phpstan-phpunit": "^2.0",
+        "phpstan/phpstan-strict-rules": "^2.0",
+        "phpunit/phpunit": "^11.5",
+        "psalm/plugin-phpunit": "^0.19.2",
+        "vimeo/psalm": "^6.2"
     },
     "minimum-stability": "stable",
     "autoload": {
@@ -48,7 +46,7 @@
             "@phpunit",
             "@infection"
         ],
-        "check-deps": "composer-require-checker",
+        "check-deps": "wget -O crc.phar https://github.com/maglnet/ComposerRequireChecker/releases/latest/download/composer-require-checker.phar && php crc.phar check && rm crc.phar",
         "cs-check": "php-cs-fixer fix --dry-run",
         "cs-fix": "php-cs-fixer fix",
         "infection": "infection -jmax",
