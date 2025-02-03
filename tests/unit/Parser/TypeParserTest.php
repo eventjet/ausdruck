@@ -38,9 +38,9 @@ final class TypeParserTest extends TestCase
         ];
         yield 'Empty string' => [
             <<<'AUSDRUCK'
-            
-            =
-            AUSDRUCK,
+                
+                =
+                AUSDRUCK,
             'Invalid type ""',
         ];
         yield 'Whitespace-only string' => [
@@ -49,9 +49,9 @@ final class TypeParserTest extends TestCase
         ];
         yield 'Arrow' => [
             <<<'AUSDRUCK'
-            ->
-            ==
-            AUSDRUCK,
+                ->
+                ==
+                AUSDRUCK,
             'Expected type, got ->',
         ];
         yield 'Open curly brace' => [

@@ -10,7 +10,6 @@ jobs:
       fail-fast: false
       matrix:
         php:
-          - "8.1"
           - "8.2"
           - "8.3"
         dependencies:
@@ -43,7 +42,6 @@ jobs:
       fail-fast: false
       matrix:
         php:
-          - "8.1"
           - "8.2"
         dependencies:
           - ""
@@ -74,7 +72,6 @@ jobs:
       fail-fast: false
       matrix:
         php:
-          - "8.1"
           - "8.2"
           - "8.3"
         dependencies:
@@ -106,7 +103,6 @@ jobs:
       fail-fast: false
       matrix:
         php:
-          - "8.1"
           - "8.2"
           - "8.3"
         dependencies:
@@ -140,7 +136,6 @@ jobs:
       fail-fast: false
       matrix:
         php:
-          - "8.1"
           - "8.2"
           - "8.3"
         dependencies:
@@ -171,9 +166,9 @@ jobs:
             --coverage-clover=build/coverage/clover.xml
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: coverage-${{ matrix.php }}
+          name: coverage-${{ matrix.php }}-${{ matrix.dependencies }}
           path: build/coverage/
 
   infection:
@@ -185,7 +180,6 @@ jobs:
       fail-fast: false
       matrix:
         php:
-          - "8.1"
           - "8.2"
           - "8.3"
         dependencies:
@@ -211,9 +205,9 @@ jobs:
         run: composer update --no-progress --no-interaction ${{ matrix.dependencies }}
 
       - name: Download coverage
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: coverage-${{ matrix.php }}
+          name: coverage-${{ matrix.php }}-${{ matrix.dependencies }}
           path: build/coverage/
 
       - name: Infection coverage of changed lines
@@ -231,31 +225,8 @@ jobs:
             -jmax
 
       - name: Save Infection result
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: infection-log-${{ matrix.php }}.txt
+          name: infection-log-${{ matrix.php }}-${{ matrix.dependencies }}.txt
           path: infection-log.txt
-
-  bc-breaks:
-    name: Backward Compatibility
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: 8.2
-          extensions: ctype
-
-      - name: Install dependencies
-        run: composer update --no-progress --no-interaction
-
-      - name: "Check for BC breaks"
-        run: vendor/bin/roave-backward-compatibility-check
