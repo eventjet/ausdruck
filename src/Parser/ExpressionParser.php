@@ -13,7 +13,6 @@ use Eventjet\Ausdruck\ListLiteral;
 use Eventjet\Ausdruck\StructLiteral;
 use Eventjet\Ausdruck\Type;
 
-use function array_key_exists;
 use function array_shift;
 use function assert;
 use function count;
@@ -227,7 +226,7 @@ final class ExpressionParser
         if ($type instanceof TypeError) {
             throw $type;
         }
-        if ($declaredType !== null && !$declaredType->equals($type)) {
+        if ($declaredType !== null && !$declaredType->isSubtypeOf($type)) {
             throw TypeError::create(
                 sprintf(
                     'Variable %s is declared as %s, but used as %s',
@@ -489,7 +488,7 @@ final class ExpressionParser
         if (!$targetType->isStruct()) {
             throw TypeError::create(sprintf('Can\'t access field "%s" on non-struct type %s', $name, $targetType), $location);
         }
-        if (!array_key_exists($name, $targetType->fields)) {
+        if ($targetType->getFieldType($name) === null) {
             throw TypeError::create(sprintf('Unknown field "%s" on type %s', $name, $targetType), $location);
         }
         return Expr::fieldAccess($target, $name, $location);

@@ -167,23 +167,13 @@ final class ExpressionTest extends TestCase
             (static function () {
                 $itemType = Type::listOf(Type::string());
                 $bagType = Type::listOf(Type::listOf($itemType));
-                /**
-                * @param array{list<array{string}>} $bag
-                * @return list<array{string}>
-                * @psalm-suppress MixedReturnStatement
-                * @psalm-suppress MixedInferredReturnType
-                */
-                $getItems = static fn(array $bag): array => $bag[0];
-                /**
-                * @param array{string} $item
-                * @psalm-suppress MixedReturnStatement
-                * @psalm-suppress MixedInferredReturnType
-                */
-                $getName = static fn(array $item): string => $item[0];
                 return
                     [
                         'bag.items().map:list<string>(|i| i:Item.name())',
-                        new Scope(['bag' => [[['a'], ['b']]]], ['items' => $getItems, 'name' => $getName]),
+                        new Scope(
+                            ['bag' => [[['a'], ['b']]]],
+                            ['items' => self::firstElement(...), 'name' => self::firstElement(...)],
+                        ),
                         ['a', 'b'],
                         new Declarations(
                             types: new Types(['Bag' => $bagType, 'Item' => $itemType]),
@@ -274,6 +264,39 @@ final class ExpressionTest extends TestCase
                 ),
                 new Scope(),
                 false,
+            ],
+            [
+                'myitem:Item.name',
+                new Scope(['myitem' => (object)['name' => 'Test']]),
+                'Test',
+                new Declarations(
+                    new Types(['Item' => Type::struct(['name' => Type::string()])]),
+                    ['myitem' => Type::struct(['name' => Type::string()])],
+                ),
+            ],
+            [
+                // Inline type can be smaller than the declared variable type
+                'user:{name: string}.name',
+                new Scope(['user' => (object)['name' => 'John', 'age' => 37]]),
+                'John',
+                new Declarations(variables: ['user' => Type::struct(['name' => Type::string(), 'age' => Type::int()])]),
+            ],
+            [
+                // map<string, string> in a struct accepts an empty PHP array
+                'thing:{kv: map<string, string>}.kv',
+                new Scope(['thing' => (object)['kv' => []]]),
+                [],
+            ],
+            [
+                // list<string> in a struct accepts an empty PHP array
+                'thing:{items: list<string>}.items',
+                new Scope(['thing' => (object)['items' => []]]),
+                [],
+            ],
+            [
+                'maybes:list<Option<string>>.filter:list<Some<string>>(|m| m:Option<string>.isSome())',
+                new Scope(['maybes' => ['foo', null, 'bar']]),
+                ['foo', 'bar'],
             ],
         ];
         foreach ($cases as $tuple) {
@@ -417,6 +440,11 @@ final class ExpressionTest extends TestCase
             new Scope(['user' => 'John']),
             'Expected object, got string',
         ];
+        yield 'String does not accept empty PHP array' => [
+            ['foo:string'],
+            new Scope(['foo' => []]),
+            'Expected variable "foo" to be of type string, got array: Expected string, got list<never>',
+        ];
     }
 
     /**
@@ -487,6 +515,16 @@ final class ExpressionTest extends TestCase
         yield 'Empty list literal' => ['[]', Type::listOf(Type::any())];
     }
 
+    /**
+     * @template T
+     * @param array{T} $array
+     * @return T
+     */
+    private static function firstElement(array $array): mixed
+    {
+        return $array[0];
+    }
+
     private static function span(): Span
     {
         return Span::char(1, 1);
@@ -503,12 +541,14 @@ final class ExpressionTest extends TestCase
      */
     public function testEvaluate(Expression|string|callable $expression, Scope $scope, Declarations|null $declarations, mixed $expected): void
     {
-        if (is_callable($expression)) {
-            $expression = $expression();
-        } elseif (is_string($expression)) {
-            $expression = ExpressionParser::parse($expression, $declarations);
+        if (!$expression instanceof Expression) {
+            /** @psalm-suppress MixedAssignment False positive */
+            $expression = is_string($expression)
+                ? ExpressionParser::parse($expression, $declarations)
+                : $expression();
         }
 
+        /** @psalm-suppress MixedMethodCall False positive */
         self::assertSame($expected, $expression->evaluate($scope));
     }
 

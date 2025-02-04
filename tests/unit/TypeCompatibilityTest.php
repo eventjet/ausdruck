@@ -53,6 +53,8 @@ final class TypeCompatibilityTest extends TestCase
             // Option
             ['Option<string>', 'Option<any>'],
             ['Some<string>', 'Option<string>'],
+            ['Some<string>', 'string'],
+            ['string', 'Some<string>'],
             ['None', 'None'],
 
             // Lists
@@ -97,7 +99,6 @@ final class TypeCompatibilityTest extends TestCase
             ['Option<int>', 'Option<string>'],
             ['Option<any>', 'Option<string>'],
             ['Option<string>', 'Some<string>'],
-            ['Some<string>', 'string'],
             ['None', 'string'],
 
             // Lists

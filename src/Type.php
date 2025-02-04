@@ -13,6 +13,7 @@ use function array_key_first;
 use function array_map;
 use function array_shift;
 use function array_slice;
+use function assert;
 use function count;
 use function get_object_vars;
 use function gettype;
@@ -112,7 +113,7 @@ final class Type implements Stringable
 
     public static function some(self $some): self
     {
-        return new self('Some', [$some]);
+        return $some;
     }
 
     public static function none(): self
@@ -159,6 +160,7 @@ final class Type implements Stringable
         if ($this->name === 'Func') {
             $args = $this->args;
             $returnType = array_shift($args);
+            assert($returnType !== null);
             return sprintf('func(%s): %s', implode(', ', $args), $returnType);
         }
         return $this->name . ($this->args === [] ? '' : sprintf('<%s>', implode(', ', $this->args)));
@@ -169,6 +171,9 @@ final class Type implements Stringable
      */
     public function assert(mixed $value): mixed
     {
+        if ($value === [] && $this->name === 'map') {
+            return $value;
+        }
         $valueType = self::fromValue($value);
         return $valueType->isSubtypeOf($this)
             ? $value
@@ -177,7 +182,13 @@ final class Type implements Stringable
 
     public function equals(self $type): bool
     {
-        if (($this->aliasFor ?? $this)->name !== ($type->aliasFor ?? $type)->name) {
+        if ($type->aliasFor !== null) {
+            $type = $type->canonical();
+        }
+        if ($this->aliasFor !== null) {
+            return $this->canonical()->equals($type);
+        }
+        if ($this->name !== $type->name) {
             return false;
         }
         if (!in_array($this->name, ['Func', 'list', 'Struct'], true)) {
@@ -230,8 +241,8 @@ final class Type implements Stringable
         if ($self->name === 'Option') {
             return $other->name === 'Option' && $self->args[0]->isSubtypeOf($other->args[0]);
         }
-        if ($self->name === 'Some') {
-            return in_array($other->name, ['Option', 'Some'], true) && $self->args[0]->isSubtypeOf($other->args[0]);
+        if ($self->name === 'list' && $self->args[0]->isNever() && $other->name === 'map') {
+            return true;
         }
         if ($self->name !== $other->name) {
             return false;
@@ -280,7 +291,12 @@ final class Type implements Stringable
 
     public function isStruct(): bool
     {
-        return $this->name === 'Struct';
+        return $this->canonical()->name === 'Struct';
+    }
+
+    public function getFieldType(string $name): self|null
+    {
+        return $this->canonical()->fields[$name] ?? null;
     }
 
     /**
@@ -299,5 +315,10 @@ final class Type implements Stringable
     private function isNone(): bool
     {
         return $this->name === 'None';
+    }
+
+    private function isNever(): bool
+    {
+        return $this->name === 'never';
     }
 }

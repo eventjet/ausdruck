@@ -353,15 +353,15 @@ final class ExpressionParserTest extends TestCase
         yield [
             <<<'EXPR'
 
-              :list<int>
-            EXPR,
+                  :list<int>
+                EXPR,
             Span::char(2, 3),
         ];
         yield [
             <<<'EXPR'
-              foo:string
-                === :string
-            EXPR,
+                  foo:string
+                    === :string
+                EXPR,
             Span::char(2, 9),
         ];
     }
