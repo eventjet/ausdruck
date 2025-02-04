@@ -282,6 +282,18 @@ final class ExpressionTest extends TestCase
                 new Declarations(variables: ['user' => Type::struct(['name' => Type::string(), 'age' => Type::int()])]),
             ],
             [
+                // map<string, string> in a struct accepts an empty PHP array
+                'thing:{kv: map<string, string>}.kv',
+                new Scope(['thing' => (object)['kv' => []]]),
+                [],
+            ],
+            [
+                // list<string> in a struct accepts an empty PHP array
+                'thing:{items: list<string>}.items',
+                new Scope(['thing' => (object)['items' => []]]),
+                [],
+            ],
+            [
                 'maybes:list<Option<string>>.filter:list<Some<string>>(|m| m:Option<string>.isSome())',
                 new Scope(['maybes' => ['foo', null, 'bar']]),
                 ['foo', 'bar'],
@@ -427,6 +439,11 @@ final class ExpressionTest extends TestCase
             Expr::fieldAccess(Expr::get('user', Type::string()), 'name', self::span()),
             new Scope(['user' => 'John']),
             'Expected object, got string',
+        ];
+        yield 'String does not accept empty PHP array' => [
+            ['foo:string'],
+            new Scope(['foo' => []]),
+            'Expected variable "foo" to be of type string, got array: Expected string, got list<never>',
         ];
     }
 
