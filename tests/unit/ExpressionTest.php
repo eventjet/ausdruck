@@ -435,6 +435,11 @@ final class ExpressionTest extends TestCase
             new Scope(['user' => 'John']),
             'Expected object, got string',
         ];
+        yield 'String does not accept empty PHP array' => [
+            ['foo:string'],
+            new Scope(['foo' => []]),
+            'Expected variable "foo" to be of type string, got array: Expected string, got list<never>',
+        ];
     }
 
     /**
