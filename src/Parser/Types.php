@@ -51,7 +51,7 @@ final class Types
             'map' => $this->resolveMap($node),
             'list' => $this->resolveList($node),
             'Option' => $this->resolveOption($this->exactlyOneTypeArg($node)),
-            'Some' => $this->resolveSome($this->exactlyOneTypeArg($node)),
+            'Some' => $this->exactlyOneTypeArg($node),
             'None' => self::noArgs(Type::none(), $node),
             '' => $this->resolveStruct($node),
             default => $this->resolveAlias($node->name) ?? TypeError::create(
@@ -159,11 +159,6 @@ final class Types
     private function resolveOption(Type|TypeError $arg): Type|TypeError
     {
         return $arg instanceof TypeError ? $arg : Type::option($arg);
-    }
-
-    private function resolveSome(Type|TypeError $arg): Type|TypeError
-    {
-        return $arg instanceof TypeError ? $arg : Type::some($arg);
     }
 
     private function resolveFunction(TypeNode $node): Type|TypeError
