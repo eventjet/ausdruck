@@ -281,6 +281,18 @@ final class ExpressionTest extends TestCase
                 'John',
                 new Declarations(variables: ['user' => Type::struct(['name' => Type::string(), 'age' => Type::int()])]),
             ],
+            [
+                // map<string, string> in a struct accepts an empty PHP array
+                'thing:{kv: map<string, string>}.kv',
+                new Scope(['thing' => (object)['kv' => []]]),
+                [],
+            ],
+            [
+                // list<string> in a struct accepts an empty PHP array
+                'thing:{items: list<string>}.items',
+                new Scope(['thing' => (object)['items' => []]]),
+                [],
+            ],
         ];
         foreach ($cases as $tuple) {
             [$expr, $scope, $expected] = $tuple;

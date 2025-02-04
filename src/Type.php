@@ -244,6 +244,9 @@ final class Type implements Stringable
         if ($self->name === 'Some') {
             return in_array($other->name, ['Option', 'Some'], true) && $self->args[0]->isSubtypeOf($other->args[0]);
         }
+        if ($self->name === 'list' && $self->args[0]->isNever() && $other->name === 'map') {
+            return true;
+        }
         if ($self->name !== $other->name) {
             return false;
         }
@@ -315,5 +318,10 @@ final class Type implements Stringable
     private function isNone(): bool
     {
         return $this->name === 'None';
+    }
+
+    private function isNever(): bool
+    {
+        return $this->name === 'never';
     }
 }
