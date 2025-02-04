@@ -293,6 +293,11 @@ final class ExpressionTest extends TestCase
                 new Scope(['thing' => (object)['items' => []]]),
                 [],
             ],
+            [
+                'maybes:list<Option<string>>.filter:list<Some<string>>(|m| m:Option<string>.isSome())',
+                new Scope(['maybes' => ['foo', null, 'bar']]),
+                ['foo', 'bar'],
+            ],
         ];
         foreach ($cases as $tuple) {
             [$expr, $scope, $expected] = $tuple;

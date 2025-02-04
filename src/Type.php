@@ -113,7 +113,7 @@ final class Type implements Stringable
 
     public static function some(self $some): self
     {
-        return new self('Some', [$some]);
+        return $some;
     }
 
     public static function none(): self
@@ -240,9 +240,6 @@ final class Type implements Stringable
         }
         if ($self->name === 'Option') {
             return $other->name === 'Option' && $self->args[0]->isSubtypeOf($other->args[0]);
-        }
-        if ($self->name === 'Some') {
-            return in_array($other->name, ['Option', 'Some'], true) && $self->args[0]->isSubtypeOf($other->args[0]);
         }
         if ($self->name === 'list' && $self->args[0]->isNever() && $other->name === 'map') {
             return true;
