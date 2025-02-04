@@ -104,7 +104,7 @@ final class ExpressionParser
                 $token === null
                     ? 'Expected expression, got end of input'
                     : sprintf('Expected expression, got %s', Token::print($token)),
-                self::nextSpan(),
+                $this->nextSpan(),
             );
         }
         return $expr;
@@ -168,7 +168,7 @@ final class ExpressionParser
             return $token === Token::Or ? $left->or_($right) : $left->and_($right);
         }
         if ($token === Token::Pipe) {
-            return self::lambda();
+            return $this->lambda();
         }
         if ($token === Token::Minus) {
             $this->tokens->next();
@@ -210,10 +210,10 @@ final class ExpressionParser
             return $left->gt($right);
         }
         if ($token === Token::OpenBracket) {
-            return self::parseListLiteral();
+            return $this->parseListLiteral();
         }
         if ($token === Token::OpenBrace) {
-            return self::parseStructLiteral();
+            return $this->parseStructLiteral();
         }
         return null;
     }
@@ -369,7 +369,7 @@ final class ExpressionParser
         }
         $this->tokens->next();
         if ($this->tokens->peek()?->token !== Token::Pipe) {
-            self::expect(Token::Comma);
+            $this->expect(Token::Comma);
         }
         return $token;
     }
@@ -377,10 +377,10 @@ final class ExpressionParser
     private function dot(Expression $target): Call|FieldAccess
     {
         $dot = $this->expect(Token::Dot);
-        [$name, $nameLocation] = self::expectIdentifier($dot, 'function name');
+        [$name, $nameLocation] = $this->expectIdentifier($dot, 'function name');
         $token = $this->tokens->peek()?->token;
         return match ($token) {
-            Token::Colon, Token::OpenParen => self::call($name, $nameLocation, $target),
+            Token::Colon, Token::OpenParen => $this->call($name, $nameLocation, $target),
             default => self::fieldAccess($target, $name, $target->location()->to($nameLocation)),
         };
     }
@@ -449,9 +449,9 @@ final class ExpressionParser
                 );
             }
         }
-        self::expect(Token::OpenParen);
-        $args = self::parseArgs();
-        $closeParen = self::expect(Token::CloseParen);
+        $this->expect(Token::OpenParen);
+        $args = $this->parseArgs();
+        $closeParen = $this->expect(Token::CloseParen);
         if ($fnType !== null) {
             $parameterTypes = $fnType->args;
             array_shift($parameterTypes); // Remove return type
@@ -515,7 +515,7 @@ final class ExpressionParser
 
     private function parseListLiteral(): ListLiteral
     {
-        $start = self::expect(Token::OpenBracket);
+        $start = $this->expect(Token::OpenBracket);
         $items = [];
         while (true) {
             $item = $this->parseLazy(null);
@@ -527,13 +527,13 @@ final class ExpressionParser
                 $this->tokens->next();
             }
         }
-        $close = self::expect(Token::CloseBracket);
+        $close = $this->expect(Token::CloseBracket);
         return Expr::listLiteral($items, $start->location()->to($close->location()));
     }
 
     private function parseStructLiteral(): StructLiteral
     {
-        $start = self::expect(Token::OpenBrace);
+        $start = $this->expect(Token::OpenBrace);
         $fields = [];
         while (true) {
             $field = $this->parseStructField();
@@ -547,7 +547,7 @@ final class ExpressionParser
             }
             $this->tokens->next();
         }
-        $close = self::expect(Token::CloseBrace);
+        $close = $this->expect(Token::CloseBrace);
         return Expr::structLiteral($fields, $start->location()->to($close->location()));
     }
 
@@ -564,10 +564,10 @@ final class ExpressionParser
             return null;
         }
         $this->tokens->next();
-        self::expect(Token::Colon);
+        $this->expect(Token::Colon);
         $value = $this->parseLazy(null);
         if ($value === null) {
-            throw SyntaxError::create('Expected value after colon', self::nextSpan());
+            throw SyntaxError::create('Expected value after colon', $this->nextSpan());
         }
         return [$name->token, $value];
     }
