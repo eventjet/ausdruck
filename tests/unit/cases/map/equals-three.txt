@@ -1,0 +1,5 @@
+numbers:list<int>.map:list<bool>(|n| n:int === 3)
+-- Input --
+{ "numbers": [1, 2, 3, 4, 3, 5] }
+-- Output --
+[false, false, true, false, true, false]
