@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Parser;
 
 use Eventjet\Ausdruck\Type;
+use Eventjet\Ausdruck\ValueDeclaration;
 use InvalidArgumentException;
 
+use function array_filter;
 use function array_key_exists;
 use function sprintf;
+
+use const ARRAY_FILTER_USE_KEY;
 
 final class Declarations
 {
@@ -24,7 +28,22 @@ final class Declarations
         public readonly array $variables = [],
         array $functions = [],
     ) {
-        $fns = [
+        $fns = self::builtInFunctions();
+        foreach ($functions as $name => $type) {
+            if (array_key_exists($name, $fns)) {
+                throw new InvalidArgumentException(sprintf('Can\'t override built-in function %s', $name));
+            }
+            $fns[$name] = $type;
+        }
+        $this->functions = $fns;
+    }
+
+    /**
+     * @return array<string, Type>
+     */
+    private static function builtInFunctions(): array
+    {
+        return [
             'contains' => Type::func(Type::bool(), [Type::listOf(Type::any()), Type::any()]),
             'count' => Type::func(Type::int(), [Type::listOf(Type::any())]),
             // Can't declare filter until we have generics
@@ -39,12 +58,23 @@ final class Declarations
             // Can't declare unwrap until we have generics
             // 'unwrap' => Type::func(Type::some(Type::any()), [Type::option(Type::any())]),
         ];
-        foreach ($functions as $name => $type) {
-            if (array_key_exists($name, $fns)) {
-                throw new InvalidArgumentException(sprintf('Can\'t override built-in function %s', $name));
-            }
-            $fns[$name] = $type;
+    }
+
+    /**
+     * @param list<ValueDeclaration> $declarations
+     */
+    public function withAddedDeclarations(array $declarations): self
+    {
+        $newValues = $this->variables;
+        foreach ($declarations as $declaration) {
+            $newValues[$declaration->name] = $declaration->type;
         }
-        $this->functions = $fns;
+        $builtInFunctions = self::builtInFunctions();
+        $functions = array_filter(
+            $this->functions,
+            static fn($name) => !array_key_exists($name, $builtInFunctions),
+            ARRAY_FILTER_USE_KEY,
+        );
+        return new self($this->types, $newValues, $functions);
     }
 }

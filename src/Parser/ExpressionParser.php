@@ -12,6 +12,7 @@ use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\ListLiteral;
 use Eventjet\Ausdruck\StructLiteral;
 use Eventjet\Ausdruck\Type;
+use Eventjet\Ausdruck\ValueDeclaration;
 
 use function array_shift;
 use function assert;
@@ -49,7 +50,7 @@ final class ExpressionParser
          *     string literals and identifiers are just put back together. If you encounter a case where it does matter,
          *     just change it to mb_str_split and add an appropriate test case.
          */
-        return (new self(new Peekable(Tokenizer::tokenize($chars)), $declarations))->parseExpression();
+        return (new self(new Peekable(Tokenizer::tokenize($chars)), $declarations))->parseStatements();
     }
 
     public static function parseTyped(string $expression, Type $type, Declarations|Types|null $types = null): Expression
@@ -87,6 +88,52 @@ final class ExpressionParser
         return Expr::fieldAccess($target, $name, $location);
     }
 
+    private function parseStatements(): Expression
+    {
+        $declarations = [];
+        while (true) {
+            $declaration = $this->parseDeclaration();
+            if ($declaration === null) {
+                break;
+            }
+            $declarations[] = $declaration;
+        }
+        $this->declarations = $this->declarations->withAddedDeclarations($declarations);
+        return $this->parseExpression();
+    }
+
+    private function parseDeclaration(): ValueDeclaration|null
+    {
+        $token = $this->tokens->peek()?->token;
+        if ($token === 'val') {
+            return $this->parseValueDeclaration();
+        }
+        return null;
+    }
+
+    private function parseValueDeclaration(): ValueDeclaration
+    {
+        $valToken = $this->tokens->next();
+        assert($valToken !== null);
+        [$name] = $this->expectIdentifier($valToken, 'value name');
+        $this->expect(Token::Equals);
+        $typeNode = TypeParser::parse($this->tokens);
+        if ($typeNode === null) {
+            throw SyntaxError::create('Expected type, got end of input', $this->nextSpan());
+        }
+        if ($typeNode instanceof ParsedToken) {
+            throw SyntaxError::create(
+                sprintf('Expected type, got %s', Token::print($typeNode->token)),
+                $typeNode->location(),
+            );
+        }
+        $type = $this->declarations->types->resolve($typeNode);
+        if ($type instanceof TypeError) {
+            throw $type;
+        }
+        return new ValueDeclaration($name, $type);
+    }
+
     private function parseExpression(): Expression
     {
         /** @var Expression | null $expr */
@@ -117,6 +164,9 @@ final class ExpressionParser
             return null;
         }
         $token = $parsedToken->token;
+        if ($token === Token::Equals) {
+            self::unexpectedToken($parsedToken);
+        }
         if ($token === Token::Dot) {
             if ($left === null) {
                 self::unexpectedToken($parsedToken);

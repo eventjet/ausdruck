@@ -298,6 +298,25 @@ final class ExpressionTest extends TestCase
                 new Scope(['maybes' => ['foo', null, 'bar']]),
                 ['foo', 'bar'],
             ],
+            [
+                <<<AUSDRUCK
+                    val foo = int
+                    
+                    foo
+                    AUSDRUCK,
+                new Scope(['foo' => 42]),
+                42,
+            ],
+            [
+                <<<AUSDRUCK
+                    val foo = string
+                    val bar = string
+                    
+                    foo === bar
+                    AUSDRUCK,
+                new Scope(['foo' => 'a', 'bar' => 'b']),
+                false,
+            ],
         ];
         foreach ($cases as $tuple) {
             [$expr, $scope, $expected] = $tuple;

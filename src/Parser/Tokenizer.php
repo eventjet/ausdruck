@@ -164,6 +164,9 @@ final class Tokenizer
     {
         $chars->next();
         $column++;
+        if ($chars->peek() !== '=') {
+            return Token::Equals;
+        }
         self::expect($chars, '==', $line, $column);
         return Token::TripleEquals;
     }
