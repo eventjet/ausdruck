@@ -102,7 +102,7 @@ final class ExpressionParserTest extends TestCase
         yield 'double equals' => ['foo:string == bar:string'];
         yield 'double length fat arrow' => ['foo:string ==> bar:string'];
         yield 'end after single pipe' => ['foo:bool |'];
-        yield 'end after single equals' => ['foo:bool =', 'Expected ==, got end of input'];
+        yield 'end after single equals' => ['foo:bool =', 'Unexpected ='];
         yield 'end after double equals' => ['foo:bool =='];
         yield 'close brace after triple equals' => ['foo:bool === )'];
         yield 'lambda: missing closing brace' => ['(foo, bar => foo:string'];
@@ -149,6 +149,11 @@ final class ExpressionParserTest extends TestCase
         yield 'non-token, non-identifier symbol' => ['foo:bool € bar:bool'];
         yield 'identifier starting with a number' => ['42foo:bool', 'Unexpected identifier foo'];
         yield 'identifier starting with an underscore' => ['_foo:bool', 'Unexpected character _'];
+        yield 'End of input after val keyword' => ['val', 'Expected value name, got end of input'];
+        yield 'End of input after val name' => ['val foo', 'Expected =, got end of input'];
+        yield 'End of input after val equals' => ['val foo =', 'Expected type, got end of input'];
+        yield 'No Expression after val statement' => ['val foo = int', 'Expected expression, got end of input'];
+        yield 'Not a type after val equals' => ["val foo = :\nfoo", 'Expected type, got :'];
     }
 
     /**
@@ -246,6 +251,7 @@ final class ExpressionParserTest extends TestCase
             'Unknown field "age" on type { name: string }',
         ];
         yield 'field access on string' => ['foo:string.age', 'Can\'t access field "age" on non-struct type string'];
+        yield 'val statement with unknown type' => ["val foo = huh\nfoo", 'Unknown type huh'];
     }
 
     /**
