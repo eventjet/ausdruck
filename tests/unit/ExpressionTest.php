@@ -423,7 +423,6 @@ final class ExpressionTest extends TestCase
             $expression = ExpressionParser::parse($expression, $declarations);
         }
 
-        /** @phpstan-ignore-next-line method.nonObject False positive */
         self::assertSame($expected, $expression->evaluate($scope));
     }
 

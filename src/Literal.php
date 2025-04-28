@@ -51,7 +51,6 @@ final class Literal extends Expression
             return (string)$value;
         }
         if (array_is_list($value)) {
-            /** @phpstan-ignore-next-line argument.type PHPStan is right, but it's fine */
             return sprintf('[%s]', implode(', ', array_map(self::dumpValue(...), $value)));
         }
         $pairs = [];
