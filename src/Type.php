@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use InvalidArgumentException;
+use Override;
 use Stringable;
 
 use function array_is_list;
@@ -147,6 +148,7 @@ final class Type implements Stringable
         return [self::fromValue($firstKey), self::fromValue($value[$firstKey])];
     }
 
+    #[Override]
     public function __toString(): string
     {
         if ($this->name === 'Struct') {

@@ -15,7 +15,8 @@ final class EndToEndTest extends TestCase
      */
     public static function cases(): iterable
     {
-        foreach (E2eCase::all() as $name => $case) {;
+        foreach (E2eCase::all() as $name => $case) {
+            ;
             yield $name => [$case];
         }
     }
@@ -27,6 +28,7 @@ final class EndToEndTest extends TestCase
     {
         $expression = ExpressionParser::parse($case->source);
 
+        /** @var mixed $actual */
         $actual = $expression->evaluate(new Scope($case->input));
 
         self::assertSame($case->expected, $actual);

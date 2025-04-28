@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Override;
 use Stringable;
 
 use function implode;
@@ -40,6 +41,7 @@ final class TypeNode implements Stringable
         return new self('', [$key, $value], $key->location->to($value->location), 'kv');
     }
 
+    #[Override]
     public function __toString(): string
     {
         if ($this->delimiters === 'kv') {

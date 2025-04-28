@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Override;
 
 use function get_debug_type;
 use function is_object;
@@ -29,11 +30,13 @@ final class FieldAccess extends Expression
         return sprintf('%s.%s', $this->struct, $this->field);
     }
 
+    #[Override]
     public function location(): Span
     {
         return $this->location;
     }
 
+    #[Override]
     public function evaluate(Scope $scope): mixed
     {
         $struct = $this->struct->evaluate($scope);
@@ -47,6 +50,7 @@ final class FieldAccess extends Expression
         return $struct->{$this->field};
     }
 
+    #[Override]
     public function equals(Expression $other): bool
     {
         return $other instanceof self
@@ -54,6 +58,7 @@ final class FieldAccess extends Expression
             && $this->field === $other->field;
     }
 
+    #[Override]
     public function getType(): Type
     {
         return $this->struct->getType()->fields[$this->field];

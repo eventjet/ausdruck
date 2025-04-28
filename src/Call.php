@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Override;
 use Throwable;
 
 use function array_map;
@@ -57,6 +58,7 @@ final class Call extends Expression
         return sprintf('%s.%s:%s(%s)', $this->target, $this->name, $this->type, implode(', ', $this->arguments));
     }
 
+    #[Override]
     public function evaluate(Scope $scope): mixed
     {
         $func = $scope->func($this->name);
@@ -72,6 +74,7 @@ final class Call extends Expression
         }
     }
 
+    #[Override]
     public function equals(Expression $other): bool
     {
         return $other instanceof self
@@ -81,6 +84,7 @@ final class Call extends Expression
             && self::compareArguments($this->arguments, $other->arguments);
     }
 
+    #[Override]
     public function getType(): Type
     {
         return $this->type;

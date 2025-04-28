@@ -62,38 +62,37 @@ final readonly class E2eCase
 
     private static function parse(string $contents): self
     {
-        $lines = explode("\n", $contents);
-        $sections = ['Source' => []];
+        $sectionLines = ['Source' => []];
         $section = null;
-        foreach ($lines as $line) {
+        foreach (explode("\n", $contents) as $line) {
             if (str_starts_with($line, '-- ') && str_ends_with($line, ' --')) {
-                if ($sections['Source'] === []) {
+                if ($sectionLines['Source'] === []) {
                     throw new RuntimeException('Test file must start with a source section');
                 }
                 $section = substr($line, 3, -3);
                 continue;
             }
             if ($section === null) {
-                $sections['Source'][] = $line;
+                $sectionLines['Source'][] = $line;
                 continue;
             }
-            if (!array_key_exists($section, $sections)) {
-                $sections[$section] = [];
+            if (!array_key_exists($section, $sectionLines)) {
+                $sectionLines[$section] = [];
             }
-            $sections[$section][] = $line;
+            $sectionLines[$section][] = $line;
         }
-        foreach ($sections as &$section) {
-            $section = implode("\n", $section);
+        $sections = [];
+        foreach ($sectionLines as $name => $lines) {
+            $sections[$name] = implode("\n", $lines);
         }
+        /** @var mixed $output */
         $output = json_decode($sections['Output']);
         if ($output === null) {
             throw new RuntimeException('Invalid JSON in output section');
         }
         if (array_key_exists('Input', $sections)) {
+            /** @var array<string, mixed> $input */
             $input = json_decode($sections['Input'], true);
-            if ($input === null) {
-                throw new RuntimeException('Invalid JSON in input section');
-            }
         } else {
             $input = [];
         }

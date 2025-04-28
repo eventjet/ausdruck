@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Override;
 
 use function array_is_list;
 use function array_map;
@@ -67,17 +68,20 @@ final class Literal extends Expression
         return self::dumpValue($this->value);
     }
 
+    #[Override]
     public function evaluate(Scope $scope): mixed
     {
         return $this->value;
     }
 
+    #[Override]
     public function equals(Expression $other): bool
     {
         return $other instanceof self
             && $this->value === $other->value;
     }
 
+    #[Override]
     public function getType(): Type
     {
         return Type::fromValue($this->value);
