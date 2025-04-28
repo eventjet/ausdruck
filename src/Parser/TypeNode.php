@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Override;
 use Stringable;
 
 use function implode;
@@ -25,6 +26,7 @@ final class TypeNode implements Stringable
     ) {
     }
 
+    #[Override]
     public function __toString(): string
     {
         return $this->args === []

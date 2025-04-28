@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Override;
 
 use function get_debug_type;
 use function is_bool;
@@ -25,6 +26,7 @@ final class And_ extends Expression
         return sprintf('%s && %s', $this->left, $this->right);
     }
 
+    #[Override]
     public function evaluate(Scope $scope): bool
     {
         $left = $this->left->evaluate($scope);
@@ -37,6 +39,7 @@ final class And_ extends Expression
         return $left && $right;
     }
 
+    #[Override]
     public function equals(Expression $other): bool
     {
         return $other instanceof self
@@ -44,11 +47,13 @@ final class And_ extends Expression
             && $this->right->equals($other->right);
     }
 
+    #[Override]
     public function getType(): Type
     {
         return Type::bool();
     }
 
+    #[Override]
     public function location(): Span
     {
         return $this->left->location()->to($this->right->location());

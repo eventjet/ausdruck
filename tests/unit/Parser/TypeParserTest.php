@@ -10,7 +10,6 @@ use Eventjet\Ausdruck\Parser\TypeParser;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 
-use function assert;
 use function explode;
 use function implode;
 use function preg_match;
@@ -37,9 +36,9 @@ final class TypeParserTest extends TestCase
         ];
         yield 'Empty string' => [
             <<<'AUSDRUCK'
-            
-            =
-            AUSDRUCK,
+                
+                =
+                AUSDRUCK,
             'Invalid type ""',
         ];
         yield 'Whitespace-only string' => [
@@ -48,9 +47,9 @@ final class TypeParserTest extends TestCase
         ];
         yield 'Arrow' => [
             <<<'AUSDRUCK'
-            ->
-            ==
-            AUSDRUCK,
+                ->
+                ==
+                AUSDRUCK,
             'Expected type, got ->',
         ];
     }
@@ -76,7 +75,7 @@ final class TypeParserTest extends TestCase
             }
             $startCol = strlen($matches['indent']) + 1;
             $endCol = strlen($matches['indent']) + strlen($matches['marker']);
-            assert($endCol > 0, 'End column can\'t be lower than 1 because the marker is at least one character long');
+            /** @psalm-suppress InvalidArgument Psalm doesn't analyze regular expressions */
             $expectedSpan = new Span($lineNumber, $startCol, $lineNumber, $endCol);
             unset($lines[$lineIndex]);
         }

@@ -6,6 +6,7 @@ namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\TypeHint;
+use Override;
 
 use function get_debug_type;
 use function sprintf;
@@ -34,6 +35,7 @@ final class Get extends Expression
         return sprintf('%s%s', $this->name, $this->typeHint);
     }
 
+    #[Override]
     public function evaluate(Scope $scope): mixed
     {
         /** @psalm-suppress MixedAssignment */
@@ -57,6 +59,7 @@ final class Get extends Expression
         }
     }
 
+    #[Override]
     public function equals(Expression $other): bool
     {
         return $other instanceof self
@@ -64,6 +67,7 @@ final class Get extends Expression
             && $this->typeHint->type->equals($other->typeHint->type);
     }
 
+    #[Override]
     public function getType(): Type
     {
         return $this->typeHint->type;

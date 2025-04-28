@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Override;
 use Stringable;
 
 use function sprintf;
@@ -33,6 +34,7 @@ final class Span implements Stringable
         return new self($line, $column, $line, $column);
     }
 
+    #[Override]
     public function __toString(): string
     {
         return sprintf(

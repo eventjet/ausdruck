@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use InvalidArgumentException;
+use Override;
 use Stringable;
 
 use function array_is_list;
 use function array_key_first;
 use function array_shift;
 use function array_slice;
+use function assert;
 use function gettype;
 use function implode;
 use function in_array;
@@ -140,9 +142,11 @@ final class Type implements Stringable
         return [self::fromValue($firstKey), self::fromValue($value[$firstKey])];
     }
 
+    #[Override]
     public function __toString(): string
     {
         if ($this->name === 'Func') {
+            assert($this->args !== []);
             $args = $this->args;
             $returnType = array_shift($args);
             return sprintf('func(%s): %s', implode(', ', $args), $returnType);
