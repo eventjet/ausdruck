@@ -10,8 +10,8 @@ jobs:
       fail-fast: false
       matrix:
         php:
-          - "8.2"
           - "8.3"
+          - "8.4"
         dependencies:
           - ""
           - "--prefer-lowest"
@@ -72,8 +72,8 @@ jobs:
       fail-fast: false
       matrix:
         php:
-          - "8.2"
           - "8.3"
+          - "8.4"
         dependencies:
           - ""
           - "--prefer-lowest"
@@ -103,8 +103,8 @@ jobs:
       fail-fast: false
       matrix:
         php:
-          - "8.2"
           - "8.3"
+          - "8.4"
         dependencies:
           - ""
           - "--prefer-lowest"
@@ -136,8 +136,8 @@ jobs:
       fail-fast: false
       matrix:
         php:
-          - "8.2"
           - "8.3"
+          - "8.4"
         dependencies:
           - ""
           - "--prefer-lowest"
@@ -180,8 +180,8 @@ jobs:
       fail-fast: false
       matrix:
         php:
-          - "8.2"
           - "8.3"
+          - "8.4"
         dependencies:
           - ""
           - "--prefer-lowest"
