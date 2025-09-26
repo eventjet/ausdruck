@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Override;
 use Stringable;
 
 use function is_string;
@@ -23,6 +24,7 @@ final class Literal implements Stringable
     {
     }
 
+    #[Override]
     public function __toString(): string
     {
         if (is_string($this->value)) {

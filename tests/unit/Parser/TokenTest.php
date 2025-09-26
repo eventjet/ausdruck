@@ -6,6 +6,7 @@ namespace Eventjet\Ausdruck\Test\Unit\Parser;
 
 use Eventjet\Ausdruck\Parser\Literal;
 use Eventjet\Ausdruck\Parser\Token;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class TokenTest extends TestCase
@@ -40,8 +41,8 @@ final class TokenTest extends TestCase
 
     /**
      * @param Token|string|Literal<string | int | float> $token
-     * @dataProvider printCases
      */
+    #[DataProvider('printCases')]
     public function testPrint(Token|string|Literal $token, string $expected): void
     {
         self::assertSame($expected, Token::print($token));

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Override;
 
 use function array_key_exists;
 use function array_map;
@@ -34,16 +35,19 @@ final class StructLiteral extends Expression
         return sprintf('{%s}', implode(', ', $fieldStrings));
     }
 
+    #[Override]
     public function location(): Span
     {
         return $this->location;
     }
 
+    #[Override]
     public function evaluate(Scope $scope): mixed
     {
         return (object)array_map(static fn(Expression $value): mixed => $value->evaluate($scope), $this->fields);
     }
 
+    #[Override]
     public function equals(Expression $other): bool
     {
         if (!$other instanceof self) {
@@ -61,6 +65,7 @@ final class StructLiteral extends Expression
         return true;
     }
 
+    #[Override]
     public function getType(): Type
     {
         return Type::struct(array_map(static fn(Expression $value) => $value->getType(), $this->fields));

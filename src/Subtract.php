@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Override;
 
 use function get_debug_type;
 use function gettype;
@@ -27,6 +28,7 @@ final class Subtract extends Expression
         return sprintf('%s - %s', $this->minuend, $this->subtrahend);
     }
 
+    #[Override]
     public function evaluate(Scope $scope): int|float
     {
         /** @var mixed $minuend */
@@ -57,6 +59,7 @@ final class Subtract extends Expression
         );
     }
 
+    #[Override]
     public function equals(Expression $other): bool
     {
         return $other instanceof self
@@ -64,11 +67,13 @@ final class Subtract extends Expression
             && $this->subtrahend->equals($other->subtrahend);
     }
 
+    #[Override]
     public function getType(): Type
     {
         return $this->minuend->getType();
     }
 
+    #[Override]
     public function location(): Span
     {
         return $this->minuend->location()->to($this->subtrahend->location());

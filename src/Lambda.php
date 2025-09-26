@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Override;
 
 use function array_map;
 use function implode;
@@ -34,6 +35,7 @@ final class Lambda extends Expression
     /**
      * @return callable(Scope): mixed
      */
+    #[Override]
     public function evaluate(Scope $scope): callable
     {
         return function (mixed ...$params) use ($scope): mixed {
@@ -45,6 +47,7 @@ final class Lambda extends Expression
         };
     }
 
+    #[Override]
     public function equals(Expression $other): bool
     {
         return $other instanceof self
@@ -52,6 +55,7 @@ final class Lambda extends Expression
             && $this->body->equals($other->body);
     }
 
+    #[Override]
     public function getType(): Type
     {
         return Type::func($this->body->getType(), array_map(static fn(string $_name) => Type::any(), $this->parameters));

@@ -21,6 +21,7 @@ use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\StructLiteral;
 use Eventjet\Ausdruck\Subtract;
 use Eventjet\Ausdruck\Type;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class ExpressionComparisonTest extends TestCase
@@ -285,18 +286,14 @@ final class ExpressionComparisonTest extends TestCase
         return Span::char(1, 1);
     }
 
-    /**
-     * @dataProvider equalsCases
-     */
+    #[DataProvider('equalsCases')]
     public function testEquals(Expression $a, Expression $b): void
     {
         self::assertTrue($a->equals($b));
         self::assertTrue($b->equals($a));
     }
 
-    /**
-     * @dataProvider notEqualsCases
-     */
+    #[DataProvider('notEqualsCases')]
     public function testNotEquals(Expression $a, Expression $b): void
     {
         self::assertFalse($a->equals($b));

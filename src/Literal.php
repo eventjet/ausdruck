@@ -5,18 +5,16 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Override;
 
 use function array_is_list;
 use function array_map;
-use function get_debug_type;
 use function implode;
 use function is_array;
-use function is_bool;
-use function is_float;
-use function is_int;
 use function is_null;
 use function is_string;
 use function sprintf;
+use function var_export;
 
 /**
  * @internal
@@ -39,17 +37,11 @@ final class Literal extends Expression
         if (is_string($value)) {
             return sprintf('"%s"', $value);
         }
-        if (is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
         if (is_null($value)) {
             return 'null';
         }
-        if (is_int($value) || is_float($value)) {
-            return (string)$value;
-        }
         if (!is_array($value)) {
-            return get_debug_type($value);
+            return var_export($value, true);
         }
         if (array_is_list($value)) {
             return sprintf('[%s]', implode(', ', array_map(self::dumpValue(...), $value)));
@@ -67,17 +59,20 @@ final class Literal extends Expression
         return self::dumpValue($this->value);
     }
 
+    #[Override]
     public function evaluate(Scope $scope): mixed
     {
         return $this->value;
     }
 
+    #[Override]
     public function equals(Expression $other): bool
     {
         return $other instanceof self
             && $this->value === $other->value;
     }
 
+    #[Override]
     public function getType(): Type
     {
         return Type::fromValue($this->value);
