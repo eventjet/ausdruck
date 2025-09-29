@@ -119,28 +119,6 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{Type | callable(): Type, Type | callable(): Type}>
-     */
-    public static function equalsCases(): iterable
-    {
-        yield 'Some<T> == T' => [
-            static fn() => Type::some(Type::string()),
-            Type::string(),
-        ];
-    }
-
-    /**
-     * @return iterable<string, array{Type, string}>
-     */
-    public static function toStringCases(): iterable
-    {
-        yield 'Struct' => [
-            Type::struct(['name' => Type::string(), 'age' => Type::int()]),
-            '{ name: string, age: int }',
-        ];
-    }
-
-    /**
      * @return iterable<string, array{Type, Type}>
      */
     public static function notEqualsCases(): iterable
@@ -172,6 +150,28 @@ final class TypeTest extends TestCase
             assert(!$typeB instanceof TypeError);
             yield sprintf('%s vs. %s', $a, $b) => [$typeA, $typeB];
         }
+    }
+
+    /**
+     * @return iterable<string, array{Type | callable(): Type, Type | callable(): Type}>
+     */
+    public static function equalsCases(): iterable
+    {
+        yield 'Some<T> == T' => [
+            static fn() => Type::some(Type::string()),
+            Type::string(),
+        ];
+    }
+
+    /**
+     * @return iterable<string, array{Type, string}>
+     */
+    public static function toStringCases(): iterable
+    {
+        yield 'Struct' => [
+            Type::struct(['name' => Type::string(), 'age' => Type::int()]),
+            '{ name: string, age: int }',
+        ];
     }
 
     #[DataProvider('invalidValues')]
@@ -210,13 +210,6 @@ final class TypeTest extends TestCase
         $type->assert($value);
     }
 
-    #[DataProvider('notEqualsCases')]
-    public function testNotEquals(Type $a, Type $b): void
-    {
-        self::assertFalse($a->equals($b));
-        self::assertFalse($b->equals($a));
-    }
-
     #[DataProvider('successfulAssertCases')]
     public function testSuccessfulAssert(Type $type, mixed $value): void
     {
@@ -231,6 +224,13 @@ final class TypeTest extends TestCase
         $actual = Type::fromValue($value);
 
         self::assertTrue($actual->equals($expected));
+    }
+
+    #[DataProvider('notEqualsCases')]
+    public function testNotEquals(Type $a, Type $b): void
+    {
+        self::assertFalse($a->equals($b));
+        self::assertFalse($b->equals($a));
     }
 
     /**
