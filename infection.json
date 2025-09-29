@@ -7,7 +7,7 @@
         ]
     },
     "staticAnalysisTool": "phpstan",
-    "staticAnalysisToolOptions": "--memory-limit=128M",
+    "staticAnalysisToolOptions": "--memory-limit=256M",
     "logs": {
         "text": "infection-log.txt"
     },
