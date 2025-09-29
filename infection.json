@@ -1,10 +1,13 @@
 {
+    "$schema": "vendor/infection/infection/resources/schema.json",
     "timeout": 2,
     "source": {
         "directories": [
             "src"
         ]
     },
+    "staticAnalysisTool": "phpstan",
+    "staticAnalysisToolOptions": "--memory-limit=256M",
     "logs": {
         "text": "infection-log.txt"
     },

@@ -10,6 +10,7 @@ use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Type;
 use LogicException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 use function explode;
@@ -190,9 +191,7 @@ final class TypeParserTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider syntaxErrorCases
-     */
+    #[DataProvider('syntaxErrorCases')]
     public function testSyntaxErrors(string $type, string $expectedMessage): void
     {
         $expectedSpan = null;
@@ -211,7 +210,7 @@ final class TypeParserTest extends TestCase
             }
             $startCol = strlen($matches['indent']) + 1;
             $endCol = strlen($matches['indent']) + strlen($matches['marker']);
-            /** @psalm-suppress InvalidArgument False positive */
+            /** @psalm-suppress InvalidArgument False positive - Psalm can't analyze regular expressions */
             $expectedSpan = new Span($lineNumber, $startCol, $lineNumber, $endCol);
             unset($lines[$lineIndex]);
         }
@@ -230,9 +229,7 @@ final class TypeParserTest extends TestCase
         }
     }
 
-    /**
-     * @dataProvider parseStringCases
-     */
+    #[DataProvider('parseStringCases')]
     public function testParseString(string $typeString, Type $expected): void
     {
         /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Parser;
 
 use Eventjet\Ausdruck\Type;
+use Override;
 use Stringable;
 
 use function sprintf;
@@ -15,6 +16,7 @@ final class TypeHint implements Stringable
     {
     }
 
+    #[Override]
     public function __toString(): string
     {
         if (!$this->explicit) {

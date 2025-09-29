@@ -6,6 +6,7 @@ namespace Eventjet\Ausdruck\Test\Unit;
 
 use Eventjet\Ausdruck\Scope;
 use LogicException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 use function fopen;
@@ -36,9 +37,7 @@ final class ScopeTest extends TestCase
         yield [new Scope(['foo' => fopen('php://temp', 'r')]), '{"vars": {"foo": "resource (stream)"}}'];
     }
 
-    /**
-     * @dataProvider debugCases
-     */
+    #[DataProvider('debugCases')]
     public function testDebug(Scope $scope, string $expected): void
     {
         self::assertSame($expected, $scope->debug());

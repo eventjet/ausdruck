@@ -127,9 +127,7 @@ final class TypeCompatibilityTest extends TestCase
         return $type;
     }
 
-    /**
-     * @dataProvider isSubtypeCases
-     */
+    #[DataProvider('isSubtypeCases')]
     public function testIsSubtype(string $subtype, string $supertype): void
     {
         $super = self::fromString($supertype);
@@ -138,9 +136,7 @@ final class TypeCompatibilityTest extends TestCase
         self::assertTrue($sub->isSubtypeOf($super));
     }
 
-    /**
-     * @dataProvider isNotSubtypeCases
-     */
+    #[DataProvider('isNotSubtypeCases')]
     public function testIsNotSubtype(string $subtype, string $supertype): void
     {
         $super = self::fromString($supertype);

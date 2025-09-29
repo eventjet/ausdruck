@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Override;
 
 use function array_map;
 use function implode;
@@ -23,6 +24,7 @@ final class ListLiteral extends Expression
         return '[' . implode(', ', $this->elements) . ']';
     }
 
+    #[Override]
     public function location(): Span
     {
         return $this->location;
@@ -31,6 +33,7 @@ final class ListLiteral extends Expression
     /**
      * @return list<mixed>
      */
+    #[Override]
     public function evaluate(Scope $scope): array
     {
         return array_map(
@@ -39,6 +42,7 @@ final class ListLiteral extends Expression
         );
     }
 
+    #[Override]
     public function equals(Expression $other): bool
     {
         if (!$other instanceof self) {
@@ -53,6 +57,7 @@ final class ListLiteral extends Expression
         return true;
     }
 
+    #[Override]
     public function getType(): Type
     {
         $elementType = null;

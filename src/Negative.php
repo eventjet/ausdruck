@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Override;
 
 use function is_float;
 use function is_int;
@@ -24,6 +25,7 @@ final class Negative extends Expression
         return sprintf('-%s', $this->expression);
     }
 
+    #[Override]
     public function evaluate(Scope $scope): float|int
     {
         $value = $this->expression->evaluate($scope);
@@ -33,12 +35,14 @@ final class Negative extends Expression
         return -$value;
     }
 
+    #[Override]
     public function equals(Expression $other): bool
     {
         return $other instanceof self
             && $this->expression->equals($other->expression);
     }
 
+    #[Override]
     public function getType(): Type
     {
         return $this->expression->getType();
