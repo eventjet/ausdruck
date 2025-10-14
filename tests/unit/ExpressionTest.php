@@ -299,6 +299,19 @@ final class ExpressionTest extends TestCase
                 new Scope(['maybes' => ['foo', null, 'bar']]),
                 ['foo', 'bar'],
             ],
+            [
+                'bag.codes.filter:list<Code>(|c| c:Code.groups.contains("a")).take(2).map:list<{foo: string}>(|c| {foo: "test"})',
+                new Scope(['bag' => (object)['codes' => [(object)['groups' => ['a']]]]]),
+                [(object)['foo' => 'test']],
+                (static function (): Declarations {
+                    $codeType = Type::struct(['groups' => Type::listOf(Type::string())]);
+                    $bagType = Type::struct(['codes' => Type::listOf($codeType)]);
+                    return new Declarations(
+                        new Types(['Bag' => $bagType, 'Code' => $codeType]),
+                        ['bag' => $bagType],
+                    );
+                })(),
+            ],
         ];
         foreach ($cases as $tuple) {
             [$expr, $scope, $expected] = $tuple;
@@ -550,7 +563,7 @@ final class ExpressionTest extends TestCase
         };
 
         /** @psalm-suppress MixedMethodCall False positive */
-        self::assertSame($expected, $expression->evaluate($scope));
+        self::assertEquals($expected, $expression->evaluate($scope));
     }
 
     #[DataProvider('toStringCases')]
