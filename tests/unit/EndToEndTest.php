@@ -6,6 +6,7 @@ namespace Eventjet\Ausdruck\Test\Unit;
 
 use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Scope;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class EndToEndTest extends TestCase
@@ -21,9 +22,7 @@ final class EndToEndTest extends TestCase
         }
     }
 
-    /**
-     * @dataProvider cases
-     */
+    #[DataProvider('cases')]
     public function testFoo(E2eCase $case): void
     {
         $expression = ExpressionParser::parse($case->source);
