@@ -1,5 +1,5 @@
 42 === myint:int
 -- Input --
-{ "myint": 42 }
+{ myint: 42 }
 -- Output --
 true

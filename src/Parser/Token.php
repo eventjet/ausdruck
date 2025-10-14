@@ -30,7 +30,7 @@ enum Token: string
     case Arrow = '->';
 
     /**
-     * @param Token | string | Literal<string | int | float> $token
+     * @param Token | string | Literal<string | int | float | bool> $token
      */
     public static function print(self|string|Literal $token): string
     {

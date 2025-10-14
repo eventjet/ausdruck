@@ -1,8 +1,8 @@
 a:{ foo: string, bar: int } === b:{ bar: int, foo: string }
 -- Input --
 {
-  "a": { "foo": "bar", "bar": 123 },
-  "b": { "bar": 123, "foo": "bar" }
+  a: { foo: "bar", bar: 123 },
+  b: { bar: 123, foo: "bar" }
 }
 -- Output --
 true

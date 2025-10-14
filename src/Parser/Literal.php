@@ -11,7 +11,7 @@ use function is_string;
 use function sprintf;
 
 /**
- * @template-covariant T of string | int | float
+ * @template-covariant T of string | int | float | bool
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
@@ -20,7 +20,7 @@ final class Literal implements Stringable
     /**
      * @param T $value
      */
-    public function __construct(public readonly string|int|float $value)
+    public function __construct(public readonly string|int|float|bool $value)
     {
     }
 

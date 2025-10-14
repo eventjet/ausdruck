@@ -1,18 +1,18 @@
 bag:Bag.items.filter:list<Item>(|i| i:Item.tags.contains("foo"))
 -- Input --
 {
-  "bag": {
-    "items": [
-      { "tags": ["foo"] },
-      { "tags": ["foo", "bar"] },
-      { "tags": ["bar"] }
+  bag: {
+    items: [
+      { tags: ["foo"] },
+      { tags: ["foo", "bar"] },
+      { tags: ["bar"] }
     ]
   }
 }
 -- Output --
 [
-  { "tags": ["foo"] },
-  { "tags": ["foo", "bar"] }
+  { tags: ["foo"] },
+  { tags: ["foo", "bar"] }
 ]
 -- Types --
 Item: {

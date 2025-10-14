@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
+use Eventjet\Ausdruck\AbstractLiteral;
+use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
+use Eventjet\Ausdruck\StructLiteral;
 use Eventjet\Ausdruck\Type;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
@@ -21,8 +24,6 @@ use function count;
 use function explode;
 use function file_get_contents;
 use function implode;
-use function json_decode;
-use function json_last_error;
 use function sprintf;
 use function str_ends_with;
 use function str_replace;
@@ -32,7 +33,6 @@ use function substr;
 use function trim;
 
 use const DIRECTORY_SEPARATOR;
-use const JSON_ERROR_NONE;
 
 final readonly class E2eCase
 {
@@ -99,14 +99,19 @@ final readonly class E2eCase
         foreach ($sectionLines as $name => $lines) {
             $sections[$name] = implode("\n", $lines);
         }
-        /** @var mixed $output */
-        $output = json_decode($sections['Output']);
-        if ($output === null && json_last_error() !== JSON_ERROR_NONE) {
-            throw new RuntimeException('Invalid JSON in output section');
+        $output = ExpressionParser::parse($sections['Output']);
+        if (!$output instanceof AbstractLiteral) {
+            throw new RuntimeException(sprintf('Output section must be a literal, got %s', $output));
         }
+        /** @var mixed $output */
+        $output = $output->value();
         if (array_key_exists('Input', $sections)) {
+            $inputStruct = ExpressionParser::parse($sections['Input']);
+            if (!$inputStruct instanceof StructLiteral) {
+                throw new RuntimeException('Input section must be a struct literal');
+            }
             /** @var array<string, mixed> $input */
-            $input = (array)json_decode($sections['Input'], associative: false);
+            $input = (array)$inputStruct->value();
         } else {
             $input = [];
         }

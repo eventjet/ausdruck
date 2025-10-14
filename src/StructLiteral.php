@@ -6,6 +6,8 @@ namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
+use RuntimeException;
+use stdClass;
 
 use function array_key_exists;
 use function array_map;
@@ -17,7 +19,7 @@ use function sprintf;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class StructLiteral extends Expression
+final class StructLiteral extends AbstractLiteral
 {
     /**
      * @param array<string, Expression> $fields
@@ -69,5 +71,18 @@ final class StructLiteral extends Expression
     public function getType(): Type
     {
         return Type::struct(array_map(static fn(Expression $value) => $value->getType(), $this->fields));
+    }
+
+    #[Override]
+    public function value(): mixed
+    {
+        $out = new stdClass();
+        foreach ($this->fields as $name => $value) {
+            if (!$value instanceof AbstractLiteral) {
+                throw new RuntimeException(sprintf('Field "%s" is not a literal', $name));
+            }
+            $out->$name = $value->value();
+        }
+        return $out;
     }
 }

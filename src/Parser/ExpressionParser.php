@@ -123,6 +123,14 @@ final class ExpressionParser
             }
             return $this->dot($left);
         }
+        if ($token === 'true') {
+            $this->tokens->next();
+            return Expr::literal(true, $parsedToken->location());
+        }
+        if ($token === 'false') {
+            $this->tokens->next();
+            return Expr::literal(false, $parsedToken->location());
+        }
         if (is_string($token)) {
             if ($left !== null) {
                 throw SyntaxError::create(
