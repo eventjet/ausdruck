@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
+use Eventjet\Ausdruck\Parser\SyntaxError;
+use Eventjet\Ausdruck\Parser\TypeError;
+use Eventjet\Ausdruck\Parser\TypeParser;
+use Eventjet\Ausdruck\Parser\Types;
+use Eventjet\Ausdruck\Type;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -11,6 +16,8 @@ use RuntimeException;
 use SplFileInfo;
 
 use function array_key_exists;
+use function array_splice;
+use function count;
 use function explode;
 use function file_get_contents;
 use function implode;
@@ -21,6 +28,7 @@ use function str_replace;
 use function str_starts_with;
 use function strlen;
 use function substr;
+use function trim;
 
 use const DIRECTORY_SEPARATOR;
 
@@ -31,8 +39,12 @@ final readonly class E2eCase
     /**
      * @param array<string, mixed> $input
      */
-    public function __construct(public string $source, public mixed $expected, public array $input = [])
-    {
+    public function __construct(
+        public string $source,
+        public mixed $expected,
+        public array $input = [],
+        public Types $types = new Types(),
+    ) {
     }
 
     /**
@@ -92,10 +104,48 @@ final readonly class E2eCase
         }
         if (array_key_exists('Input', $sections)) {
             /** @var array<string, mixed> $input */
-            $input = json_decode($sections['Input'], true);
+            $input = (array)json_decode($sections['Input'], associative: false);
         } else {
             $input = [];
         }
-        return new self($sections['Source'], $output, $input);
+        $types = [];
+        if (array_key_exists('Types', $sections)) {
+            $types = self::parseTypes($sections['Types']);
+        }
+        return new self($sections['Source'], $output, $input, new Types($types));
+    }
+
+    /**
+     * @return array<string, Type>
+     */
+    private static function parseTypes(string $src): array
+    {
+        $aliases = [];
+        $types = new Types();
+        while (true) {
+            $parts = explode(':', $src, 2);
+            if (count($parts) !== 2) {
+                break;
+            }
+            [$name, $src] = $parts;
+            /**
+             * @psalm-suppress InternalClass
+             * @psalm-suppress InternalMethod
+             */
+            $node = TypeParser::parseString($src);
+            if ($node instanceof SyntaxError) {
+                throw $node;
+            }
+            $type = $types->resolve($node);
+            if ($type instanceof TypeError) {
+                throw $type;
+            }
+            $aliases[trim($name)] = $type;
+            $types = new Types($aliases);
+            $lines = explode("\n", $src);
+            array_splice($lines, 0, $node->location->endLine);
+            $src = implode("\n", $lines);
+        }
+        return $aliases;
     }
 }
