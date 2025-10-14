@@ -1,0 +1,8 @@
+a:int === 24 && b:int === 42
+-- Input --
+{
+  a: 24,
+  b: 42,
+}
+-- Output --
+true
