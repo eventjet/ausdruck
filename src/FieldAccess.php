@@ -61,6 +61,8 @@ final class FieldAccess extends Expression
     #[Override]
     public function getType(): Type
     {
-        return $this->struct->getType()->fields[$this->field];
+        $structType = $this->struct->getType();
+        return $structType->getFieldType($this->field)
+            ?? throw new EvaluationError(sprintf('Unknown field "%s" on type %s', $this->field, $structType));
     }
 }
