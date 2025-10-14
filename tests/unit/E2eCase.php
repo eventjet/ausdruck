@@ -22,6 +22,7 @@ use function explode;
 use function file_get_contents;
 use function implode;
 use function json_decode;
+use function json_last_error;
 use function sprintf;
 use function str_ends_with;
 use function str_replace;
@@ -31,6 +32,7 @@ use function substr;
 use function trim;
 
 use const DIRECTORY_SEPARATOR;
+use const JSON_ERROR_NONE;
 
 final readonly class E2eCase
 {
@@ -99,7 +101,7 @@ final readonly class E2eCase
         }
         /** @var mixed $output */
         $output = json_decode($sections['Output']);
-        if ($output === null) {
+        if ($output === null && json_last_error() !== JSON_ERROR_NONE) {
             throw new RuntimeException('Invalid JSON in output section');
         }
         if (array_key_exists('Input', $sections)) {
