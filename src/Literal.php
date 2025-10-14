@@ -20,7 +20,7 @@ use function var_export;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class Literal extends Expression
+final class Literal extends AbstractLiteral
 {
     use LocationTrait;
 
@@ -76,5 +76,11 @@ final class Literal extends Expression
     public function getType(): Type
     {
         return Type::fromValue($this->value);
+    }
+
+    #[Override]
+    public function value(): mixed
+    {
+        return $this->value;
     }
 }

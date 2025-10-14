@@ -10,7 +10,7 @@ use function strlen;
 final class ParsedToken
 {
     /**
-     * @param Token | string | Literal<string | int | float> $token
+     * @param Token | string | Literal<string | int | float | bool> $token
      * @param positive-int $line
      * @param positive-int $column
      */

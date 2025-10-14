@@ -1,5 +1,5 @@
 a:bool || b:bool
 -- Input --
-{ "a": false, "b": true }
+{ a: false, b: true }
 -- Output --
 true

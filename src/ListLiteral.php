@@ -6,11 +6,13 @@ namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
+use RuntimeException;
 
 use function array_map;
 use function implode;
+use function sprintf;
 
-final class ListLiteral extends Expression
+final class ListLiteral extends AbstractLiteral
 {
     /**
      * @param list<Expression> $elements
@@ -73,5 +75,19 @@ final class ListLiteral extends Expression
             $elementType = Type::any();
         }
         return Type::listOf($elementType ?? Type::any());
+    }
+
+    #[Override]
+    public function value(): mixed
+    {
+        $out = [];
+        foreach ($this->elements as $index => $element) {
+            if (!$element instanceof AbstractLiteral) {
+                throw new RuntimeException(sprintf('Element at index %d is not a literal', $index));
+            }
+            /** @psalm-suppress MixedAssignment */
+            $out[] = $element->value();
+        }
+        return $out;
     }
 }
