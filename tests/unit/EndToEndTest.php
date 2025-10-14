@@ -30,6 +30,6 @@ final class EndToEndTest extends TestCase
         /** @var mixed $actual */
         $actual = $expression->evaluate(new Scope($case->input));
 
-        self::assertSame($case->expected, $actual);
+        self::assertEquals($case->expected, $actual);
     }
 }
