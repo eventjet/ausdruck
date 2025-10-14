@@ -19,7 +19,6 @@ use function count;
 use function get_object_vars;
 use function gettype;
 use function implode;
-use function in_array;
 use function is_array;
 use function sprintf;
 
@@ -160,9 +159,9 @@ final class Type implements Stringable
             return '{ ' . implode(', ', $fields) . ' }';
         }
         if ($this->name === 'Func') {
+            assert(count($this->args) > 0);
             $args = $this->args;
             $returnType = array_shift($args);
-            assert($returnType !== null);
             return sprintf('func(%s): %s', implode(', ', $args), $returnType);
         }
         return $this->name . ($this->args === [] ? '' : sprintf('<%s>', implode(', ', $this->args)));
@@ -173,9 +172,6 @@ final class Type implements Stringable
      */
     public function assert(mixed $value): mixed
     {
-        if ($value === [] && $this->name === 'map') {
-            return $value;
-        }
         $valueType = self::fromValue($value);
         return $valueType->isSubtypeOf($this)
             ? $value
@@ -184,36 +180,7 @@ final class Type implements Stringable
 
     public function equals(self $type): bool
     {
-        if ($type->aliasFor !== null) {
-            $type = $type->canonical();
-        }
-        if ($this->aliasFor !== null) {
-            return $this->canonical()->equals($type);
-        }
-        if ($this->name !== $type->name) {
-            return false;
-        }
-        if (!in_array($this->name, ['Func', 'list', 'Struct'], true)) {
-            return true;
-        }
-        foreach ($this->args as $i => $arg) {
-            if ($arg->equals($type->args[$i])) {
-                continue;
-            }
-            return false;
-        }
-        if (count($type->fields) !== count($this->fields)) {
-            return false;
-        }
-        foreach ($this->fields as $name => $fieldType) {
-            if (!array_key_exists($name, $type->fields)) {
-                return false;
-            }
-            if (!$type->fields[$name]->equals($fieldType)) {
-                return false;
-            }
-        }
-        return true;
+        return $this->isSubtypeOf($type) && $type->isSubtypeOf($this);
     }
 
     public function isOption(): bool
@@ -236,9 +203,6 @@ final class Type implements Stringable
         }
         if ($other->name === 'any') {
             return true;
-        }
-        if ($self->name === 'any') {
-            return false;
         }
         if ($self->name === 'Option') {
             return $other->name === 'Option' && $self->args[0]->isSubtypeOf($other->args[0]);

@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
+use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
+use Eventjet\Ausdruck\Parser\TypeParser;
+use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Type;
 use LogicException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
+use function assert;
 use function fopen;
+use function sprintf;
 
 final class TypeTest extends TestCase
 {
@@ -117,18 +123,33 @@ final class TypeTest extends TestCase
      */
     public static function notEqualsCases(): iterable
     {
-        yield 'Struct: one has more fields' => [
-            Type::struct(['name' => Type::string()]),
-            Type::struct(['name' => Type::string(), 'age' => Type::int()]),
+        $cases = [
+            ['{name: string}', '{name: string, age: int}'],
+            ['{name: string}', '{name: int}'],
+            ['{name: string}', '{firstName: string}'],
+            ['Some<string>', 'Some<int>'],
+            ['any', 'string'],
         ];
-        yield 'Struct: one has different field type' => [
-            Type::struct(['name' => Type::string()]),
-            Type::struct(['name' => Type::int()]),
-        ];
-        yield 'Struct: one has different field name' => [
-            Type::struct(['name' => Type::string()]),
-            Type::struct(['firstName' => Type::string()]),
-        ];
+        foreach ($cases as [$a, $b]) {
+            /**
+             * @psalm-suppress InternalMethod
+             * @psalm-suppress InternalClass
+             */
+            $nodeA = TypeParser::parseString($a);
+            /**
+             * @psalm-suppress InternalMethod
+             * @psalm-suppress InternalClass
+             */
+            $nodeB = TypeParser::parseString($b);
+            assert(!$nodeA instanceof SyntaxError);
+            assert(!$nodeB instanceof SyntaxError);
+            $types = new Types();
+            $typeA = $types->resolve($nodeA);
+            $typeB = $types->resolve($nodeB);
+            assert(!$typeA instanceof TypeError);
+            assert(!$typeB instanceof TypeError);
+            yield sprintf('%s vs. %s', $a, $b) => [$typeA, $typeB];
+        }
     }
 
     /**
@@ -153,9 +174,7 @@ final class TypeTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider invalidValues
-     */
+    #[DataProvider('invalidValues')]
     public function testFromInvalidValue(mixed $value): void
     {
         $this->expectException(LogicException::class);
@@ -182,9 +201,7 @@ final class TypeTest extends TestCase
         self::assertTrue($bar->equals($foo));
     }
 
-    /**
-     * @dataProvider failingAssertCases
-     */
+    #[DataProvider('failingAssertCases')]
     public function testFailingAssert(Type $type, mixed $value, string $expectedMessage): void
     {
         $this->expectException(TypeError::class);
@@ -193,9 +210,7 @@ final class TypeTest extends TestCase
         $type->assert($value);
     }
 
-    /**
-     * @dataProvider successfulAssertCases
-     */
+    #[DataProvider('successfulAssertCases')]
     public function testSuccessfulAssert(Type $type, mixed $value): void
     {
         $this->expectNotToPerformAssertions();
@@ -203,9 +218,7 @@ final class TypeTest extends TestCase
         $type->assert($value);
     }
 
-    /**
-     * @dataProvider fromValuesCases
-     */
+    #[DataProvider('fromValuesCases')]
     public function testFromValue(mixed $value, Type $expected): void
     {
         $actual = Type::fromValue($value);
@@ -213,9 +226,7 @@ final class TypeTest extends TestCase
         self::assertTrue($actual->equals($expected));
     }
 
-    /**
-     * @dataProvider notEqualsCases
-     */
+    #[DataProvider('notEqualsCases')]
     public function testNotEquals(Type $a, Type $b): void
     {
         self::assertFalse($a->equals($b));
@@ -225,8 +236,8 @@ final class TypeTest extends TestCase
     /**
      * @param Type | callable(): Type $a
      * @param Type | callable(): Type $b
-     * @dataProvider equalsCases
      */
+    #[DataProvider('equalsCases')]
     public function testEquals(Type|callable $a, Type|callable $b): void
     {
         $a = $a instanceof Type ? $a : $a();
@@ -236,9 +247,7 @@ final class TypeTest extends TestCase
         self::assertTrue($b->equals($a));
     }
 
-    /**
-     * @dataProvider toStringCases
-     */
+    #[DataProvider('toStringCases')]
     public function testToString(Type $type, string $expected): void
     {
         self::assertSame($expected, (string)$type);

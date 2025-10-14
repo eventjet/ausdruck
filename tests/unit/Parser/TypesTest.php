@@ -8,6 +8,7 @@ use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeNode;
 use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 use function assert;
@@ -23,9 +24,7 @@ final class TypesTest extends TestCase
         yield 'Unknown function parameter' => ['fn(Nope) -> string', 'Unknown type Nope'];
     }
 
-    /**
-     * @dataProvider resolveTypeErrorsCases
-     */
+    #[DataProvider('resolveTypeErrorsCases')]
     public function testResolveTypeErrors(string $type, string $expectedMessage): void
     {
         /**

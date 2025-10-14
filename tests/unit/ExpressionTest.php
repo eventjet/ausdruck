@@ -14,6 +14,7 @@ use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Scope;
 use Eventjet\Ausdruck\Type;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 use function is_array;
@@ -537,24 +538,22 @@ final class ExpressionTest extends TestCase
 
     /**
      * @param Expression | string | callable(): Expression $expression
-     * @dataProvider evaluateCases
      */
+    #[DataProvider('evaluateCases')]
     public function testEvaluate(Expression|string|callable $expression, Scope $scope, Declarations|null $declarations, mixed $expected): void
     {
-        if (!$expression instanceof Expression) {
-            /** @psalm-suppress MixedAssignment False positive */
-            $expression = is_string($expression)
-                ? ExpressionParser::parse($expression, $declarations)
-                : $expression();
-        }
+        /** @psalm-suppress MixedAssignment False positive */
+        $expression = match (true) {
+            $expression instanceof Expression => $expression,
+            is_string($expression) => ExpressionParser::parse($expression, $declarations),
+            is_callable($expression) => $expression(),
+        };
 
         /** @psalm-suppress MixedMethodCall False positive */
         self::assertSame($expected, $expression->evaluate($scope));
     }
 
-    /**
-     * @dataProvider toStringCases
-     */
+    #[DataProvider('toStringCases')]
     public function testToString(Expression|string $expr, string $expected, Declarations|null $declarations = null): void
     {
         if (is_string($expr)) {
@@ -566,8 +565,8 @@ final class ExpressionTest extends TestCase
 
     /**
      * @param Expression | array{0: string, 1?: Declarations} $expression
-     * @dataProvider evaluationErrorsCases
      */
+    #[DataProvider('evaluationErrorsCases')]
     public function testEvaluationErrors(Expression|array $expression, Scope $scope, string|null $message = null): void
     {
         if (is_array($expression)) {
@@ -582,9 +581,7 @@ final class ExpressionTest extends TestCase
         $expression->evaluate($scope);
     }
 
-    /**
-     * @dataProvider typeCases
-     */
+    #[DataProvider('typeCases')]
     public function testType(Expression|string $expression, Type $expected): void
     {
         if (is_string($expression)) {

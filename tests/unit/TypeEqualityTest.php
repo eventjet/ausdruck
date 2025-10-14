@@ -9,6 +9,7 @@ use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Type;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class TypeEqualityTest extends TestCase
@@ -47,9 +48,7 @@ final class TypeEqualityTest extends TestCase
         return $type;
     }
 
-    /**
-     * @dataProvider equal
-     */
+    #[DataProvider('equal')]
     public function testEqual(string $a, string $b): void
     {
         $typeA = self::fromString($a);
@@ -59,9 +58,7 @@ final class TypeEqualityTest extends TestCase
         self::assertTrue($typeB->equals($typeA));
     }
 
-    /**
-     * @dataProvider notEqual
-     */
+    #[DataProvider('notEqual')]
     public function testNotEqual(string $a, string $b): void
     {
         $typeA = self::fromString($a);

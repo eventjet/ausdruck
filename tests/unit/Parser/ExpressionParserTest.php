@@ -12,6 +12,7 @@ use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Type;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 use function assert;
@@ -442,10 +443,8 @@ final class ExpressionParserTest extends TestCase
         }
     }
 
-    /**
-     * @dataProvider parseCases
-     * @dataProvider nonCanonicalParseCases
-     */
+    #[DataProvider('parseCases')]
+    #[DataProvider('nonCanonicalParseCases')]
     public function testParse(string $str, Expression $expected): void
     {
         $actual = ExpressionParser::parse($str);
@@ -457,17 +456,13 @@ final class ExpressionParserTest extends TestCase
         ));
     }
 
-    /**
-     * @dataProvider parseCases
-     */
+    #[DataProvider('parseCases')]
     public function testToString(string $expected, Expression $expr): void
     {
         self::assertSame($expected, (string)$expr);
     }
 
-    /**
-     * @dataProvider invalidSyntaxExpressions
-     */
+    #[DataProvider('invalidSyntaxExpressions')]
     public function testSyntaxError(string $expression, string|null $expectedMessage = null): void
     {
         $this->expectException(SyntaxError::class);
@@ -478,9 +473,7 @@ final class ExpressionParserTest extends TestCase
         ExpressionParser::parse($expression);
     }
 
-    /**
-     * @dataProvider typeErrorExpressions
-     */
+    #[DataProvider('typeErrorExpressions')]
     public function testTypeError(string $expression, string|null $expectedMessage = null, Declarations|null $declarations = null): void
     {
         $this->expectException(TypeError::class);
@@ -499,9 +492,7 @@ final class ExpressionParserTest extends TestCase
         ExpressionParser::parseTyped('foo:list<string>', Type::string());
     }
 
-    /**
-     * @dataProvider typeErrorLocationCases
-     */
+    #[DataProvider('typeErrorLocationCases')]
     public function testTypeErrorLocation(string $expression, Span $expected): void
     {
         try {
@@ -535,9 +526,7 @@ final class ExpressionParserTest extends TestCase
         self::assertSame('foo:string', (string)$actual);
     }
 
-    /**
-     * @dataProvider syntaxErrorLocationCases
-     */
+    #[DataProvider('syntaxErrorLocationCases')]
     public function testSyntaxErrorLocation(string $expression, Span $expected): void
     {
         try {
