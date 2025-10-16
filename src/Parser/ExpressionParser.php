@@ -110,6 +110,33 @@ final class ExpressionParser
         return $expr;
     }
 
+    private function parseExpressionUntilLogical(): Expression
+    {
+        /** @var Expression | null $expr */
+        $expr = null;
+        while (true) {
+            $peek = $this->tokens->peek();
+            if ($peek !== null && in_array($peek->token, [Token::Or, Token::And], true) && $expr !== null) {
+                break;
+            }
+            $newExpr = $this->parseLazy($expr);
+            if ($newExpr === null) {
+                break;
+            }
+            $expr = $newExpr;
+        }
+        if ($expr === null) {
+            $token = $this->tokens->peek()?->token;
+            throw SyntaxError::create(
+                $token === null
+                    ? 'Expected expression, got end of input'
+                    : sprintf('Expected expression, got %s', Token::print($token)),
+                $this->nextSpan(),
+            );
+        }
+        return $expr;
+    }
+
     private function parseLazy(Expression|null $left): Expression|null
     {
         $parsedToken = $this->tokens->peek();
@@ -149,7 +176,7 @@ final class ExpressionParser
             if ($left === null) {
                 self::unexpectedToken($parsedToken);
             }
-            $right = $this->parseExpression();
+            $right = $this->parseExpressionUntilLogical();
             $right = self::assertExpressionType($right, $left->getType(), sprintf(
                 'The expressions of both sides of === must be of the same type. Left: %s, right: %s',
                 $left->getType(),
@@ -208,7 +235,7 @@ final class ExpressionParser
                 self::unexpectedToken($parsedToken);
             }
             $this->tokens->next();
-            $right = $this->parseExpression();
+            $right = $this->parseExpressionUntilLogical();
             if (!$right->matchesType(Type::int()) && !$right->matchesType(Type::float())) {
                 throw TypeError::create(sprintf('Can\'t compare %s to %s', $right->getType(), $left->getType()), $right->location());
             }
