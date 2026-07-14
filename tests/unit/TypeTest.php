@@ -15,6 +15,7 @@ use PHPUnit\Framework\TestCase;
 
 use function assert;
 use function fopen;
+use function json_decode;
 use function sprintf;
 
 final class TypeTest extends TestCase
@@ -115,6 +116,10 @@ final class TypeTest extends TestCase
                 public int $age = 42;
             },
             Type::struct(['name' => Type::string(), 'age' => Type::int()]),
+        ];
+        yield 'Numeric property names are not struct fields' => [
+            json_decode('{"1": "one", "name": "John Doe"}'),
+            Type::struct(['name' => Type::string()]),
         ];
     }
 

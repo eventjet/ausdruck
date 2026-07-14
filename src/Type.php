@@ -20,6 +20,7 @@ use function get_object_vars;
 use function gettype;
 use function implode;
 use function is_array;
+use function is_string;
 use function sprintf;
 
 /**
@@ -101,7 +102,7 @@ final class Type implements Stringable
             'integer' => self::int(),
             'boolean' => self::bool(),
             'double' => self::float(),
-            'object' => self::struct(array_map(self::fromValue(...), get_object_vars($value))),
+            'object' => self::struct(self::fieldsFromObject($value)),
             default => throw new InvalidArgumentException(sprintf('Unsupported type %s', gettype($value))),
         };
     }
@@ -132,6 +133,35 @@ final class Type implements Stringable
     private static function never(): self
     {
         return new self('never');
+    }
+
+    /**
+     * @return array<string, self>
+     */
+    private static function fieldsFromObject(object $value): array
+    {
+        return array_map(self::fromValue(...), self::stringKeys(get_object_vars($value)));
+    }
+
+    /**
+     * PHP normalizes numeric property names like "1" to integer array keys. Such names are not valid identifiers, so
+     * they can neither be declared in a struct type nor accessed in an expression. Drop them instead of pretending
+     * they are fields.
+     *
+     * @template T
+     * @param array<array-key, T> $items
+     * @return array<string, T>
+     */
+    private static function stringKeys(array $items): array
+    {
+        $stringKeyed = [];
+        foreach ($items as $key => $item) {
+            if (!is_string($key)) {
+                continue;
+            }
+            $stringKeyed[$key] = $item;
+        }
+        return $stringKeyed;
     }
 
     /**
