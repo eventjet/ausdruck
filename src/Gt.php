@@ -27,7 +27,7 @@ final class Gt extends Expression
     #[Override]
     public function evaluate(Scope $scope): bool
     {
-        return $this->left->evaluate($scope) > $this->right->evaluate($scope);
+        return Operand::number($this->left->evaluate($scope)) > Operand::number($this->right->evaluate($scope));
     }
 
     #[Override]
