@@ -383,82 +383,52 @@ final class ExpressionParser
     }
 
     /**
-     * some(foo:list<string>, |item| item:string === bar:string)
-     *      ===================================================
+     * The body of every bracketed, comma-separated list in the language: call arguments, list items, struct fields and
+     * lambda parameters.
      *
-     * A trailing comma is allowed. A missing one ends the argument list, which leaves the caller's expect(CloseParen)
-     * to report it.
+     * A trailing comma is allowed. A missing one simply ends the list, which leaves the caller's expect($close) to
+     * report the token that isn't a comma.
      *
-     * @return list<Expression>
+     * @template T
+     * @param callable(): T $parseItem
+     * @return list<T>
      */
-    private function parseArgs(): array
+    private function parseCommaSeparated(Token $close, callable $parseItem): array
     {
-        $args = [];
+        $items = [];
         while (true) {
             $token = $this->nextToken();
-            if ($token === null || $token === Token::CloseParen) {
-                return $args;
+            if ($token === null || $token === $close) {
+                return $items;
             }
-            $args[] = $this->parseExpression();
+            $items[] = $parseItem();
             if ($this->nextToken() !== Token::Comma) {
-                return $args;
+                return $items;
             }
             $this->tokens->next();
         }
     }
 
     /**
-     * |item| => item:string === needle:string
-     * =======================================
+     * |one, two, three, | item:string === needle:string
+     * =================================================
      */
     private function lambda(): Expression
     {
         $start = $this->expect(Token::Pipe);
-        $args = $this->parseParams();
+        $params = $this->parseCommaSeparated(
+            Token::Pipe,
+            fn(): string => $this->expectIdentifier('parameter name')[0],
+        );
         $this->expect(Token::Pipe);
         $body = $this->parseExpression();
-        return Expr::lambda($body, $args, $start->location()->to($body->location()));
-    }
-
-    /**
-     * |one, two, three, | => foo:string
-     *  =================
-     * @return list<string>
-     */
-    private function parseParams(): array
-    {
-        $params = [];
-        while (true) {
-            $param = $this->parseParam();
-            if ($param === null) {
-                break;
-            }
-            $params[] = $param;
-        }
-        return $params;
-    }
-
-    /**
-     * |foo, bar| foo:bool === bar:bool
-     *  =====
-     */
-    private function parseParam(): string|null
-    {
-        $token = $this->nextToken();
-        if (!is_string($token)) {
-            return null;
-        }
-        $this->tokens->next();
-        if ($this->nextToken() !== Token::Pipe) {
-            $this->expect(Token::Comma);
-        }
-        return $token;
+        return Expr::lambda($body, $params, $start->location()->to($body->location()));
     }
 
     private function dot(Expression $target): Call|FieldAccess
     {
-        $dot = $this->expect(Token::Dot);
-        [$name, $nameLocation] = $this->expectIdentifier($dot, 'function name');
+        $this->expect(Token::Dot);
+        [$name, $nameLocation] = $this->expectIdentifier('function name');
         $token = $this->nextToken();
         return match ($token) {
             Token::Colon, Token::OpenParen => $this->call($name, $nameLocation, $target),
@@ -531,7 +501,7 @@ final class ExpressionParser
             }
         }
         $this->expect(Token::OpenParen);
-        $args = $this->parseArgs();
+        $args = $this->parseCommaSeparated(Token::CloseParen, $this->parseExpression(...));
         $closeParen = $this->expect(Token::CloseParen);
         if ($fnType !== null) {
             $parameterTypes = $fnType->args;
@@ -563,21 +533,16 @@ final class ExpressionParser
     /**
      * @return array{string, Span}
      */
-    private function expectIdentifier(
-        ParsedToken $lastToken,
-        string $expected = 'identifier',
-    ): array {
+    private function expectIdentifier(string $expected): array
+    {
         $name = $this->tokens->peek();
         if ($name === null) {
-            throw SyntaxError::create(
-                sprintf('Expected %s, got end of input', $expected),
-                Span::char($lastToken->line, $lastToken->column + 1),
-            );
+            throw SyntaxError::create(sprintf('Expected %s, got end of input', $expected), $this->nextSpan());
         }
         if (!is_string($name->token)) {
             throw SyntaxError::create(
                 sprintf('Expected %s, got %s', $expected, Token::print($name->token)),
-                Span::char($name->line, $name->column),
+                $name->location(),
             );
         }
         $this->tokens->next();
@@ -611,18 +576,7 @@ final class ExpressionParser
     private function parseListLiteral(): ListLiteral
     {
         $start = $this->expect(Token::OpenBracket);
-        $items = [];
-        while (true) {
-            $token = $this->nextToken();
-            if ($token === null || $token === Token::CloseBracket) {
-                break;
-            }
-            $items[] = $this->parseExpression();
-            if ($this->nextToken() !== Token::Comma) {
-                break;
-            }
-            $this->tokens->next();
-        }
+        $items = $this->parseCommaSeparated(Token::CloseBracket, $this->parseExpression(...));
         $close = $this->expect(Token::CloseBracket);
         return Expr::listLiteral($items, $start->location()->to($close->location()));
     }
@@ -635,16 +589,8 @@ final class ExpressionParser
     {
         $start = $this->expect(Token::OpenBrace);
         $fields = [];
-        while (true) {
-            $field = $this->parseStructField();
-            if ($field === null) {
-                break;
-            }
-            $fields[$field[0]] = $field[1];
-            if ($this->nextToken() !== Token::Comma) {
-                break;
-            }
-            $this->tokens->next();
+        foreach ($this->parseCommaSeparated(Token::CloseBrace, $this->parseStructField(...)) as [$name, $value]) {
+            $fields[$name] = $value;
         }
         $close = $this->expect(Token::CloseBrace);
         return Expr::structLiteral($fields, $start->location()->to($close->location()));
@@ -654,16 +600,12 @@ final class ExpressionParser
      * {name: "John"}
      *  ============
      *
-     * @return array{string, Expression} | null
+     * @return array{string, Expression}
      */
-    private function parseStructField(): array|null
+    private function parseStructField(): array
     {
-        $name = $this->tokens->peek();
-        if ($name === null || !is_string($name->token)) {
-            return null;
-        }
-        $this->tokens->next();
+        [$name] = $this->expectIdentifier('field name');
         $this->expect(Token::Colon);
-        return [$name->token, $this->parseExpression()];
+        return [$name, $this->parseExpression()];
     }
 }
