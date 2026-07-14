@@ -7,8 +7,6 @@ namespace Eventjet\Ausdruck;
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
 
-use function get_debug_type;
-use function is_object;
 use function property_exists;
 use function sprintf;
 
@@ -44,11 +42,14 @@ final class FieldAccess extends Expression
     #[Override]
     public function evaluate(Scope $scope): mixed
     {
-        $struct = $this->struct->evaluate($scope);
-        if (!is_object($struct)) {
-            throw new EvaluationError(sprintf('Expected object, got %s', get_debug_type($struct)));
-        }
+        $struct = Operand::struct($this->struct->evaluate($scope));
         if (!property_exists($struct, $this->field)) {
+            /**
+             * Unreachable; see {@see Operand}. Kept because reading a missing property would quietly yield null rather
+             * than fail, which is the worst possible way for a bug in this library to surface.
+             *
+             * @infection-ignore-all
+             */
             throw new EvaluationError(sprintf('Unknown field "%s"', $this->field));
         }
         /** @phpstan-ignore-next-line property.dynamicName */

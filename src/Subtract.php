@@ -7,10 +7,6 @@ namespace Eventjet\Ausdruck;
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
 
-use function get_debug_type;
-use function gettype;
-use function is_float;
-use function is_int;
 use function sprintf;
 
 /**
@@ -28,35 +24,16 @@ final class Subtract extends Expression
         return sprintf('%s - %s', $this->minuend, $this->subtrahend);
     }
 
+    /**
+     * @psalm-suppress InvalidOperand Psalm's strict binary operands mode rejects int|float on either side, because it
+     *     can't see that {@see Expr::subtract()} has already required both operands to be of the *same* numeric type.
+     *     The int/float mix it's guarding against can't reach us.
+     */
     #[Override]
     public function evaluate(Scope $scope): int|float
     {
-        /** @var mixed $minuend */
-        $minuend = $this->minuend->evaluate($scope);
-        /** @var mixed $subtrahend */
-        $subtrahend = $this->subtrahend->evaluate($scope);
-        if (is_int($minuend) && is_int($subtrahend)) {
-            return $minuend - $subtrahend;
-        }
-        if (is_float($minuend) && is_float($subtrahend)) {
-            return $minuend - $subtrahend;
-        }
-        if (gettype($minuend) === gettype($subtrahend)) {
-            throw new EvaluationError(
-                sprintf(
-                    'Expected operands to be of type int or float, got %s and %s',
-                    get_debug_type($minuend),
-                    get_debug_type($subtrahend),
-                ),
-            );
-        }
-        throw new EvaluationError(
-            sprintf(
-                'Expected operands to be of the same type, got %s and %s',
-                get_debug_type($minuend),
-                get_debug_type($subtrahend),
-            ),
-        );
+        return Operand::number($this->minuend->evaluate($scope))
+            - Operand::number($this->subtrahend->evaluate($scope));
     }
 
     #[Override]

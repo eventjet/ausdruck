@@ -7,8 +7,6 @@ namespace Eventjet\Ausdruck;
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
 
-use function is_float;
-use function is_int;
 use function sprintf;
 
 final class Negative extends Expression
@@ -28,11 +26,7 @@ final class Negative extends Expression
     #[Override]
     public function evaluate(Scope $scope): float|int
     {
-        $value = $this->expression->evaluate($scope);
-        if (!is_int($value) && !is_float($value)) {
-            throw new EvaluationError('Expected operand to be of type int or float');
-        }
-        return -$value;
+        return -Operand::number($this->expression->evaluate($scope));
     }
 
     #[Override]

@@ -16,8 +16,8 @@ use function sprintf;
  * that type-checks. Anything that reads a value from a {@see Scope} ({@see Get}, {@see Call}) asserts that value
  * against its declared type, so the guarantee survives evaluation too.
  *
- * The operand checks the nodes themselves do when they evaluate are therefore only reachable by constructing a node
- * behind this class's back.
+ * The nodes therefore don't re-check their operands when they evaluate. They only narrow the mixed they get back from
+ * their sub-expressions, via {@see Operand}, to the type PHP needs to apply the operator.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
