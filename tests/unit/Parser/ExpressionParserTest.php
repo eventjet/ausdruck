@@ -29,6 +29,7 @@ final class ExpressionParserTest extends TestCase
     {
         $s = Type::string();
         $b = Type::bool();
+        $i = Type::int();
         $cases = [
             ['foo:string', Expr::get('foo', $s)],
             ['"my-literal"', Expr::literal('my-literal')],
@@ -90,6 +91,35 @@ final class ExpressionParserTest extends TestCase
                     Expr::or_(Expr::get('a', $b), Expr::get('b', $b)),
                     Expr::get('c', $b),
                 ),
+            ],
+            // Each level of the cascade binds tighter than the one above it. Evaluating an expression can only ever
+            // half-prove that: && and || are monotone, so a wrong grouping of `a && b || c` can return the wrong value
+            // for operands that make it true, but never for operands that make it false. The grouping itself is what
+            // has to be pinned, so every adjacent pair of levels is checked here rather than by example.
+            [
+                'a:int - b:int > c:int && d:bool',
+                Expr::and_(
+                    Expr::gt(
+                        Expr::subtract(Expr::get('a', $i), Expr::get('b', $i)),
+                        Expr::get('c', $i),
+                    ),
+                    Expr::get('d', $b),
+                ),
+            ],
+            [
+                'a:int === b:int - c:int || d:bool',
+                Expr::or_(
+                    Expr::eq(
+                        Expr::get('a', $i),
+                        Expr::subtract(Expr::get('b', $i), Expr::get('c', $i)),
+                    ),
+                    Expr::get('d', $b),
+                ),
+            ],
+            // Unary binds tighter than additive, so this subtracts a negation rather than negating a subtraction.
+            [
+                'a:int - -b:int',
+                Expr::subtract(Expr::get('a', $i), Expr::negative(Expr::get('b', $i))),
             ],
             // Operators are allowed wherever an expression is expected, not just at the top level.
             [
