@@ -1,0 +1,7 @@
+a:int -2
+-- Input --
+{
+  a: 5,
+}
+-- Output --
+3
