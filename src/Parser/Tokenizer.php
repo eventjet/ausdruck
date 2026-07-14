@@ -86,9 +86,14 @@ final class Tokenizer
                 yield new ParsedToken($token, $line, $startCol);
                 continue;
             }
-            if ($char === '-' || is_numeric($char)) {
+            if ($char === '-') {
                 $startCol = $column;
-                yield new ParsedToken(self::numberOrArrow($chars, $column), $line, $startCol);
+                yield new ParsedToken(self::minusOrArrow($chars, $column), $line, $startCol);
+                continue;
+            }
+            if (is_numeric($char)) {
+                $startCol = $column;
+                yield new ParsedToken(self::number($chars, $column), $line, $startCol);
                 continue;
             }
             if ($char === '|') {
@@ -198,34 +203,40 @@ final class Tokenizer
     }
 
     /**
+     * The sign is never folded into a number literal: a `-` always yields Token::Minus, and the parser turns a minus in
+     * front of a numeric literal back into a negative literal. If the sign were folded in here, whitespace would
+     * silently decide the meaning of `a -2`: subtraction, or `a` followed by the literal -2.
+     *
      * @param Peekable<string> $chars
      * @param positive-int $column
-     * @return Literal<int | float> | Token
      */
-    private static function numberOrArrow(Peekable $chars, int &$column): Literal|Token
+    private static function minusOrArrow(Peekable $chars, int &$column): Token
+    {
+        $chars->next();
+        $column++;
+        if ($chars->peek() !== '>') {
+            return Token::Minus;
+        }
+        $chars->next();
+        return Token::Arrow;
+    }
+
+    /**
+     * @param Peekable<string> $chars
+     * @param positive-int $column
+     * @return Literal<int | float>
+     */
+    private static function number(Peekable $chars, int &$column): Literal
     {
         $number = '';
         while (true) {
             $char = $chars->peek();
-            if ($number === '' && $char === '-') {
-                $number = $char;
-                $chars->next();
-                $column++;
-                continue;
-            }
-            if ($number === '-' && $char === '>') {
-                $chars->next();
-                return Token::Arrow;
-            }
             if ($char === null || !is_numeric($number . $char)) {
                 break;
             }
             $number .= $char;
             $chars->next();
             $column++;
-        }
-        if ($number === '-') {
-            return Token::Minus;
         }
         return new Literal(str_contains($number, '.') ? (float)$number : (int)$number);
     }

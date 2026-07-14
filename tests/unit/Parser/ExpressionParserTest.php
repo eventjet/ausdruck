@@ -91,6 +91,23 @@ final class ExpressionParserTest extends TestCase
                     Expr::get('c', $b),
                 ),
             ],
+            // Operators are allowed wherever an expression is expected, not just at the top level.
+            [
+                '[1 - 2]',
+                Expr::listLiteral([Expr::subtract(Expr::literal(1), Expr::literal(2))], Span::char(1, 1)),
+            ],
+            [
+                '{a: 1 - 2}',
+                Expr::structLiteral(['a' => Expr::subtract(Expr::literal(1), Expr::literal(2))], Span::char(1, 1)),
+            ],
+            [
+                '"abcdef".substr:string(5 - 3, 2)',
+                Expr::literal('abcdef')->call(
+                    'substr',
+                    $s,
+                    [Expr::subtract(Expr::literal(5), Expr::literal(3)), Expr::literal(2)],
+                ),
+            ],
         ];
         foreach ($cases as $case) {
             yield $case[0] => $case;
@@ -108,6 +125,20 @@ final class ExpressionParserTest extends TestCase
                 Expr::lambda(Expr::get('foo', Type::bool())->or_(Expr::get('bar', Type::bool())), ['foo', 'bar']),
             ],
             ['69-foo:int', Expr::literal(69)->subtract(Expr::get('foo', Type::int()))],
+            // Whitespace must not decide whether the minus is a subtraction or the sign of a literal.
+            ['foo:int-2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
+            ['foo:int -2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
+            ['foo:int- 2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
+            // Trailing commas are allowed in argument and list literal element lists.
+            [
+                'foo:string.substr:string(0, 3,)',
+                Expr::get('foo', Type::string())->call(
+                    'substr',
+                    Type::string(),
+                    [Expr::literal(0), Expr::literal(3)],
+                ),
+            ],
+            ['[1, 2,]', Expr::listLiteral([Expr::literal(1), Expr::literal(2)], Span::char(1, 1))],
             [
                 // Newline after variable type
                 '
@@ -179,6 +210,13 @@ final class ExpressionParserTest extends TestCase
         yield 'non-token, non-identifier symbol' => ['foo:bool € bar:bool'];
         yield 'identifier starting with a number' => ['42foo:bool', 'Unexpected identifier foo'];
         yield 'identifier starting with an underscore' => ['_foo:bool', 'Unexpected character _'];
+        // === and > are non-associative, so a chain of them is a syntax error rather than a confusing type error.
+        yield 'chained ===' => ['a:int === b:int === c:int', 'Unexpected ==='];
+        yield 'chained >' => ['a:int > b:int > c:int', 'Unexpected >'];
+        yield 'trailing literal' => ['1 2', 'Unexpected 2'];
+        yield 'trailing operator' => ['a:int -', 'Expected expression, got end of input'];
+        yield 'missing comma between list items' => ['[1 2]', 'Expected ], got 2'];
+        yield 'missing comma between function arguments' => ['foo:string.substr(0 3)', 'Expected ), got 3'];
     }
 
     /**
