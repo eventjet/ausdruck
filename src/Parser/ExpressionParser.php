@@ -14,13 +14,20 @@ use Eventjet\Ausdruck\StructLiteral;
 use Eventjet\Ausdruck\Type;
 
 use function assert;
-use function in_array;
 use function is_string;
 use function sprintf;
 use function str_split;
 
 /**
- * @phpstan-type AnyToken Token | string | Literal<string | int | float>
+ * Expressions are parsed as a cascade of precedence levels, from loosest to tightest binding:
+ *
+ *     expression → or → and → comparison → additive → unary → postfix → primary
+ *
+ * Each level consumes only its own operators and delegates to the next tighter level for its operands. Precedence and
+ * associativity are therefore expressed by the call graph, and a level never needs to know which operators sit above
+ * it. Anywhere a full expression is expected—a lambda body, a call argument, a list item, a struct field value—call
+ * {@see self::parseExpression()} rather than one of the levels, so that operators are allowed there too.
+ *
  * @api
  */
 final class ExpressionParser
@@ -47,7 +54,7 @@ final class ExpressionParser
          *     string literals and identifiers are just put back together. If you encounter a case where it does matter,
          *     just change it to mb_str_split and add an appropriate test case.
          */
-        return (new self(new Peekable(Tokenizer::tokenize($chars)), $declarations))->parseExpression();
+        return (new self(new Peekable(Tokenizer::tokenize($chars)), $declarations))->parseComplete();
     }
 
     public static function parseTyped(string $expression, Type $type, Declarations|Types|null $types = null): Expression
@@ -64,72 +71,135 @@ final class ExpressionParser
 
     private static function unexpectedToken(ParsedToken $token): never
     {
-        throw SyntaxError::create(sprintf('Unexpected %s', Token::print($token->token)), $token->location());
+        throw SyntaxError::create(
+            is_string($token->token)
+                ? sprintf('Unexpected identifier %s', $token->token)
+                : sprintf('Unexpected %s', Token::print($token->token)),
+            $token->location(),
+        );
+    }
+
+    private function parseComplete(): Expression
+    {
+        $expression = $this->parseExpression();
+        $trailing = $this->tokens->peek();
+        if ($trailing !== null) {
+            self::unexpectedToken($trailing);
+        }
+        return $expression;
     }
 
     private function parseExpression(): Expression
     {
-        /** @var Expression | null $expr */
-        $expr = null;
-        while (true) {
-            $newExpr = $this->parseLazy($expr);
-            if ($newExpr === null) {
-                break;
-            }
-            $expr = $newExpr;
-        }
-        if ($expr === null) {
-            $token = $this->tokens->peek()?->token;
-            throw SyntaxError::create(
-                $token === null
-                    ? 'Expected expression, got end of input'
-                    : sprintf('Expected expression, got %s', Token::print($token)),
-                $this->nextSpan(),
-            );
-        }
-        return $expr;
+        return $this->parseOr();
     }
 
-    private function parseExpressionUntilLogical(): Expression
+    /**
+     * a:bool && b:bool || c:bool
+     * ==========================
+     */
+    private function parseOr(): Expression
     {
-        /** @var Expression | null $expr */
-        $expr = null;
-        while (true) {
-            $peek = $this->tokens->peek();
-            if ($peek !== null && in_array($peek->token, [Token::Or, Token::And], true) && $expr !== null) {
-                break;
-            }
-            $newExpr = $this->parseLazy($expr);
-            if ($newExpr === null) {
-                break;
-            }
-            $expr = $newExpr;
+        $left = $this->parseAnd();
+        while ($this->nextToken() === Token::Or) {
+            $this->tokens->next();
+            $left = $left->or_($this->parseAnd());
         }
-        if ($expr === null) {
-            $token = $this->tokens->peek()?->token;
-            throw SyntaxError::create(
-                $token === null
-                    ? 'Expected expression, got end of input'
-                    : sprintf('Expected expression, got %s', Token::print($token)),
-                $this->nextSpan(),
-            );
+        return $left;
+    }
+
+    /**
+     * a:bool && b:bool || c:bool
+     * ================
+     */
+    private function parseAnd(): Expression
+    {
+        $left = $this->parseComparison();
+        while ($this->nextToken() === Token::And) {
+            $this->tokens->next();
+            $left = $left->and_($this->parseComparison());
+        }
+        return $left;
+    }
+
+    /**
+     * foo:int - 1 > bar:int && baz:bool
+     * ====================
+     *
+     * === and > are non-associative: a === b === c is a syntax error rather than (a === b) === c, which could only ever
+     * be a type error anyway.
+     */
+    private function parseComparison(): Expression
+    {
+        $left = $this->parseAdditive();
+        $operator = $this->nextToken();
+        if ($operator === Token::TripleEquals) {
+            $this->tokens->next();
+            return $left->eq($this->parseAdditive());
+        }
+        if ($operator === Token::CloseAngle) {
+            $this->tokens->next();
+            return $left->gt($this->parseAdditive());
+        }
+        return $left;
+    }
+
+    /**
+     * a:int - b:int - c:int
+     * =====================
+     */
+    private function parseAdditive(): Expression
+    {
+        $left = $this->parseUnary();
+        while ($this->nextToken() === Token::Minus) {
+            $this->tokens->next();
+            $left = $left->subtract($this->parseUnary());
+        }
+        return $left;
+    }
+
+    /**
+     * -foo:int
+     * ========
+     *
+     * Negating a number literal produces a negative literal rather than a negation of a positive one, but that's
+     * {@see Expr::negative()}'s job, not ours: folding it here would mean returning a primary without going through
+     * parsePostfix(), and `-2 .abs:int()` would stop parsing.
+     */
+    private function parseUnary(): Expression
+    {
+        $minus = $this->tokens->peek();
+        if ($minus === null || $minus->token !== Token::Minus) {
+            return $this->parsePostfix();
+        }
+        $this->tokens->next();
+        $operand = $this->parseUnary();
+        return Expr::negative($operand, $minus->location()->to($operand->location()));
+    }
+
+    /**
+     * foo:MyClass.bar.baz:string.substr:string(0, 3)
+     * ==============================================
+     */
+    private function parsePostfix(): Expression
+    {
+        $expr = $this->parsePrimary();
+        while ($this->nextToken() === Token::Dot) {
+            $expr = $this->dot($expr);
         }
         return $expr;
     }
 
-    private function parseLazy(Expression|null $left): Expression|null
+    /**
+     * The tightest level: anything that can start an expression and needs no left-hand operand.
+     */
+    private function parsePrimary(): Expression
     {
         $parsedToken = $this->tokens->peek();
         if ($parsedToken === null) {
-            return null;
+            throw SyntaxError::create('Expected expression, got end of input', $this->nextSpan());
         }
         $token = $parsedToken->token;
-        if ($token === Token::Dot) {
-            if ($left === null) {
-                self::unexpectedToken($parsedToken);
-            }
-            return $this->dot($left);
-        }
         if ($token === 'true') {
             $this->tokens->next();
             return Expr::literal(true, $parsedToken->location());
@@ -139,52 +209,15 @@ final class ExpressionParser
             return Expr::literal(false, $parsedToken->location());
         }
         if (is_string($token)) {
-            if ($left !== null) {
-                throw SyntaxError::create(
-                    sprintf('Unexpected identifier %s', $token),
-                    Span::char($parsedToken->line, $parsedToken->column),
-                );
-            }
-            return $this->variable($token);
+            $this->tokens->next();
+            return $this->variable($token, $parsedToken->location());
         }
         if ($token instanceof Literal) {
             $this->tokens->next();
             return Expr::literal($token->value, $parsedToken->location());
         }
-        if ($token === Token::TripleEquals) {
-            $this->tokens->next();
-            if ($left === null) {
-                self::unexpectedToken($parsedToken);
-            }
-            return $left->eq($this->parseExpressionUntilLogical());
-        }
-        if (in_array($token, [Token::Or, Token::And], true)) {
-            $this->tokens->next();
-            if ($left === null) {
-                self::unexpectedToken($parsedToken);
-            }
-            $right = $this->parseExpression();
-            return $token === Token::Or ? $left->or_($right) : $left->and_($right);
-        }
         if ($token === Token::Pipe) {
             return $this->lambda();
-        }
-        if ($token === Token::Minus) {
-            $this->tokens->next();
-            $right = $this->parseLazy(null);
-            if ($right === null) {
-                throw SyntaxError::create('Unexpected end of input', Span::char($parsedToken->line, $parsedToken->column + 1));
-            }
-            return $left === null
-                ? Expr::negative($right, $parsedToken->location()->to($right->location()))
-                : $left->subtract($right);
-        }
-        if ($token === Token::CloseAngle) {
-            if ($left === null) {
-                self::unexpectedToken($parsedToken);
-            }
-            $this->tokens->next();
-            return $left->gt($this->parseExpressionUntilLogical());
         }
         if ($token === Token::OpenBracket) {
             return $this->parseListLiteral();
@@ -192,24 +225,28 @@ final class ExpressionParser
         if ($token === Token::OpenBrace) {
             return $this->parseStructLiteral();
         }
-        return null;
+        throw SyntaxError::create(
+            sprintf('Expected expression, got %s', Token::print($token)),
+            $parsedToken->location(),
+        );
     }
 
     /**
      * foo:MyClass.bar:string
      * ===========
+     *
+     * @param Span $start The location of the name, which {@see self::parsePrimary()} has already consumed.
      */
-    private function variable(string $name): Get
+    private function variable(string $name, Span $start): Get
     {
-        $start = $this->expect($name);
         $declaredType = $this->declarations->variables[$name] ?? null;
-        if ($this->tokens->peek()?->token !== Token::Colon) {
+        if ($this->nextToken() !== Token::Colon) {
             if ($declaredType !== null) {
-                return Expr::get($name, new TypeHint($declaredType, false), $start->location());
+                return Expr::get($name, new TypeHint($declaredType, false), $start);
             }
             throw SyntaxError::create(
                 sprintf('Variable %s must either be declared or have an inline type', $name),
-                $start->location(),
+                $start,
             );
         }
         $this->expect(Token::Colon);
@@ -235,16 +272,13 @@ final class ExpressionParser
                     $declaredType,
                     $type,
                 ),
-                $start->location()->to($typeNode->location),
+                $start->to($typeNode->location),
             );
         }
-        return Expr::get($name, $type, $start->location()->to($typeNode->location));
+        return Expr::get($name, $type, $start->to($typeNode->location));
     }
 
-    /**
-     * @param AnyToken $expected
-     */
-    private function expect(Token|string|Literal $expected): ParsedToken
+    private function expect(Token $expected): ParsedToken
     {
         $actual = $this->tokens->peek();
         if ($actual === null) {
@@ -264,98 +298,53 @@ final class ExpressionParser
     }
 
     /**
-     * some(foo:list<string>, |item| item:string === bar:string)
-     *      ===================================================
+     * The body of every bracketed, comma-separated list in the language: call arguments, list items, struct fields and
+     * lambda parameters.
      *
-     * @return list<Expression>
+     * A trailing comma is allowed. A missing one simply ends the list, which leaves the caller's expect($close) to
+     * report the token that isn't a comma.
+     *
+     * @template T
+     * @param callable(): T $parseItem
+     * @return list<T>
      */
-    private function parseArgs(): array
+    private function parseCommaSeparated(Token $close, callable $parseItem): array
     {
-        $args = [];
+        $items = [];
         while (true) {
-            $arg = $this->parseArg();
-            if ($arg === null) {
-                break;
+            $token = $this->nextToken();
+            if ($token === null || $token === $close) {
+                return $items;
             }
-            $args[] = $arg;
-        }
-        return $args;
-    }
-
-    /**
-     * some(foo:list<string>, |item| item:string === bar:string)
-     *      ==================
-     */
-    private function parseArg(): Expression|null
-    {
-        $token = $this->tokens->peek()?->token;
-        if ($token === Token::CloseParen) {
-            return null;
-        }
-        $arg = $this->parseLazy(null);
-        if ($arg === null) {
-            return null;
-        }
-        $token = $this->tokens->peek()?->token;
-        if ($token === Token::Comma) {
+            $items[] = $parseItem();
+            if ($this->nextToken() !== Token::Comma) {
+                return $items;
+            }
             $this->tokens->next();
         }
-        return $arg;
     }
 
     /**
-     * |item| => item:string === needle:string
-     * =======================================
+     * |one, two, three, | item:string === needle:string
+     * =================================================
      */
     private function lambda(): Expression
     {
         $start = $this->expect(Token::Pipe);
-        $args = $this->parseParams();
+        $params = $this->parseCommaSeparated(
+            Token::Pipe,
+            fn(): string => $this->expectIdentifier('parameter name')[0],
+        );
         $this->expect(Token::Pipe);
         $body = $this->parseExpression();
-        return Expr::lambda($body, $args, $start->location()->to($body->location()));
-    }
-
-    /**
-     * |one, two, three, | => foo:string
-     *  =================
-     * @return list<string>
-     */
-    private function parseParams(): array
-    {
-        $params = [];
-        while (true) {
-            $param = $this->parseParam();
-            if ($param === null) {
-                break;
-            }
-            $params[] = $param;
-        }
-        return $params;
-    }
-
-    /**
-     * |foo, bar| foo:bool === bar:bool
-     *  =====
-     */
-    private function parseParam(): string|null
-    {
-        $token = $this->tokens->peek()?->token;
-        if (!is_string($token)) {
-            return null;
-        }
-        $this->tokens->next();
-        if ($this->tokens->peek()?->token !== Token::Pipe) {
-            $this->expect(Token::Comma);
-        }
-        return $token;
+        return Expr::lambda($body, $params, $start->location()->to($body->location()));
     }
 
     private function dot(Expression $target): Call|FieldAccess
     {
-        $dot = $this->expect(Token::Dot);
-        [$name, $nameLocation] = $this->expectIdentifier($dot, 'function name');
-        $token = $this->tokens->peek()?->token;
+        $this->expect(Token::Dot);
+        [$name, $nameLocation] = $this->expectIdentifier('function name');
+        $token = $this->nextToken();
         return match ($token) {
             Token::Colon, Token::OpenParen => $this->call($name, $nameLocation, $target),
             default => Expr::fieldAccess($target, $name, $target->location()->to($nameLocation)),
@@ -371,7 +360,7 @@ final class ExpressionParser
         $signature = $this->declarations->functions[$name] ?? null;
         $returnType = $this->returnType();
         $this->expect(Token::OpenParen);
-        $args = $this->parseArgs();
+        $args = $this->parseCommaSeparated(Token::CloseParen, $this->parseExpression(...));
         $closeParen = $this->expect(Token::CloseParen);
         return Expr::call(
             $target,
@@ -394,7 +383,7 @@ final class ExpressionParser
      */
     private function returnType(): TypeAnnotation|null
     {
-        if ($this->tokens->peek()?->token !== Token::Colon) {
+        if ($this->nextToken() !== Token::Colon) {
             return null;
         }
         $this->expect(Token::Colon);
@@ -418,25 +407,30 @@ final class ExpressionParser
     /**
      * @return array{string, Span}
      */
-    private function expectIdentifier(
-        ParsedToken $lastToken,
-        string $expected = 'identifier',
-    ): array {
+    private function expectIdentifier(string $expected): array
+    {
         $name = $this->tokens->peek();
         if ($name === null) {
-            throw SyntaxError::create(
-                sprintf('Expected %s, got end of input', $expected),
-                Span::char($lastToken->line, $lastToken->column + 1),
-            );
+            throw SyntaxError::create(sprintf('Expected %s, got end of input', $expected), $this->nextSpan());
         }
         if (!is_string($name->token)) {
             throw SyntaxError::create(
                 sprintf('Expected %s, got %s', $expected, Token::print($name->token)),
-                Span::char($name->line, $name->column),
+                $name->location(),
             );
         }
         $this->tokens->next();
         return [$name->token, $name->location()];
+    }
+
+    /**
+     * The token the parser is looking at, or null at the end of the input.
+     *
+     * @return Token | string | Literal<string | int | float | bool> | null
+     */
+    private function nextToken(): Token|string|Literal|null
+    {
+        return $this->tokens->peek()?->token;
     }
 
     private function nextSpan(): Span
@@ -449,62 +443,43 @@ final class ExpressionParser
         return $previous === null ? Span::char(1, 1) : Span::char($previous->line, $previous->column + 1);
     }
 
+    /**
+     * [1 - 2, foo:int]
+     * ================
+     */
     private function parseListLiteral(): ListLiteral
     {
         $start = $this->expect(Token::OpenBracket);
-        $items = [];
-        while (true) {
-            $item = $this->parseLazy(null);
-            if ($item === null) {
-                break;
-            }
-            $items[] = $item;
-            if ($this->tokens->peek()?->token === Token::Comma) {
-                $this->tokens->next();
-            }
-        }
+        $items = $this->parseCommaSeparated(Token::CloseBracket, $this->parseExpression(...));
         $close = $this->expect(Token::CloseBracket);
         return Expr::listLiteral($items, $start->location()->to($close->location()));
     }
 
+    /**
+     * {name: "John", age: 42 - 1}
+     * ===========================
+     */
     private function parseStructLiteral(): StructLiteral
     {
         $start = $this->expect(Token::OpenBrace);
         $fields = [];
-        while (true) {
-            $field = $this->parseStructField();
-            if ($field === null) {
-                break;
-            }
-            $fields[$field[0]] = $field[1];
-            $comma = $this->tokens->peek();
-            if ($comma?->token !== Token::Comma) {
-                break;
-            }
-            $this->tokens->next();
+        foreach ($this->parseCommaSeparated(Token::CloseBrace, $this->parseStructField(...)) as [$name, $value]) {
+            $fields[$name] = $value;
         }
         $close = $this->expect(Token::CloseBrace);
         return Expr::structLiteral($fields, $start->location()->to($close->location()));
     }
 
     /**
-     * @return array{string, Expression} | null
+     * {name: "John"}
+     *  ============
+     *
+     * @return array{string, Expression}
      */
-    private function parseStructField(): array|null
+    private function parseStructField(): array
     {
-        $name = $this->tokens->peek();
-        if ($name === null) {
-            return null;
-        }
-        if (!is_string($name->token)) {
-            return null;
-        }
-        $this->tokens->next();
+        [$name] = $this->expectIdentifier('field name');
         $this->expect(Token::Colon);
-        $value = $this->parseLazy(null);
-        if ($value === null) {
-            throw SyntaxError::create('Expected value after colon', $this->nextSpan());
-        }
-        return [$name->token, $value];
+        return [$name, $this->parseExpression()];
     }
 }

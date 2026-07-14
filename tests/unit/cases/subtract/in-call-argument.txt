@@ -1,0 +1,8 @@
+foo:string.substr(a:int - 1, 2)
+-- Input --
+{
+  foo: "abcdef",
+  a: 3,
+}
+-- Output --
+"cd"
