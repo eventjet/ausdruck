@@ -247,11 +247,11 @@ final class ExpressionParserTest extends TestCase
         yield 'subtract string from string' => ['foo:string - bar:string', 'Can\'t subtract string from string'];
         yield 'subtract string from int' => ['foo:int - bar:string', 'Can\'t subtract string from int'];
         yield 'subtract int from string' => ['foo:string - bar:int', 'Can\'t subtract int from string'];
-        yield 'int > float' => ['foo:int > bar:float'];
-        yield 'float > int' => ['foo:float > bar:int'];
-        yield 'string > string' => ['foo:string > bar:string'];
-        yield 'string > int' => ['foo:string > bar:int'];
-        yield 'int > string' => ['foo:int > bar:string'];
+        yield 'int > float' => ['foo:int > bar:float', 'Can\'t compare int to float'];
+        yield 'float > int' => ['foo:float > bar:int', 'Can\'t compare float to int'];
+        yield 'string > string' => ['foo:string > bar:string', 'Can\'t compare string to string'];
+        yield 'string > int' => ['foo:string > bar:int', 'Can\'t compare string to int'];
+        yield 'int > string' => ['foo:int > bar:string', 'Can\'t compare string to int'];
         yield 'generic syntax on string' => ['foo:string<int>'];
         yield 'unknown variable type' => ['foo:notavalidtype'];
         yield 'map with no type arguments' => ['foo:map', 'The map type requires two arguments, none given'];
@@ -454,9 +454,15 @@ final class ExpressionParserTest extends TestCase
     public static function typeErrorLocationCases(): iterable
     {
         $cases = [
+            // > and - enforce the same rule -- both operands numeric and of the same type -- so they blame the same
+            // operand for the same mistake. Compare the pair below with the '42 - "foo"' / '"foo" - 42' pair.
             [
                 '42 > "foo"',
                 '     =====',
+            ],
+            [
+                '"foo" > 42',
+                '=====     ',
             ],
             [
                 'x:list<string, int>',

@@ -129,31 +129,22 @@ final class Expr
 
     public static function subtract(Expression $minuend, Expression $subtrahend): Subtract
     {
-        // Both operands must be numbers of the same type. Either way the message is the same; only the operand we blame
-        // for it differs.
-        if (!self::isNumeric($subtrahend)) {
-            throw self::cantSubtract($minuend, $subtrahend, $subtrahend->location());
-        }
-        if (!$minuend->matchesType($subtrahend->getType())) {
-            throw self::cantSubtract($minuend, $subtrahend, $minuend->location());
-        }
+        // Which operand is at fault doesn't change how we name the mistake, only which one we point at.
+        self::assertSameNumberType($minuend, $subtrahend, static fn(): string => sprintf(
+            'Can\'t subtract %s from %s',
+            $subtrahend->getType(),
+            $minuend->getType(),
+        ));
         return new Subtract($minuend, $subtrahend);
     }
 
     public static function gt(Expression $left, Expression $right): Gt
     {
-        if (!self::isNumeric($right)) {
-            throw TypeError::create(
-                sprintf('Can\'t compare %s to %s', $right->getType(), $left->getType()),
-                $right->location(),
-            );
-        }
-        if (!$left->matchesType($right->getType())) {
-            throw TypeError::create(
-                sprintf('Can\'t compare %s to %s', $left->getType(), $right->getType()),
-                $left->location()->to($right->location()),
-            );
-        }
+        self::assertSameNumberType($left, $right, static fn(Expression $bad, Expression $good): string => sprintf(
+            'Can\'t compare %s to %s',
+            $bad->getType(),
+            $good->getType(),
+        ));
         return new Gt($left, $right);
     }
 
@@ -194,12 +185,22 @@ final class Expr
         return $type->equals(Type::int()) || $type->equals(Type::float());
     }
 
-    private static function cantSubtract(Expression $minuend, Expression $subtrahend, Span $location): TypeError
+    /**
+     * The rule every arithmetic and ordering operator follows: both operands have to be numbers, and they have to be
+     * the same number type. The error points at whichever operand breaks it, so that operators that enforce the same
+     * rule can't drift into blaming different parts of the expression for the same mistake.
+     *
+     * @param callable(Expression, Expression): string $message Called with the offending operand first and the one it
+     *     was measured against second, for operators whose wording depends on which is which.
+     */
+    private static function assertSameNumberType(Expression $left, Expression $right, callable $message): void
     {
-        return TypeError::create(
-            sprintf('Can\'t subtract %s from %s', $subtrahend->getType(), $minuend->getType()),
-            $location,
-        );
+        if (!self::isNumeric($right)) {
+            throw TypeError::create($message($right, $left), $right->location());
+        }
+        if (!$left->matchesType($right->getType())) {
+            throw TypeError::create($message($left, $right), $left->location());
+        }
     }
 
     /**
