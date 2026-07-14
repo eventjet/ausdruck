@@ -5,25 +5,26 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Eventjet\Ausdruck\Parser\TypeAnnotation;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeHint;
 
-use function array_slice;
 use function count;
 use function sprintf;
 
 /**
- * The only place expression nodes are constructed, and therefore the only place their operand types are checked. Both
- * the parser and the builder API on {@see Expression} go through here, so an expression that exists is an expression
- * whose operands type-check. Anything that reads a value from a {@see Scope} ({@see Get}, {@see Call}) asserts that
- * value against its declared type, so the guarantee survives evaluation too.
+ * The only place expression nodes are constructed, and therefore the only place their types are checked. Both the parser
+ * and the builder API on {@see Expression} go through here, so an expression that exists is an expression whose operands
+ * type-check and whose type is the one its operands give it. Anything that reads a value from a {@see Scope}
+ * ({@see Get}, {@see Call}) asserts that value against its declared type, so the guarantee survives evaluation too.
  *
  * The nodes therefore don't re-check their operands when they evaluate. They only narrow the mixed they get back from
  * their sub-expressions, via {@see Operand}, to the type PHP needs to apply the operator.
  *
- * The one operand we can't always check is a call's receiver and arguments: that needs the function's signature, and
- * only a *declared* function has one. {@see self::call()} therefore takes the signature it should check against, and
- * null means there is nothing to check against, not that the check was skipped. See its docblock.
+ * The one node whose type doesn't follow from its operands is a {@see Call}: what a call returns is what its inline
+ * annotation says, or what the function's declaration says, and only a *declared* function has a signature to check the
+ * receiver and the arguments against. {@see self::call()} therefore takes both, and resolves the return type from them
+ * rather than being handed one; null means there is nothing to check against, not that the check was skipped.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -82,29 +83,33 @@ final class Expr
     }
 
     /**
-     * @param Type $returnType What the call evaluates to: the inline return type if it was annotated, the declared one
-     *     otherwise. {@see Call::evaluate()} asserts the function's actual return value against it.
+     * @param TypeAnnotation|null $returnType The return type the call site spells out, or null if it doesn't spell one
+     *     out. What the call evaluates to is resolved from this and the declaration; see {@see self::returnType()}.
      * @param list<Expression> $arguments
      * @param Type|null $signature The declared type of the function, or null if it has no declaration. Only a
      *     declaration says which receiver and arguments a function accepts, so a call to an undeclared function has
      *     nothing to check its operands against. That's the case for functions that are used with nothing but an
      *     inline return type, and for every call built through {@see Expression::call()}, which has no declarations to
      *     consult.
+     * @param Span|null $nameLocation Where the function is named, which is what an error about the function itself
+     *     rather than about one of its operands points at.
      */
     public static function call(
         Expression $target,
         string $name,
-        Type $returnType,
+        TypeAnnotation|null $returnType,
         array $arguments,
         Type|null $signature,
+        Span|null $nameLocation = null,
         Span|null $location = null,
     ): Call {
         $location ??= self::dummySpan();
+        $type = self::returnType($name, $returnType, $signature, $nameLocation ?? self::dummySpan());
         if ($signature !== null) {
             self::checkReceiver($target, $name, $signature);
             self::checkArguments($arguments, $name, $signature, $location);
         }
-        return new Call($target, $name, $returnType, $arguments, $location);
+        return new Call($target, $name, $type, $arguments, $location);
     }
 
     public static function or_(Expression $left, Expression $right): Or_
@@ -187,6 +192,16 @@ final class Expr
     }
 
     /**
+     * The location of an expression that has none, because it was built rather than parsed. It only ever fills a
+     * parameter list, or points an error at a source that isn't there.
+     */
+    public static function dummySpan(): Span
+    {
+        /** @infection-ignore-all These dummy spans are just there to fill parameter lists */
+        return Span::char(1, 1);
+    }
+
+    /**
      * int and float are the only types the arithmetic and ordering operators accept. Note that this has nothing to do
      * with PHP's is_numeric(): a numeric string is a string.
      */
@@ -215,12 +230,46 @@ final class Expr
     }
 
     /**
+     * A call returns what its inline annotation says, and what the declaration says if it has no annotation. At least
+     * one of the two has to be there, and where both are, the annotation has to fit the declaration. Those are the same
+     * rules a variable's type follows; see {@see Parser\ExpressionParser::variable()}.
+     *
+     * Resolving the return type here rather than taking one is what keeps a Call's type and its signature from
+     * contradicting each other: there is no way to hand this a return type that the declaration disagrees with.
+     */
+    private static function returnType(
+        string $name,
+        TypeAnnotation|null $annotation,
+        Type|null $signature,
+        Span $nameLocation,
+    ): Type {
+        if ($annotation === null) {
+            return $signature?->returnType() ?? throw TypeError::create(
+                sprintf('Function %s is not declared and has no inline type', $name),
+                $nameLocation,
+            );
+        }
+        if ($signature !== null && !$annotation->type->isSubtypeOf($signature->returnType())) {
+            throw TypeError::create(
+                sprintf(
+                    'Inline return type %s of function %s does not match declared return type %s',
+                    $annotation->type,
+                    $name,
+                    $signature->returnType(),
+                ),
+                $annotation->location,
+            );
+        }
+        return $annotation->type;
+    }
+
+    /**
      * A receiver function takes the expression it's called on as its first argument: `substr` is declared as
      * func(string, [string, int, int]) and called as `foo:string.substr:string(0, 3)`, so `foo` has to be a string.
      */
     private static function checkReceiver(Expression $target, string $name, Type $signature): void
     {
-        $receiverType = $signature->args[1] ?? null;
+        $receiverType = $signature->receiverType();
         if ($receiverType === null) {
             throw TypeError::create(
                 sprintf('%s can\'t be used as a receiver function because it doesn\'t accept any arguments', $name),
@@ -249,18 +298,19 @@ final class Expr
      */
     private static function checkArguments(array $arguments, string $name, Type $signature, Span $location): void
     {
-        // What's left after dropping the return type and the receiver type are the parameters that are passed in
-        // parentheses.
-        $parameterTypes = array_slice($signature->args, 2);
-        foreach ($parameterTypes as $index => $parameterType) {
-            $argument = $arguments[$index] ?? null;
-            if ($argument === null) {
-                throw TypeError::create(
-                    sprintf('%s expects %d arguments, got %d', $name, count($parameterTypes), count($arguments)),
-                    $location,
-                );
-            }
-            if ($argument->isSubtypeOf($parameterType)) {
+        $argumentTypes = $signature->argumentTypes();
+        if (count($arguments) !== count($argumentTypes)) {
+            // An argument too many is right there to point at. One that's missing isn't anywhere, so the call as a
+            // whole is the closest we can get.
+            $surplus = $arguments[count($argumentTypes)] ?? null;
+            throw TypeError::create(
+                sprintf('%s expects %d arguments, got %d', $name, count($argumentTypes), count($arguments)),
+                $surplus?->location() ?? $location,
+            );
+        }
+        foreach ($argumentTypes as $index => $argumentType) {
+            $argument = $arguments[$index];
+            if ($argument->isSubtypeOf($argumentType)) {
                 continue;
             }
             throw TypeError::create(
@@ -268,7 +318,7 @@ final class Expr
                     'Argument %d of %s must be of type %s, got %s',
                     $index + 1,
                     $name,
-                    $parameterType,
+                    $argumentType,
                     $argument->getType(),
                 ),
                 $argument->location(),
@@ -293,11 +343,5 @@ final class Expr
             ),
             $expr->location(),
         );
-    }
-
-    private static function dummySpan(): Span
-    {
-        /** @infection-ignore-all These dummy spans are just there to fill parameter lists */
-        return Span::char(1, 1);
     }
 }

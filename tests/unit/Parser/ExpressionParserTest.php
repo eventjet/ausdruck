@@ -306,6 +306,15 @@ final class ExpressionParserTest extends TestCase
             'foo:string.substr(0)',
             'substr expects 2 arguments, got 1',
         ];
+        yield 'too many function arguments' => [
+            'foo:string.substr(0, 3, 9)',
+            'substr expects 2 arguments, got 3',
+        ];
+        yield 'arguments passed to a function that only takes a receiver' => [
+            'foo:string.myCustomFn(42)',
+            'myCustomFn expects 0 arguments, got 1',
+            new Declarations(functions: ['myCustomFn' => Type::func(Type::string(), [Type::string()])]),
+        ];
         yield 'wrong argument type' => [
             'foo:string.substr(0, "3")',
             'Argument 2 of substr must be of type int, got string',
@@ -539,7 +548,7 @@ final class ExpressionParserTest extends TestCase
             ],
             // Calls are checked against the function's declared signature, so their type errors point at the operand
             // that doesn't fit it: the receiver, or the argument. A missing argument has no location of its own, so
-            // the error spans the whole call.
+            // the error spans the whole call; one too many is right there to point at.
             [
                 'foo:int.substr(0, 3)',
                 '=======             ',
@@ -551,6 +560,10 @@ final class ExpressionParserTest extends TestCase
             [
                 'foo:string.substr(0)',
                 '====================',
+            ],
+            [
+                'foo:string.substr(0, 3, 9)',
+                '                        = ',
             ],
             [
                 'foo:string.substr(0, "3")',

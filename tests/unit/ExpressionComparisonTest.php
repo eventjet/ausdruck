@@ -196,27 +196,27 @@ final class ExpressionComparisonTest extends TestCase
             Expr::literal(1),
         ];
         yield Call::class . ': target is different' => [
-            Expr::call(Expr::literal(1), 'foo', Type::int(), [], null),
-            Expr::call(Expr::literal(2), 'foo', Type::int(), [], null),
+            Expr::literal(1)->call('foo', Type::int(), []),
+            Expr::literal(2)->call('foo', Type::int(), []),
         ];
         yield Call::class . ': name is different' => [
-            Expr::call(Expr::literal(1), 'foo', Type::int(), [], null),
-            Expr::call(Expr::literal(1), 'bar', Type::int(), [], null),
+            Expr::literal(1)->call('foo', Type::int(), []),
+            Expr::literal(1)->call('bar', Type::int(), []),
         ];
         yield Call::class . ': type is different' => [
-            Expr::call(Expr::literal(1), 'foo', Type::int(), [], null),
-            Expr::call(Expr::literal(1), 'foo', Type::string(), [], null),
+            Expr::literal(1)->call('foo', Type::int(), []),
+            Expr::literal(1)->call('foo', Type::string(), []),
         ];
         yield Call::class . ': different number of arguments' => [
-            Expr::call(Expr::literal(1), 'foo', Type::int(), [], null),
-            Expr::call(Expr::literal(1), 'foo', Type::int(), [Expr::literal(1)], null),
+            Expr::literal(1)->call('foo', Type::int(), []),
+            Expr::literal(1)->call('foo', Type::int(), [Expr::literal(1)]),
         ];
         yield Call::class . ': argument is different' => [
-            Expr::call(Expr::literal(1), 'foo', Type::int(), [Expr::literal(1), Expr::literal(2), Expr::literal(3)], null),
-            Expr::call(Expr::literal(1), 'foo', Type::int(), [Expr::literal(1), Expr::literal(9), Expr::literal(3)], null),
+            Expr::literal(1)->call('foo', Type::int(), [Expr::literal(1), Expr::literal(2), Expr::literal(3)]),
+            Expr::literal(1)->call('foo', Type::int(), [Expr::literal(1), Expr::literal(9), Expr::literal(3)]),
         ];
         yield Call::class . ': different type' => [
-            Expr::call(Expr::literal(1), 'foo', Type::int(), [], null),
+            Expr::literal(1)->call('foo', Type::int(), []),
             Expr::literal(1),
         ];
         yield Gt::class . ': left is different' => [
@@ -262,7 +262,7 @@ final class ExpressionComparisonTest extends TestCase
         ];
         yield FieldAccess::class . ': different type' => [
             Expr::fieldAccess(Expr::get('person', $personType), 'name', self::location()),
-            Expr::call(Expr::get('person', $personType), 'name', Type::string(), [], null),
+            Expr::get('person', $personType)->call('name', Type::string(), []),
         ];
         yield StructLiteral::class . ': different type' => [
             new StructLiteral(['foo' => Expr::literal('bar')], self::location()),

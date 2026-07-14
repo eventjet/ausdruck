@@ -165,7 +165,8 @@ final class ExpressionTest extends TestCase
                 md5('mystrtest'),
                 new Declarations(
                     variables: ['foo' => Type::string()],
-                    functions: ['customHash' => Type::func(Type::string(), [Type::string()])],
+                    // The receiver is the text, the argument is the salt.
+                    functions: ['customHash' => Type::func(Type::string(), [Type::string(), Type::string()])],
                 ),
             ],
             (static function () {

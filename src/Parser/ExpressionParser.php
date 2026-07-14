@@ -358,7 +358,7 @@ final class ExpressionParser
     private function call(string $name, Span $nameLocation, Expression $target): Call
     {
         $signature = $this->declarations->functions[$name] ?? null;
-        $returnType = $this->returnType($name, $nameLocation, $signature);
+        $returnType = $this->returnType();
         $this->expect(Token::OpenParen);
         $args = $this->parseCommaSeparated(Token::CloseParen, $this->parseExpression(...));
         $closeParen = $this->expect(Token::CloseParen);
@@ -368,6 +368,7 @@ final class ExpressionParser
             $returnType,
             $args,
             $signature,
+            $nameLocation,
             $target->location()->to($closeParen->location()),
         );
     }
@@ -376,17 +377,14 @@ final class ExpressionParser
      * foo:string.substr:string(0, 3)
      *                  ======
      *
-     * A call returns what its inline annotation says, and what the declaration says if it has no annotation. At least
-     * one of the two has to be there, and where both are, the annotation has to fit the declaration. Those are the same
-     * rules a variable's type follows; see {@see self::variable()}.
+     * Only whether the call site spells a return type out, and which one. Whether it's allowed to leave it out, and
+     * whether the one it spells out fits the function's declaration, is {@see Expr::call()}'s business: those rules hold
+     * for a call however it was built, and a call built through {@see Expression::call()} never comes past here.
      */
-    private function returnType(string $name, Span $nameLocation, Type|null $signature): Type
+    private function returnType(): TypeAnnotation|null
     {
         if ($this->nextToken() !== Token::Colon) {
-            return $signature?->returnType() ?? throw TypeError::create(
-                sprintf('Function %s is not declared and has no inline type', $name),
-                $nameLocation,
-            );
+            return null;
         }
         $this->expect(Token::Colon);
         $typeNode = TypeParser::parse($this->tokens);
@@ -403,18 +401,7 @@ final class ExpressionParser
         if ($returnType instanceof TypeError) {
             throw $returnType;
         }
-        if ($signature !== null && !$returnType->isSubtypeOf($signature->returnType())) {
-            throw TypeError::create(
-                sprintf(
-                    'Inline return type %s of function %s does not match declared return type %s',
-                    $returnType,
-                    $name,
-                    $signature->returnType(),
-                ),
-                $typeNode->location,
-            );
-        }
-        return $returnType;
+        return new TypeAnnotation($returnType, $typeNode->location);
     }
 
     /**
