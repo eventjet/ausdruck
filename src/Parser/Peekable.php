@@ -47,7 +47,10 @@ final class Peekable
     }
 
     /**
+     * Advances the underlying generator, so subsequent peeks return a different item.
+     *
      * @return T | null
+     * @phpstan-impure
      */
     public function next(): mixed
     {

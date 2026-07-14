@@ -26,7 +26,7 @@ use function sprintf;
 
 /**
  * @phpstan-type Shape array{
- *     vars?: array<string, string | int | bool | array<string, mixed> | null>,
+ *     vars?: array<string, string | int | bool | array<array-key, mixed> | null>,
  *     parent?: mixed,
  * }
  * @api
@@ -218,7 +218,7 @@ final class Scope
     }
 
     /**
-     * @return string|int|bool|array<string, mixed>|null
+     * @return string|int|bool|array<array-key, mixed>|null
      */
     private static function printValue(mixed $var): string|int|bool|array|null
     {
