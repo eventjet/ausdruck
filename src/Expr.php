@@ -131,16 +131,11 @@ final class Expr
     {
         // Both operands must be numbers of the same type. Either way the message is the same; only the operand we blame
         // for it differs.
-        $culprit = match (true) {
-            !self::isNumeric($subtrahend) => $subtrahend,
-            !$minuend->matchesType($subtrahend->getType()) => $minuend,
-            default => null,
-        };
-        if ($culprit !== null) {
-            throw TypeError::create(
-                sprintf('Can\'t subtract %s from %s', $subtrahend->getType(), $minuend->getType()),
-                $culprit->location(),
-            );
+        if (!self::isNumeric($subtrahend)) {
+            throw self::cantSubtract($minuend, $subtrahend, $subtrahend->location());
+        }
+        if (!$minuend->matchesType($subtrahend->getType())) {
+            throw self::cantSubtract($minuend, $subtrahend, $minuend->location());
         }
         return new Subtract($minuend, $subtrahend);
     }
@@ -197,6 +192,14 @@ final class Expr
     {
         $type = $expr->getType();
         return $type->equals(Type::int()) || $type->equals(Type::float());
+    }
+
+    private static function cantSubtract(Expression $minuend, Expression $subtrahend, Span $location): TypeError
+    {
+        return TypeError::create(
+            sprintf('Can\'t subtract %s from %s', $subtrahend->getType(), $minuend->getType()),
+            $location,
+        );
     }
 
     /**
