@@ -79,6 +79,10 @@ final class ExpressionParserTest extends TestCase
                 Expr::lambda(Expr::get('foo', Type::bool())->or_(Expr::get('bar', Type::bool())), ['foo', 'bar']),
             ],
             ['69-foo:int', Expr::literal(69)->subtract(Expr::get('foo', Type::int()))],
+            // Whitespace must not decide whether the minus is a subtraction or the sign of a literal.
+            ['foo:int-2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
+            ['foo:int -2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
+            ['foo:int- 2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
             [
                 // Newline after variable type
                 '
