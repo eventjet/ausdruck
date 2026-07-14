@@ -9,6 +9,9 @@ use Override;
 
 use function sprintf;
 
+/**
+ * Never wraps a {@see Literal}: {@see Expr::negative()} folds a negated number literal into a negative one.
+ */
 final class Negative extends Expression
 {
     use LocationTrait;

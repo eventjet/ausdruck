@@ -203,9 +203,10 @@ final class Tokenizer
     }
 
     /**
-     * The sign is never folded into a number literal: a `-` always yields Token::Minus, and the parser turns a minus in
-     * front of a numeric literal back into a negative literal. If the sign were folded in here, whitespace would
-     * silently decide the meaning of `a -2`: subtraction, or `a` followed by the literal -2.
+     * The sign is never folded into a number literal: a `-` always yields Token::Minus, and
+     * {@see \Eventjet\Ausdruck\Expr::negative()} turns a negated number literal back into a negative one. If the sign
+     * were folded in here, whitespace would silently decide the meaning of `a -2`: subtraction, or `a` followed by the
+     * literal -2.
      *
      * @param Peekable<string> $chars
      * @param positive-int $column

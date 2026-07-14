@@ -146,6 +146,15 @@ final class ExpressionParserTest extends TestCase
                 ',
                 Expr::get('foo', Type::string()),
             ],
+            // A negated literal is a literal like any other, so the levels below unary still apply to it: postfix binds
+            // tighter than the minus, exactly as it does for -foo:int.abs:int().
+            [
+                '-2 .abs:int()',
+                Expr::negative(Expr::literal(2)->call('abs', Type::int(), [])),
+            ],
+            // Negating a number literal folds into a negative literal, so the fold survives being nested.
+            ['[-2]', Expr::listLiteral([Expr::literal(-2)], Span::char(1, 1))],
+            ['- -1', Expr::literal(1)],
         ];
         foreach ($cases as $case) {
             yield $case[0] => $case;

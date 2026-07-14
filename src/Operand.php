@@ -12,8 +12,8 @@ use function is_object;
 use function sprintf;
 
 /**
- * Narrows the mixed that {@see Expression::evaluate()} returns back to the concrete type an operator needs to apply its
- * PHP counterpart.
+ * Narrows the mixed an expression hands back—from {@see Expression::evaluate()}, or from {@see Literal::value()}—to the
+ * concrete type an operator needs to apply its PHP counterpart.
  *
  * These are not type checks. {@see Expr} has already rejected operands of the wrong type, and everything that reads a
  * value from a {@see Scope} ({@see Get}, {@see Call}) asserts it against its declared type, so none of these can fail

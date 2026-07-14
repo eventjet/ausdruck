@@ -14,8 +14,6 @@ use Eventjet\Ausdruck\StructLiteral;
 use Eventjet\Ausdruck\Type;
 
 use function assert;
-use function is_float;
-use function is_int;
 use function is_string;
 use function sprintf;
 use function str_split;
@@ -164,9 +162,9 @@ final class ExpressionParser
      * -foo:int
      * ========
      *
-     * A minus in front of a number literal folds into a negative literal, so that -69 stays a literal rather than
-     * becoming a negation of 69. The tokenizer deliberately doesn't do this, because there it couldn't tell the
-     * negative literal in `[-2]` apart from the subtraction in `a -2`.
+     * Negating a number literal produces a negative literal rather than a negation of a positive one, but that's
+     * {@see Expr::negative()}'s job, not ours: folding it here would mean returning a primary without going through
+     * parsePostfix(), and `-2 .abs:int()` would stop parsing.
      */
     private function parseUnary(): Expression
     {
@@ -175,15 +173,6 @@ final class ExpressionParser
             return $this->parsePostfix();
         }
         $this->tokens->next();
-        $number = $this->tokens->peek();
-        $literal = $number?->token;
-        if ($number !== null && $literal instanceof Literal) {
-            $value = $literal->value;
-            if (is_int($value) || is_float($value)) {
-                $this->tokens->next();
-                return Expr::literal(-$value, $minus->location()->to($number->location()));
-            }
-        }
         $operand = $this->parseUnary();
         return Expr::negative($operand, $minus->location()->to($operand->location()));
     }

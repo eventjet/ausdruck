@@ -56,8 +56,13 @@ final class ExpressionComparisonTest extends TestCase
             Expr::gt(Expr::literal(1), Expr::literal(2)),
         ];
         yield [
+            Expr::negative(Expr::get('a', Type::int())),
+            Expr::negative(Expr::get('a', Type::int())),
+        ];
+        // A negated number literal is a negative number literal, not a negation of a positive one.
+        yield [
             Expr::negative(Expr::literal(1)),
-            Expr::negative(Expr::literal(1)),
+            Expr::literal(-1),
         ];
         yield [
             Expr::listLiteral([Expr::literal(1), Expr::literal(2), Expr::literal(3)], Span::char(1, 1)),
@@ -231,12 +236,12 @@ final class ExpressionComparisonTest extends TestCase
             Expr::eq(Expr::literal(1), Expr::literal(2)),
         ];
         yield Negative::class . ': different type' => [
-            Expr::negative(Expr::literal(1)),
-            Expr::literal(1),
+            Expr::negative(Expr::get('a', Type::int())),
+            Expr::get('a', Type::int()),
         ];
         yield Negative::class . ': different expression' => [
-            Expr::negative(Expr::literal(1)),
-            Expr::negative(Expr::literal(2)),
+            Expr::negative(Expr::get('a', Type::int())),
+            Expr::negative(Expr::get('b', Type::int())),
         ];
         yield ListLiteral::class . ': different elements' => [
             Expr::listLiteral([Expr::literal(1), Expr::literal(2), Expr::literal(3)], Span::char(1, 1)),

@@ -148,7 +148,15 @@ final class Expr
         return new Gt($left, $right);
     }
 
-    public static function negative(Expression $expression, Span|null $location = null): Negative
+    /**
+     * Negating a number literal folds into a negative literal, so that -69 is the literal -69 rather than a negation of
+     * 69. The tokenizer deliberately doesn't fold the sign in, because there it couldn't tell the negative literal in
+     * `[-2]` apart from the subtraction in `a -2`; by the time we get here, the minus is known to be a negation.
+     *
+     * A Negative therefore never wraps a Literal, and isNumeric() has already established that one that gets this far
+     * holds an int or a float.
+     */
+    public static function negative(Expression $expression, Span|null $location = null): Negative|Literal
     {
         if (!self::isNumeric($expression)) {
             throw TypeError::create(
@@ -156,7 +164,10 @@ final class Expr
                 $expression->location(),
             );
         }
-        return new Negative($expression, $location ?? self::dummySpan());
+        $location ??= self::dummySpan();
+        return $expression instanceof Literal
+            ? new Literal(-Operand::number($expression->value()), $location)
+            : new Negative($expression, $location);
     }
 
     public static function fieldAccess(Expression $struct, string $field, Span $location): FieldAccess
