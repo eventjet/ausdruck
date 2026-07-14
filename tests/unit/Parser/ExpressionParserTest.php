@@ -522,6 +522,33 @@ final class ExpressionParserTest extends TestCase
                 'foo:Option<string, int, bool>',
                 '                   ========= ',
             ],
+            // Calls are checked against the function's declared signature, so their type errors point at the operand
+            // that doesn't fit it: the receiver, or the argument. A missing argument has no location of its own, so
+            // the error spans the whole call.
+            [
+                'foo:int.substr(0, 3)',
+                '=======             ',
+            ],
+            [
+                'x:int.contains(42)',
+                '=====             ',
+            ],
+            [
+                'foo:string.substr(0)',
+                '====================',
+            ],
+            [
+                'foo:string.substr(0, "3")',
+                '                     === ',
+            ],
+            [
+                'x:list<string>.some("foo")',
+                '                    =====  ',
+            ],
+            [
+                'x:string.foo()',
+                '         ===  ',
+            ],
         ];
         foreach ($cases as [$expression, $location]) {
             preg_match('/^(?<spaces> *)(?<underline>=+)/', $location, $matches);

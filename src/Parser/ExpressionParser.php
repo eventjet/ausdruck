@@ -13,9 +13,7 @@ use Eventjet\Ausdruck\ListLiteral;
 use Eventjet\Ausdruck\StructLiteral;
 use Eventjet\Ausdruck\Type;
 
-use function array_shift;
 use function assert;
-use function count;
 use function is_float;
 use function is_int;
 use function is_string;
@@ -372,92 +370,64 @@ final class ExpressionParser
      */
     private function call(string $name, Span $nameLocation, Expression $target): Call
     {
-        $fnType = $this->declarations->functions[$name] ?? null;
-        $colonOrOpenParen = $this->tokens->peek();
-        assert($colonOrOpenParen !== null);
-        if ($colonOrOpenParen->token === Token::Colon) {
-            $this->tokens->next();
-            $typeNode = TypeParser::parse($this->tokens);
-            if ($typeNode === null) {
-                throw SyntaxError::create('Expected type after colon', $this->nextSpan());
-            }
-            if ($typeNode instanceof ParsedToken) {
-                throw SyntaxError::create(
-                    sprintf('Expected type after colon, got %s', Token::print($typeNode->token)),
-                    $typeNode->location(),
-                );
-            }
-            $returnType = $this->declarations->types->resolve($typeNode);
-            if ($returnType instanceof TypeError) {
-                throw $returnType;
-            }
-            if ($fnType !== null && !$returnType->isSubtypeOf($fnType->args[0])) {
-                throw TypeError::create(
-                    sprintf(
-                        'Inline return type %s of function %s does not match declared return type %s',
-                        $returnType,
-                        $name,
-                        $fnType->returnType(),
-                    ),
-                    $typeNode->location,
-                );
-            }
-        } else {
-            if ($fnType === null) {
-                throw TypeError::create(
-                    sprintf('Function %s is not declared and has no inline type', $name),
-                    $nameLocation,
-                );
-            }
-            $returnType = $fnType->args[0];
-        }
-        if ($fnType !== null) {
-            $targetType = $fnType->args[1] ?? null;
-            if ($targetType === null) {
-                throw new TypeError(
-                    sprintf('%s can\'t be used as a receiver function because it doesn\'t accept any arguments', $name),
-                );
-            }
-            if (!$target->isSubtypeOf($targetType)) {
-                throw new TypeError(
-                    sprintf(
-                        '%s must be called on an expression of type %s, but %s is of type %s',
-                        $name,
-                        $targetType,
-                        $target,
-                        $target->getType(),
-                    ),
-                );
-            }
-        }
+        $signature = $this->declarations->functions[$name] ?? null;
+        $returnType = $this->returnType($name, $nameLocation, $signature);
         $this->expect(Token::OpenParen);
         $args = $this->parseCommaSeparated(Token::CloseParen, $this->parseExpression(...));
         $closeParen = $this->expect(Token::CloseParen);
-        if ($fnType !== null) {
-            $parameterTypes = $fnType->args;
-            array_shift($parameterTypes); // Remove return type
-            array_shift($parameterTypes); // Remove receiver type
-            foreach ($parameterTypes as $index => $parameterType) {
-                $argument = $args[$index] ?? null;
-                if ($argument === null) {
-                    throw new TypeError(
-                        sprintf('%s expects %d arguments, got %d', $name, count($parameterTypes), count($args)),
-                    );
-                }
-                if (!$argument->isSubtypeOf($parameterType)) {
-                    throw new TypeError(
-                        sprintf(
-                            'Argument %d of %s must be of type %s, got %s',
-                            $index + 1,
-                            $name,
-                            $parameterType,
-                            $argument->getType(),
-                        ),
-                    );
-                }
-            }
+        return Expr::call(
+            $target,
+            $name,
+            $returnType,
+            $args,
+            $signature,
+            $target->location()->to($closeParen->location()),
+        );
+    }
+
+    /**
+     * foo:string.substr:string(0, 3)
+     *                  ======
+     *
+     * A call returns what its inline annotation says, and what the declaration says if it has no annotation. At least
+     * one of the two has to be there, and where both are, the annotation has to fit the declaration. Those are the same
+     * rules a variable's type follows; see {@see self::variable()}.
+     */
+    private function returnType(string $name, Span $nameLocation, Type|null $signature): Type
+    {
+        if ($this->nextToken() !== Token::Colon) {
+            return $signature?->returnType() ?? throw TypeError::create(
+                sprintf('Function %s is not declared and has no inline type', $name),
+                $nameLocation,
+            );
         }
-        return $target->call($name, $returnType, $args, $target->location()->to($closeParen->location()));
+        $this->expect(Token::Colon);
+        $typeNode = TypeParser::parse($this->tokens);
+        if ($typeNode === null) {
+            throw SyntaxError::create('Expected type after colon', $this->nextSpan());
+        }
+        if ($typeNode instanceof ParsedToken) {
+            throw SyntaxError::create(
+                sprintf('Expected type after colon, got %s', Token::print($typeNode->token)),
+                $typeNode->location(),
+            );
+        }
+        $returnType = $this->declarations->types->resolve($typeNode);
+        if ($returnType instanceof TypeError) {
+            throw $returnType;
+        }
+        if ($signature !== null && !$returnType->isSubtypeOf($signature->returnType())) {
+            throw TypeError::create(
+                sprintf(
+                    'Inline return type %s of function %s does not match declared return type %s',
+                    $returnType,
+                    $name,
+                    $signature->returnType(),
+                ),
+                $typeNode->location,
+            );
+        }
+        return $returnType;
     }
 
     /**

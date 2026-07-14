@@ -8,16 +8,22 @@ use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeHint;
 
+use function array_slice;
+use function count;
 use function sprintf;
 
 /**
  * The only place expression nodes are constructed, and therefore the only place their operand types are checked. Both
  * the parser and the builder API on {@see Expression} go through here, so an expression that exists is an expression
- * that type-checks. Anything that reads a value from a {@see Scope} ({@see Get}, {@see Call}) asserts that value
- * against its declared type, so the guarantee survives evaluation too.
+ * whose operands type-check. Anything that reads a value from a {@see Scope} ({@see Get}, {@see Call}) asserts that
+ * value against its declared type, so the guarantee survives evaluation too.
  *
  * The nodes therefore don't re-check their operands when they evaluate. They only narrow the mixed they get back from
  * their sub-expressions, via {@see Operand}, to the type PHP needs to apply the operator.
+ *
+ * The one operand we can't always check is a call's receiver and arguments: that needs the function's signature, and
+ * only a *declared* function has one. {@see self::call()} therefore takes the signature it should check against, and
+ * null means there is nothing to check against, not that the check was skipped. See its docblock.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -76,11 +82,29 @@ final class Expr
     }
 
     /**
+     * @param Type $returnType What the call evaluates to: the inline return type if it was annotated, the declared one
+     *     otherwise. {@see Call::evaluate()} asserts the function's actual return value against it.
      * @param list<Expression> $arguments
+     * @param Type|null $signature The declared type of the function, or null if it has no declaration. Only a
+     *     declaration says which receiver and arguments a function accepts, so a call to an undeclared function has
+     *     nothing to check its operands against. That's the case for functions that are used with nothing but an
+     *     inline return type, and for every call built through {@see Expression::call()}, which has no declarations to
+     *     consult.
      */
-    public static function call(Expression $target, string $name, Type $type, array $arguments, Span|null $location = null): Call
-    {
-        return new Call($target, $name, $type, $arguments, $location ?? self::dummySpan());
+    public static function call(
+        Expression $target,
+        string $name,
+        Type $returnType,
+        array $arguments,
+        Type|null $signature,
+        Span|null $location = null,
+    ): Call {
+        $location ??= self::dummySpan();
+        if ($signature !== null) {
+            self::checkReceiver($target, $name, $signature);
+            self::checkArguments($arguments, $name, $signature, $location);
+        }
+        return new Call($target, $name, $returnType, $arguments, $location);
     }
 
     public static function or_(Expression $left, Expression $right): Or_
@@ -163,6 +187,68 @@ final class Expr
             throw TypeError::create(sprintf('Unknown field "%s" on type %s', $field, $structType), $location);
         }
         return new FieldAccess($struct, $field, $fieldType, $location);
+    }
+
+    /**
+     * A receiver function takes the expression it's called on as its first argument: `substr` is declared as
+     * func(string, [string, int, int]) and called as `foo:string.substr:string(0, 3)`, so `foo` has to be a string.
+     */
+    private static function checkReceiver(Expression $target, string $name, Type $signature): void
+    {
+        $receiverType = $signature->args[1] ?? null;
+        if ($receiverType === null) {
+            throw TypeError::create(
+                sprintf('%s can\'t be used as a receiver function because it doesn\'t accept any arguments', $name),
+                $target->location(),
+            );
+        }
+        if ($target->isSubtypeOf($receiverType)) {
+            return;
+        }
+        throw TypeError::create(
+            sprintf(
+                '%s must be called on an expression of type %s, but %s is of type %s',
+                $name,
+                $receiverType,
+                $target,
+                $target->getType(),
+            ),
+            $target->location(),
+        );
+    }
+
+    /**
+     * @param list<Expression> $arguments
+     * @param Span $location The location of the whole call, which is the best we can do to point at an argument that
+     *     isn't there.
+     */
+    private static function checkArguments(array $arguments, string $name, Type $signature, Span $location): void
+    {
+        // What's left after dropping the return type and the receiver type are the parameters that are passed in
+        // parentheses.
+        $parameterTypes = array_slice($signature->args, 2);
+        foreach ($parameterTypes as $index => $parameterType) {
+            $argument = $arguments[$index] ?? null;
+            if ($argument === null) {
+                throw TypeError::create(
+                    sprintf('%s expects %d arguments, got %d', $name, count($parameterTypes), count($arguments)),
+                    $location,
+                );
+            }
+            if ($argument->isSubtypeOf($parameterType)) {
+                continue;
+            }
+            throw TypeError::create(
+                sprintf(
+                    'Argument %d of %s must be of type %s, got %s',
+                    $index + 1,
+                    $name,
+                    $parameterType,
+                    $argument->getType(),
+                ),
+                $argument->location(),
+            );
+        }
     }
 
     /**
