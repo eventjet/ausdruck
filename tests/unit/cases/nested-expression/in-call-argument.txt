@@ -1,0 +1,10 @@
+xs:list<bool>.contains:bool(o:{ n: string }.n === s:string.substr:string(0, 1) || b:bool)
+-- Input --
+{
+  xs: [true],
+  o: {n: "a"},
+  s: "xyz",
+  b: true,
+}
+-- Output --
+true
