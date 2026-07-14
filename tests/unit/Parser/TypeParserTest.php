@@ -91,6 +91,19 @@ final class TypeParserTest extends TestCase
             '{name: string age: int}',
             'Expected }, got age',
         ];
+        // A type string is a whole type, so anything after the first complete one is an error rather than ignored.
+        yield 'Trailing identifier' => [
+            'int foo',
+            'Unexpected identifier foo',
+        ];
+        yield 'Trailing identifier after a generic type' => [
+            'list<int> bar',
+            'Unexpected identifier bar',
+        ];
+        yield 'Trailing literal' => [
+            'string 42',
+            'Unexpected 42',
+        ];
     }
 
     /**

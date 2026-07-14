@@ -16,11 +16,17 @@ use function str_split;
  */
 final class TypeParser
 {
+    /**
+     * A whole string is a whole type: unlike {@see self::parse()}, which reads one type off a stream the expression
+     * parser keeps using afterwards, nothing here comes after the type, so a leftover token is an error rather than the
+     * caller's business.
+     */
     public static function parseString(string $str): TypeNode|SyntaxError
     {
         $chars = $str === '' ? [] : str_split($str);
+        $tokens = new Peekable(Tokenizer::tokenize($chars));
         try {
-            $node = self::parse(new Peekable(Tokenizer::tokenize($chars)));
+            $node = self::parse($tokens);
         } catch (SyntaxError $e) {
             return $e;
         }
@@ -29,6 +35,10 @@ final class TypeParser
         }
         if ($node === null) {
             return SyntaxError::create('Invalid type ""', Span::char(1, 1));
+        }
+        $trailing = $tokens->peek();
+        if ($trailing !== null) {
+            return SyntaxError::unexpectedToken($trailing);
         }
         return $node;
     }
