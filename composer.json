@@ -53,7 +53,7 @@
             "@phpunit",
             "@infection"
         ],
-        "check-deps": "wget -O crc.phar https://github.com/maglnet/ComposerRequireChecker/releases/latest/download/composer-require-checker.phar && php crc.phar check && rm crc.phar",
+        "check-deps": "composer-require-checker check",
         "cs-check": "php-cs-fixer fix --dry-run",
         "cs-fix": "php-cs-fixer fix",
         "infection": "infection -jmax",
