@@ -30,7 +30,6 @@ use function str_split;
  * it. Anywhere a full expression is expected—a lambda body, a call argument, a list item, a struct field value—call
  * {@see self::parseExpression()} rather than one of the levels, so that operators are allowed there too.
  *
- * @phpstan-type AnyToken Token | string | Literal<string | int | float>
  * @api
  */
 final class ExpressionParser
@@ -221,7 +220,8 @@ final class ExpressionParser
             return Expr::literal(false, $parsedToken->location());
         }
         if (is_string($token)) {
-            return $this->variable($token);
+            $this->tokens->next();
+            return $this->variable($token, $parsedToken->location());
         }
         if ($token instanceof Literal) {
             $this->tokens->next();
@@ -245,18 +245,19 @@ final class ExpressionParser
     /**
      * foo:MyClass.bar:string
      * ===========
+     *
+     * @param Span $start The location of the name, which {@see self::parsePrimary()} has already consumed.
      */
-    private function variable(string $name): Get
+    private function variable(string $name, Span $start): Get
     {
-        $start = $this->expect($name);
         $declaredType = $this->declarations->variables[$name] ?? null;
         if ($this->nextToken() !== Token::Colon) {
             if ($declaredType !== null) {
-                return Expr::get($name, new TypeHint($declaredType, false), $start->location());
+                return Expr::get($name, new TypeHint($declaredType, false), $start);
             }
             throw SyntaxError::create(
                 sprintf('Variable %s must either be declared or have an inline type', $name),
-                $start->location(),
+                $start,
             );
         }
         $this->expect(Token::Colon);
@@ -282,16 +283,13 @@ final class ExpressionParser
                     $declaredType,
                     $type,
                 ),
-                $start->location()->to($typeNode->location),
+                $start->to($typeNode->location),
             );
         }
-        return Expr::get($name, $type, $start->location()->to($typeNode->location));
+        return Expr::get($name, $type, $start->to($typeNode->location));
     }
 
-    /**
-     * @param AnyToken $expected
-     */
-    private function expect(Token|string|Literal $expected): ParsedToken
+    private function expect(Token $expected): ParsedToken
     {
         $actual = $this->tokens->peek();
         if ($actual === null) {
