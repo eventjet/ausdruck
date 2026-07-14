@@ -158,19 +158,33 @@ final class ExpressionParserTest extends TestCase
     public static function typeErrorExpressions(): iterable
     {
         yield 'map type with bool key type' => ['foo:map<bool, string>'];
-        yield 'or with string on the left' => ['foo:string || bar:bool'];
-        yield 'or with string on the right' => ['foo:bool || bar:string'];
+        yield 'or with string on the left' => [
+            'foo:string || bar:bool',
+            'The expression on the left side of || must be boolean, got string',
+        ];
+        yield 'or with string on the right' => [
+            'foo:bool || bar:string',
+            'The expression on the right side of || must be boolean, got string',
+        ];
+        yield 'and with string on the left' => [
+            'foo:string && bar:bool',
+            'The expression on the left side of && must be boolean, got string',
+        ];
+        yield 'and with string on the right' => [
+            'foo:bool && bar:string',
+            'The expression on the right side of && must be boolean, got string',
+        ];
         yield 'equals: different operand types' => ['foo:string === bar:int'];
         yield 'subtract int from float' => ['foo:float - bar:int', 'Can\'t subtract int from float'];
         yield 'subtract float from int' => ['foo:int - bar:float', 'Can\'t subtract float from int'];
         yield 'subtract string from string' => ['foo:string - bar:string', 'Can\'t subtract string from string'];
         yield 'subtract string from int' => ['foo:int - bar:string', 'Can\'t subtract string from int'];
         yield 'subtract int from string' => ['foo:string - bar:int', 'Can\'t subtract int from string'];
-        yield 'int > float' => ['foo:int > bar:float'];
-        yield 'float > int' => ['foo:float > bar:int'];
-        yield 'string > string' => ['foo:string > bar:string'];
-        yield 'string > int' => ['foo:string > bar:int'];
-        yield 'int > string' => ['foo:int > bar:string'];
+        yield 'int > float' => ['foo:int > bar:float', 'Can\'t compare int to float'];
+        yield 'float > int' => ['foo:float > bar:int', 'Can\'t compare float to int'];
+        yield 'string > string' => ['foo:string > bar:string', 'Can\'t compare string to string'];
+        yield 'string > int' => ['foo:string > bar:int', 'Can\'t compare string to int'];
+        yield 'int > string' => ['foo:int > bar:string', 'Can\'t compare string to int'];
         yield 'generic syntax on string' => ['foo:string<int>'];
         yield 'unknown variable type' => ['foo:notavalidtype'];
         yield 'map with no type arguments' => ['foo:map', 'The map type requires two arguments, none given'];
@@ -215,6 +229,15 @@ final class ExpressionParserTest extends TestCase
         yield 'too few function arguments' => [
             'foo:string.substr(0)',
             'substr expects 2 arguments, got 1',
+        ];
+        yield 'too many function arguments' => [
+            'foo:string.substr(0, 3, 9)',
+            'substr expects 2 arguments, got 3',
+        ];
+        yield 'arguments passed to a function that only takes a receiver' => [
+            'foo:string.myCustomFn(42)',
+            'myCustomFn expects 0 arguments, got 1',
+            new Declarations(functions: ['myCustomFn' => Type::func(Type::string(), [Type::string()])]),
         ];
         yield 'wrong argument type' => [
             'foo:string.substr(0, "3")',
@@ -373,9 +396,15 @@ final class ExpressionParserTest extends TestCase
     public static function typeErrorLocationCases(): iterable
     {
         $cases = [
+            // > and - enforce the same rule -- both operands numeric and of the same type -- so they blame the same
+            // operand for the same mistake. Compare the pair below with the '42 - "foo"' / '"foo" - 42' pair.
             [
                 '42 > "foo"',
                 '     =====',
+            ],
+            [
+                '"foo" > 42',
+                '=====     ',
             ],
             [
                 'x:list<string, int>',
@@ -432,6 +461,37 @@ final class ExpressionParserTest extends TestCase
             [
                 'foo:Option<string, int, bool>',
                 '                   ========= ',
+            ],
+            // Calls are checked against the function's declared signature, so their type errors point at the operand
+            // that doesn't fit it: the receiver, or the argument. A missing argument has no location of its own, so
+            // the error spans the whole call; one too many is right there to point at.
+            [
+                'foo:int.substr(0, 3)',
+                '=======             ',
+            ],
+            [
+                'x:int.contains(42)',
+                '=====             ',
+            ],
+            [
+                'foo:string.substr(0)',
+                '====================',
+            ],
+            [
+                'foo:string.substr(0, 3, 9)',
+                '                        = ',
+            ],
+            [
+                'foo:string.substr(0, "3")',
+                '                     === ',
+            ],
+            [
+                'x:list<string>.some("foo")',
+                '                    =====  ',
+            ],
+            [
+                'x:string.foo()',
+                '         ===  ',
             ],
         ];
         foreach ($cases as [$expression, $location]) {

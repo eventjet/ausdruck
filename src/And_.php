@@ -7,8 +7,6 @@ namespace Eventjet\Ausdruck;
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
 
-use function get_debug_type;
-use function is_bool;
 use function sprintf;
 
 /**
@@ -26,17 +24,13 @@ final class And_ extends Expression
         return sprintf('%s && %s', $this->left, $this->right);
     }
 
+    /**
+     * Short-circuits: the right operand is only evaluated if the left one is true.
+     */
     #[Override]
     public function evaluate(Scope $scope): bool
     {
-        $left = $this->left->evaluate($scope);
-        $right = $this->right->evaluate($scope);
-        if (!is_bool($left) || !is_bool($right)) {
-            throw new EvaluationError(
-                sprintf('Expected boolean operands, got %s and %s', get_debug_type($left), get_debug_type($right)),
-            );
-        }
-        return $left && $right;
+        return Operand::bool($this->left->evaluate($scope)) && Operand::bool($this->right->evaluate($scope));
     }
 
     #[Override]

@@ -56,8 +56,13 @@ final class ExpressionComparisonTest extends TestCase
             Expr::gt(Expr::literal(1), Expr::literal(2)),
         ];
         yield [
+            Expr::negative(Expr::get('a', Type::int())),
+            Expr::negative(Expr::get('a', Type::int())),
+        ];
+        // A negated number literal is a negative number literal, not a negation of a positive one.
+        yield [
             Expr::negative(Expr::literal(1)),
-            Expr::negative(Expr::literal(1)),
+            Expr::literal(-1),
         ];
         yield [
             Expr::listLiteral([Expr::literal(1), Expr::literal(2), Expr::literal(3)], Span::char(1, 1)),
@@ -191,27 +196,27 @@ final class ExpressionComparisonTest extends TestCase
             Expr::literal(1),
         ];
         yield Call::class . ': target is different' => [
-            Expr::call(Expr::literal(1), 'foo', Type::int(), []),
-            Expr::call(Expr::literal(2), 'foo', Type::int(), []),
+            Expr::literal(1)->call('foo', Type::int(), []),
+            Expr::literal(2)->call('foo', Type::int(), []),
         ];
         yield Call::class . ': name is different' => [
-            Expr::call(Expr::literal(1), 'foo', Type::int(), []),
-            Expr::call(Expr::literal(1), 'bar', Type::int(), []),
+            Expr::literal(1)->call('foo', Type::int(), []),
+            Expr::literal(1)->call('bar', Type::int(), []),
         ];
         yield Call::class . ': type is different' => [
-            Expr::call(Expr::literal(1), 'foo', Type::int(), []),
-            Expr::call(Expr::literal(1), 'foo', Type::string(), []),
+            Expr::literal(1)->call('foo', Type::int(), []),
+            Expr::literal(1)->call('foo', Type::string(), []),
         ];
         yield Call::class . ': different number of arguments' => [
-            Expr::call(Expr::literal(1), 'foo', Type::int(), []),
-            Expr::call(Expr::literal(1), 'foo', Type::int(), [Expr::literal(1)]),
+            Expr::literal(1)->call('foo', Type::int(), []),
+            Expr::literal(1)->call('foo', Type::int(), [Expr::literal(1)]),
         ];
         yield Call::class . ': argument is different' => [
-            Expr::call(Expr::literal(1), 'foo', Type::int(), [Expr::literal(1), Expr::literal(2), Expr::literal(3)]),
-            Expr::call(Expr::literal(1), 'foo', Type::int(), [Expr::literal(1), Expr::literal(9), Expr::literal(3)]),
+            Expr::literal(1)->call('foo', Type::int(), [Expr::literal(1), Expr::literal(2), Expr::literal(3)]),
+            Expr::literal(1)->call('foo', Type::int(), [Expr::literal(1), Expr::literal(9), Expr::literal(3)]),
         ];
         yield Call::class . ': different type' => [
-            Expr::call(Expr::literal(1), 'foo', Type::int(), []),
+            Expr::literal(1)->call('foo', Type::int(), []),
             Expr::literal(1),
         ];
         yield Gt::class . ': left is different' => [
@@ -231,12 +236,12 @@ final class ExpressionComparisonTest extends TestCase
             Expr::eq(Expr::literal(1), Expr::literal(2)),
         ];
         yield Negative::class . ': different type' => [
-            Expr::negative(Expr::literal(1)),
-            Expr::literal(1),
+            Expr::negative(Expr::get('a', Type::int())),
+            Expr::get('a', Type::int()),
         ];
         yield Negative::class . ': different expression' => [
-            Expr::negative(Expr::literal(1)),
-            Expr::negative(Expr::literal(2)),
+            Expr::negative(Expr::get('a', Type::int())),
+            Expr::negative(Expr::get('b', Type::int())),
         ];
         yield ListLiteral::class . ': different elements' => [
             Expr::listLiteral([Expr::literal(1), Expr::literal(2), Expr::literal(3)], Span::char(1, 1)),
@@ -257,7 +262,7 @@ final class ExpressionComparisonTest extends TestCase
         ];
         yield FieldAccess::class . ': different type' => [
             Expr::fieldAccess(Expr::get('person', $personType), 'name', self::location()),
-            Expr::call(Expr::get('person', $personType), 'name', Type::string(), []),
+            Expr::get('person', $personType)->call('name', Type::string(), []),
         ];
         yield StructLiteral::class . ': different type' => [
             new StructLiteral(['foo' => Expr::literal('bar')], self::location()),
