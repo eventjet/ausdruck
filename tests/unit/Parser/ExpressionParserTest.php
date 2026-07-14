@@ -28,6 +28,7 @@ final class ExpressionParserTest extends TestCase
     public static function parseCases(): iterable
     {
         $s = Type::string();
+        $b = Type::bool();
         $cases = [
             ['foo:string', Expr::get('foo', $s)],
             ['"my-literal"', Expr::literal('my-literal')],
@@ -62,6 +63,34 @@ final class ExpressionParserTest extends TestCase
             ],
             ['"💩"', Expr::literal('💩')],
             ['foo:map<string, int>', Expr::get('foo', Type::mapOf(Type::string(), Type::int()))],
+            [
+                'a:bool && b:bool || c:bool',
+                Expr::or_(
+                    Expr::and_(Expr::get('a', $b), Expr::get('b', $b)),
+                    Expr::get('c', $b),
+                ),
+            ],
+            [
+                'a:bool || b:bool && c:bool',
+                Expr::or_(
+                    Expr::get('a', $b),
+                    Expr::and_(Expr::get('b', $b), Expr::get('c', $b)),
+                ),
+            ],
+            [
+                'a:bool && b:bool && c:bool',
+                Expr::and_(
+                    Expr::and_(Expr::get('a', $b), Expr::get('b', $b)),
+                    Expr::get('c', $b),
+                ),
+            ],
+            [
+                'a:bool || b:bool || c:bool',
+                Expr::or_(
+                    Expr::or_(Expr::get('a', $b), Expr::get('b', $b)),
+                    Expr::get('c', $b),
+                ),
+            ],
         ];
         foreach ($cases as $case) {
             yield $case[0] => $case;
@@ -158,8 +187,22 @@ final class ExpressionParserTest extends TestCase
     public static function typeErrorExpressions(): iterable
     {
         yield 'map type with bool key type' => ['foo:map<bool, string>'];
-        yield 'or with string on the left' => ['foo:string || bar:bool'];
-        yield 'or with string on the right' => ['foo:bool || bar:string'];
+        yield 'or with string on the left' => [
+            'foo:string || bar:bool',
+            'The expression on the left side of || must be boolean, got string',
+        ];
+        yield 'or with string on the right' => [
+            'foo:bool || bar:string',
+            'The expression on the right side of || must be boolean, got string',
+        ];
+        yield 'and with string on the left' => [
+            'foo:string && bar:bool',
+            'The expression on the left side of && must be boolean, got string',
+        ];
+        yield 'and with string on the right' => [
+            'foo:bool && bar:string',
+            'The expression on the right side of && must be boolean, got string',
+        ];
         yield 'equals: different operand types' => ['foo:string === bar:int'];
         yield 'subtract int from float' => ['foo:float - bar:int', 'Can\'t subtract int from float'];
         yield 'subtract float from int' => ['foo:int - bar:float', 'Can\'t subtract float from int'];
@@ -396,6 +439,14 @@ final class ExpressionParserTest extends TestCase
             [
                 'a:bool || b:int',
                 '          =====',
+            ],
+            [
+                'a:bool && b:int || c:bool',
+                '          =====          ',
+            ],
+            [
+                'a:bool || b:bool && c:int',
+                '                    =====',
             ],
             [
                 '42 - "foo"',

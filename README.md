@@ -72,6 +72,19 @@ Both operands must be of the same type.
 
 Where's the rest? We're implementing more as we need them.
 
+#### Precedence
+
+Operators bind from tightest to loosest in this order:
+
+1. `-`
+2. `===`, `>`
+3. `&&`
+4. `||`
+
+`&&` and `||` are left-associative. As in most languages, `&&` binds tighter than `||`, so
+`a:bool && b:bool || c:bool` means `(a:bool && b:bool) || c:bool`. There are no grouping parentheses yet, so you
+can't override the precedence.
+
 ### Types
 
 The following types are supported:

@@ -1,0 +1,9 @@
+foo:string === "foo" && bar:int > 42 || baz:bool
+-- Input --
+{
+  foo: "foo",
+  bar: 23,
+  baz: false,
+}
+-- Output --
+false

@@ -87,27 +87,54 @@ final class ExpressionParser
         return Expr::fieldAccess($target, $name, $location);
     }
 
+    /**
+     * @param 'left' | 'right' $side
+     */
+    private static function assertBooleanOperand(Expression $expr, Token $operator, string $side): Expression
+    {
+        return self::assertExpressionType($expr, Type::bool(), sprintf(
+            'The expression on the %s side of %s must be boolean, got %s',
+            $side,
+            Token::print($operator),
+            $expr->getType(),
+        ));
+    }
+
     private function parseExpression(): Expression
     {
-        /** @var Expression | null $expr */
-        $expr = null;
-        while (true) {
-            $newExpr = $this->parseLazy($expr);
-            if ($newExpr === null) {
-                break;
-            }
-            $expr = $newExpr;
+        return $this->parseOr();
+    }
+
+    /**
+     * a:bool && b:bool || c:bool
+     * ==========================
+     */
+    private function parseOr(): Expression
+    {
+        $left = $this->parseAnd();
+        while ($this->tokens->peek()?->token === Token::Or) {
+            $this->tokens->next();
+            $left = self::assertBooleanOperand($left, Token::Or, 'left');
+            $right = self::assertBooleanOperand($this->parseAnd(), Token::Or, 'right');
+            $left = $left->or_($right);
         }
-        if ($expr === null) {
-            $token = $this->tokens->peek()?->token;
-            throw SyntaxError::create(
-                $token === null
-                    ? 'Expected expression, got end of input'
-                    : sprintf('Expected expression, got %s', Token::print($token)),
-                $this->nextSpan(),
-            );
+        return $left;
+    }
+
+    /**
+     * a:bool && b:bool || c:bool
+     * ================
+     */
+    private function parseAnd(): Expression
+    {
+        $left = $this->parseExpressionUntilLogical();
+        while ($this->tokens->peek()?->token === Token::And) {
+            $this->tokens->next();
+            $left = self::assertBooleanOperand($left, Token::And, 'left');
+            $right = self::assertBooleanOperand($this->parseExpressionUntilLogical(), Token::And, 'right');
+            $left = $left->and_($right);
         }
-        return $expr;
+        return $left;
     }
 
     private function parseExpressionUntilLogical(): Expression
@@ -116,7 +143,7 @@ final class ExpressionParser
         $expr = null;
         while (true) {
             $peek = $this->tokens->peek();
-            if ($peek !== null && in_array($peek->token, [Token::Or, Token::And], true) && $expr !== null) {
+            if ($peek !== null && in_array($peek->token, [Token::Or, Token::And], true)) {
                 break;
             }
             $newExpr = $this->parseLazy($expr);
@@ -183,24 +210,6 @@ final class ExpressionParser
                 $right->getType(),
             ));
             return $left->eq($right);
-        }
-        if (in_array($token, [Token::Or, Token::And], true)) {
-            $this->tokens->next();
-            if ($left === null) {
-                self::unexpectedToken($parsedToken);
-            }
-            $left = self::assertExpressionType($left, Type::bool(), sprintf(
-                'The expression on the left side of %s must be boolean, got %s',
-                Token::print($token),
-                $left->getType(),
-            ));
-            $right = $this->parseExpression();
-            $right = self::assertExpressionType($right, Type::bool(), sprintf(
-                'The expression on the right side of %s must be boolean, got %s',
-                Token::print($token),
-                $right->getType(),
-            ));
-            return $token === Token::Or ? $left->or_($right) : $left->and_($right);
         }
         if ($token === Token::Pipe) {
             return $this->lambda();
