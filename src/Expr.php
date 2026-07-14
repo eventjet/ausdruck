@@ -132,7 +132,7 @@ final class Expr
         // Both operands must be numbers of the same type. Either way the message is the same; only the operand we blame
         // for it differs.
         $culprit = match (true) {
-            !$subtrahend->getType()->isNumeric() => $subtrahend,
+            !self::isNumeric($subtrahend) => $subtrahend,
             !$minuend->matchesType($subtrahend->getType()) => $minuend,
             default => null,
         };
@@ -147,7 +147,7 @@ final class Expr
 
     public static function gt(Expression $left, Expression $right): Gt
     {
-        if (!$right->getType()->isNumeric()) {
+        if (!self::isNumeric($right)) {
             throw TypeError::create(
                 sprintf('Can\'t compare %s to %s', $right->getType(), $left->getType()),
                 $right->location(),
@@ -164,7 +164,7 @@ final class Expr
 
     public static function negative(Expression $expression, Span|null $location = null): Negative
     {
-        if (!$expression->getType()->isNumeric()) {
+        if (!self::isNumeric($expression)) {
             throw TypeError::create(
                 sprintf('Can\'t negate %s', $expression->getType()),
                 $expression->location(),
@@ -187,6 +187,16 @@ final class Expr
             throw TypeError::create(sprintf('Unknown field "%s" on type %s', $field, $structType), $location);
         }
         return new FieldAccess($struct, $field, $fieldType, $location);
+    }
+
+    /**
+     * int and float are the only types the arithmetic and ordering operators accept. Note that this has nothing to do
+     * with PHP's is_numeric(): a numeric string is a string.
+     */
+    private static function isNumeric(Expression $expr): bool
+    {
+        $type = $expr->getType();
+        return $type->equals(Type::int()) || $type->equals(Type::float());
     }
 
     /**

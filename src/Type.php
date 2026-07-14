@@ -290,14 +290,6 @@ final class Type implements Stringable
         return $this->canonical()->name === 'Struct';
     }
 
-    /**
-     * The types the arithmetic and ordering operators accept.
-     */
-    public function isNumeric(): bool
-    {
-        return $this->equals(self::int()) || $this->equals(self::float());
-    }
-
     public function getFieldType(string $name): self|null
     {
         return $this->canonical()->fields[$name] ?? null;
