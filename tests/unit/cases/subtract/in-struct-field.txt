@@ -1,0 +1,8 @@
+{total: a:int - b:int}
+-- Input --
+{
+  a: 10,
+  b: 4,
+}
+-- Output --
+{total: 6}

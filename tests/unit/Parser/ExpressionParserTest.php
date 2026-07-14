@@ -28,6 +28,8 @@ final class ExpressionParserTest extends TestCase
     public static function parseCases(): iterable
     {
         $s = Type::string();
+        $b = Type::bool();
+        $i = Type::int();
         $cases = [
             ['foo:string', Expr::get('foo', $s)],
             ['"my-literal"', Expr::literal('my-literal')],
@@ -62,6 +64,80 @@ final class ExpressionParserTest extends TestCase
             ],
             ['"💩"', Expr::literal('💩')],
             ['foo:map<string, int>', Expr::get('foo', Type::mapOf(Type::string(), Type::int()))],
+            [
+                'a:bool && b:bool || c:bool',
+                Expr::or_(
+                    Expr::and_(Expr::get('a', $b), Expr::get('b', $b)),
+                    Expr::get('c', $b),
+                ),
+            ],
+            [
+                'a:bool || b:bool && c:bool',
+                Expr::or_(
+                    Expr::get('a', $b),
+                    Expr::and_(Expr::get('b', $b), Expr::get('c', $b)),
+                ),
+            ],
+            [
+                'a:bool && b:bool && c:bool',
+                Expr::and_(
+                    Expr::and_(Expr::get('a', $b), Expr::get('b', $b)),
+                    Expr::get('c', $b),
+                ),
+            ],
+            [
+                'a:bool || b:bool || c:bool',
+                Expr::or_(
+                    Expr::or_(Expr::get('a', $b), Expr::get('b', $b)),
+                    Expr::get('c', $b),
+                ),
+            ],
+            // Each level of the cascade binds tighter than the one above it. Evaluating an expression can only ever
+            // half-prove that: && and || are monotone, so a wrong grouping of `a && b || c` can return the wrong value
+            // for operands that make it true, but never for operands that make it false. The grouping itself is what
+            // has to be pinned, so every adjacent pair of levels is checked here rather than by example.
+            [
+                'a:int - b:int > c:int && d:bool',
+                Expr::and_(
+                    Expr::gt(
+                        Expr::subtract(Expr::get('a', $i), Expr::get('b', $i)),
+                        Expr::get('c', $i),
+                    ),
+                    Expr::get('d', $b),
+                ),
+            ],
+            [
+                'a:int === b:int - c:int || d:bool',
+                Expr::or_(
+                    Expr::eq(
+                        Expr::get('a', $i),
+                        Expr::subtract(Expr::get('b', $i), Expr::get('c', $i)),
+                    ),
+                    Expr::get('d', $b),
+                ),
+            ],
+            // Unary binds tighter than additive, so this subtracts a negation rather than negating a subtraction.
+            [
+                'a:int - -b:int',
+                Expr::subtract(Expr::get('a', $i), Expr::negative(Expr::get('b', $i))),
+            ],
+            // Operators are allowed wherever an expression is expected, not just at the top level.
+            [
+                '[1 - 2]',
+                Expr::listLiteral([Expr::subtract(Expr::literal(1), Expr::literal(2))], Span::char(1, 1)),
+            ],
+            [
+                '{a: 1 - 2}',
+                Expr::structLiteral(['a' => Expr::subtract(Expr::literal(1), Expr::literal(2))], Span::char(1, 1)),
+            ],
+            [
+                '"abcdef".substr:string(5 - 3, 2)',
+                Expr::literal('abcdef')->call(
+                    'substr',
+                    $s,
+                    [Expr::subtract(Expr::literal(5), Expr::literal(3)), Expr::literal(2)],
+                ),
+            ],
         ];
         foreach ($cases as $case) {
             yield $case[0] => $case;
@@ -83,6 +159,16 @@ final class ExpressionParserTest extends TestCase
             ['foo:int-2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
             ['foo:int -2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
             ['foo:int- 2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
+            // Trailing commas are allowed in argument and list literal element lists.
+            [
+                'foo:string.substr:string(0, 3,)',
+                Expr::get('foo', Type::string())->call(
+                    'substr',
+                    Type::string(),
+                    [Expr::literal(0), Expr::literal(3)],
+                ),
+            ],
+            ['[1, 2,]', Expr::listLiteral([Expr::literal(1), Expr::literal(2)], Span::char(1, 1))],
             [
                 // Newline after variable type
                 '
@@ -90,6 +176,15 @@ final class ExpressionParserTest extends TestCase
                 ',
                 Expr::get('foo', Type::string()),
             ],
+            // A negated literal is a literal like any other, so the levels below unary still apply to it: postfix binds
+            // tighter than the minus, exactly as it does for -foo:int.abs:int().
+            [
+                '-2 .abs:int()',
+                Expr::negative(Expr::literal(2)->call('abs', Type::int(), [])),
+            ],
+            // Negating a number literal folds into a negative literal, so the fold survives being nested.
+            ['[-2]', Expr::listLiteral([Expr::literal(-2)], Span::char(1, 1))],
+            ['- -1', Expr::literal(1)],
         ];
         foreach ($cases as $case) {
             yield $case[0] => $case;
@@ -154,6 +249,13 @@ final class ExpressionParserTest extends TestCase
         yield 'non-token, non-identifier symbol' => ['foo:bool € bar:bool'];
         yield 'identifier starting with a number' => ['42foo:bool', 'Unexpected identifier foo'];
         yield 'identifier starting with an underscore' => ['_foo:bool', 'Unexpected character _'];
+        // === and > are non-associative, so a chain of them is a syntax error rather than a confusing type error.
+        yield 'chained ===' => ['a:int === b:int === c:int', 'Unexpected ==='];
+        yield 'chained >' => ['a:int > b:int > c:int', 'Unexpected >'];
+        yield 'trailing literal' => ['1 2', 'Unexpected 2'];
+        yield 'trailing operator' => ['a:int -', 'Expected expression, got end of input'];
+        yield 'missing comma between list items' => ['[1 2]', 'Expected ], got 2'];
+        yield 'missing comma between function arguments' => ['foo:string.substr(0 3)', 'Expected ), got 3'];
     }
 
     /**
@@ -429,6 +531,14 @@ final class ExpressionParserTest extends TestCase
             [
                 'a:bool || b:int',
                 '          =====',
+            ],
+            [
+                'a:bool && b:int || c:bool',
+                '          =====          ',
+            ],
+            [
+                'a:bool || b:bool && c:int',
+                '                    =====',
             ],
             [
                 '42 - "foo"',
