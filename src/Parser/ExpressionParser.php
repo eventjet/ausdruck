@@ -13,9 +13,7 @@ use Eventjet\Ausdruck\ListLiteral;
 use Eventjet\Ausdruck\StructLiteral;
 use Eventjet\Ausdruck\Type;
 
-use function array_shift;
 use function assert;
-use function count;
 use function in_array;
 use function is_string;
 use function sprintf;
@@ -55,36 +53,18 @@ final class ExpressionParser
     public static function parseTyped(string $expression, Type $type, Declarations|Types|null $types = null): Expression
     {
         $expr = self::parse($expression, $types);
-        return self::assertExpressionType($expr, $type, sprintf(
-            'Expected parsed expression to be of type %s, got %s',
-            $type,
-            $expr->getType(),
-        ));
-    }
-
-    private static function assertExpressionType(Expression $expr, Type $type, string $errorMessage): Expression
-    {
         if ($expr->matchesType($type)) {
             return $expr;
         }
-        throw TypeError::create($errorMessage, $expr->location());
+        throw TypeError::create(
+            sprintf('Expected parsed expression to be of type %s, got %s', $type, $expr->getType()),
+            $expr->location(),
+        );
     }
 
     private static function unexpectedToken(ParsedToken $token): never
     {
         throw SyntaxError::create(sprintf('Unexpected %s', Token::print($token->token)), $token->location());
-    }
-
-    private static function fieldAccess(Expression $target, string $name, Span $location): FieldAccess
-    {
-        $targetType = $target->getType();
-        if (!$targetType->isStruct()) {
-            throw TypeError::create(sprintf('Can\'t access field "%s" on non-struct type %s', $name, $targetType), $location);
-        }
-        if ($targetType->getFieldType($name) === null) {
-            throw TypeError::create(sprintf('Unknown field "%s" on type %s', $name, $targetType), $location);
-        }
-        return Expr::fieldAccess($target, $name, $location);
     }
 
     private function parseExpression(): Expression
@@ -176,30 +156,14 @@ final class ExpressionParser
             if ($left === null) {
                 self::unexpectedToken($parsedToken);
             }
-            $right = $this->parseExpressionUntilLogical();
-            $right = self::assertExpressionType($right, $left->getType(), sprintf(
-                'The expressions of both sides of === must be of the same type. Left: %s, right: %s',
-                $left->getType(),
-                $right->getType(),
-            ));
-            return $left->eq($right);
+            return $left->eq($this->parseExpressionUntilLogical());
         }
         if (in_array($token, [Token::Or, Token::And], true)) {
             $this->tokens->next();
             if ($left === null) {
                 self::unexpectedToken($parsedToken);
             }
-            $left = self::assertExpressionType($left, Type::bool(), sprintf(
-                'The expression on the left side of %s must be boolean, got %s',
-                Token::print($token),
-                $left->getType(),
-            ));
             $right = $this->parseExpression();
-            $right = self::assertExpressionType($right, Type::bool(), sprintf(
-                'The expression on the right side of %s must be boolean, got %s',
-                Token::print($token),
-                $right->getType(),
-            ));
             return $token === Token::Or ? $left->or_($right) : $left->and_($right);
         }
         if ($token === Token::Pipe) {
@@ -211,38 +175,16 @@ final class ExpressionParser
             if ($right === null) {
                 throw SyntaxError::create('Unexpected end of input', Span::char($parsedToken->line, $parsedToken->column + 1));
             }
-            if (!$right->matchesType(Type::int()) && !$right->matchesType(Type::float())) {
-                throw TypeError::create(
-                    $left === null
-                        ? sprintf('Can\'t negate %s', $right->getType())
-                        : sprintf('Can\'t subtract %s from %s', $right->getType(), $left->getType()),
-                    $right->location(),
-                );
-            }
-            if ($left === null) {
-                return Expr::negative($right, $parsedToken->location()->to($right->location()));
-            }
-            if (!$left->getType()->equals($right->getType())) {
-                throw TypeError::create(
-                    sprintf('Can\'t subtract %s from %s', $right->getType(), $left->getType()),
-                    $left->location(),
-                );
-            }
-            return $left->subtract($right);
+            return $left === null
+                ? Expr::negative($right, $parsedToken->location()->to($right->location()))
+                : $left->subtract($right);
         }
         if ($token === Token::CloseAngle) {
             if ($left === null) {
                 self::unexpectedToken($parsedToken);
             }
             $this->tokens->next();
-            $right = $this->parseExpressionUntilLogical();
-            if (!$right->matchesType(Type::int()) && !$right->matchesType(Type::float())) {
-                throw TypeError::create(sprintf('Can\'t compare %s to %s', $right->getType(), $left->getType()), $right->location());
-            }
-            if (!$left->matchesType($right->getType())) {
-                throw TypeError::create(sprintf('Can\'t compare %s to %s', $left->getType(), $right->getType()), $left->location()->to($right->location()));
-            }
-            return $left->gt($right);
+            return $left->gt($this->parseExpressionUntilLogical());
         }
         if ($token === Token::OpenBracket) {
             return $this->parseListLiteral();
@@ -416,7 +358,7 @@ final class ExpressionParser
         $token = $this->tokens->peek()?->token;
         return match ($token) {
             Token::Colon, Token::OpenParen => $this->call($name, $nameLocation, $target),
-            default => self::fieldAccess($target, $name, $target->location()->to($nameLocation)),
+            default => Expr::fieldAccess($target, $name, $target->location()->to($nameLocation)),
         };
     }
 
@@ -426,92 +368,51 @@ final class ExpressionParser
      */
     private function call(string $name, Span $nameLocation, Expression $target): Call
     {
-        $fnType = $this->declarations->functions[$name] ?? null;
-        $colonOrOpenParen = $this->tokens->peek();
-        assert($colonOrOpenParen !== null);
-        if ($colonOrOpenParen->token === Token::Colon) {
-            $this->tokens->next();
-            $typeNode = TypeParser::parse($this->tokens);
-            if ($typeNode === null) {
-                throw SyntaxError::create('Expected type after colon', $this->nextSpan());
-            }
-            if ($typeNode instanceof ParsedToken) {
-                throw SyntaxError::create(
-                    sprintf('Expected type after colon, got %s', Token::print($typeNode->token)),
-                    $typeNode->location(),
-                );
-            }
-            $returnType = $this->declarations->types->resolve($typeNode);
-            if ($returnType instanceof TypeError) {
-                throw $returnType;
-            }
-            if ($fnType !== null && !$returnType->isSubtypeOf($fnType->args[0])) {
-                throw TypeError::create(
-                    sprintf(
-                        'Inline return type %s of function %s does not match declared return type %s',
-                        $returnType,
-                        $name,
-                        $fnType->returnType(),
-                    ),
-                    $typeNode->location,
-                );
-            }
-        } else {
-            if ($fnType === null) {
-                throw TypeError::create(
-                    sprintf('Function %s is not declared and has no inline type', $name),
-                    $nameLocation,
-                );
-            }
-            $returnType = $fnType->args[0];
-        }
-        if ($fnType !== null) {
-            $targetType = $fnType->args[1] ?? null;
-            if ($targetType === null) {
-                throw new TypeError(
-                    sprintf('%s can\'t be used as a receiver function because it doesn\'t accept any arguments', $name),
-                );
-            }
-            if (!$target->isSubtypeOf($targetType)) {
-                throw new TypeError(
-                    sprintf(
-                        '%s must be called on an expression of type %s, but %s is of type %s',
-                        $name,
-                        $targetType,
-                        $target,
-                        $target->getType(),
-                    ),
-                );
-            }
-        }
+        $signature = $this->declarations->functions[$name] ?? null;
+        $returnType = $this->returnType();
         $this->expect(Token::OpenParen);
         $args = $this->parseArgs();
         $closeParen = $this->expect(Token::CloseParen);
-        if ($fnType !== null) {
-            $parameterTypes = $fnType->args;
-            array_shift($parameterTypes); // Remove return type
-            array_shift($parameterTypes); // Remove receiver type
-            foreach ($parameterTypes as $index => $parameterType) {
-                $argument = $args[$index] ?? null;
-                if ($argument === null) {
-                    throw new TypeError(
-                        sprintf('%s expects %d arguments, got %d', $name, count($parameterTypes), count($args)),
-                    );
-                }
-                if (!$argument->isSubtypeOf($parameterType)) {
-                    throw new TypeError(
-                        sprintf(
-                            'Argument %d of %s must be of type %s, got %s',
-                            $index + 1,
-                            $name,
-                            $parameterType,
-                            $argument->getType(),
-                        ),
-                    );
-                }
-            }
+        return Expr::call(
+            $target,
+            $name,
+            $returnType,
+            $args,
+            $signature,
+            $nameLocation,
+            $target->location()->to($closeParen->location()),
+        );
+    }
+
+    /**
+     * foo:string.substr:string(0, 3)
+     *                  ======
+     *
+     * Only whether the call site spells a return type out, and which one. Whether it's allowed to leave it out, and
+     * whether the one it spells out fits the function's declaration, is {@see Expr::call()}'s business: those rules hold
+     * for a call however it was built, and a call built through {@see Expression::call()} never comes past here.
+     */
+    private function returnType(): TypeAnnotation|null
+    {
+        if ($this->tokens->peek()?->token !== Token::Colon) {
+            return null;
         }
-        return $target->call($name, $returnType, $args, $target->location()->to($closeParen->location()));
+        $this->expect(Token::Colon);
+        $typeNode = TypeParser::parse($this->tokens);
+        if ($typeNode === null) {
+            throw SyntaxError::create('Expected type after colon', $this->nextSpan());
+        }
+        if ($typeNode instanceof ParsedToken) {
+            throw SyntaxError::create(
+                sprintf('Expected type after colon, got %s', Token::print($typeNode->token)),
+                $typeNode->location(),
+            );
+        }
+        $returnType = $this->declarations->types->resolve($typeNode);
+        if ($returnType instanceof TypeError) {
+            throw $returnType;
+        }
+        return new TypeAnnotation($returnType, $typeNode->location);
     }
 
     /**

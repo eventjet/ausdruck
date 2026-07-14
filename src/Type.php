@@ -81,7 +81,13 @@ final class Type implements Stringable
     }
 
     /**
-     * @param list<Type> $parameters
+     * A function type keeps its return type and its parameters in one list of args: args[0] is the return type, and
+     * everything after it is a parameter. Only returnType() and parameterTypes() know that layout, and everything else,
+     * in this class and outside it, goes through them.
+     *
+     * @param list<Type> $parameters The types the PHP callable receives, in order. A function that is called as a
+     *     receiver function -- `foo:string.substr:string(0, 3)` -- receives the expression it's called on as the first
+     *     of them; see receiverType() and argumentTypes().
      */
     public static function func(self $return, array $parameters = []): self
     {
@@ -285,6 +291,30 @@ final class Type implements Stringable
         return $this->args[0];
     }
 
+    /**
+     * The type a receiver function is called on: `substr` is declared as func(string, [string, int, int]) and called as
+     * `foo:string.substr:string(0, 3)`, so its receiver type is string. Null if the function declares no parameters at
+     * all, which is what makes it unusable as a receiver function.
+     *
+     * This should only be called on function types. The behavior is undefined for other types.
+     */
+    public function receiverType(): self|null
+    {
+        return $this->parameterTypes()[0] ?? null;
+    }
+
+    /**
+     * The types of the arguments a call passes in parentheses, which are the parameters the receiver doesn't take up.
+     *
+     * This should only be called on function types. The behavior is undefined for other types.
+     *
+     * @return list<self>
+     */
+    public function argumentTypes(): array
+    {
+        return array_slice($this->parameterTypes(), 1);
+    }
+
     public function isStruct(): bool
     {
         return $this->canonical()->name === 'Struct';
@@ -296,6 +326,10 @@ final class Type implements Stringable
     }
 
     /**
+     * Every parameter of a function type, receiver included, in the order the PHP callable receives them. Two function
+     * types are compared parameter by parameter, so this is the list that matters for subtyping; the split into a
+     * receiver and the arguments only matters at a call site.
+     *
      * @return list<self>
      */
     private function parameterTypes(): array

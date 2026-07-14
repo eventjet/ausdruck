@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Eventjet\Ausdruck\Parser\TypeAnnotation;
 use Stringable;
 
 /**
@@ -38,11 +39,24 @@ abstract class Expression implements Stringable
     }
 
     /**
+     * Unlike the other builders, this one can't check its operands: there are no declarations here to look the
+     * function's signature up in, so there is nothing to check the receiver and the arguments against. The call is
+     * checked against $type when it's evaluated. Parse the expression instead of building it if you want the
+     * arguments checked up front.
+     *
+     * @param Type $type The function's return type. There's no declaration here to contradict, so it's taken as given.
      * @param list<Expression> $arguments
      */
     public function call(string $name, Type $type, array $arguments, Span|null $location = null): Call
     {
-        return Expr::call($this, $name, $type, $arguments, $location);
+        return Expr::call(
+            $this,
+            $name,
+            new TypeAnnotation($type, $location ?? Expr::dummySpan()),
+            $arguments,
+            signature: null,
+            location: $location,
+        );
     }
 
     public function matchesType(Type $type): bool
