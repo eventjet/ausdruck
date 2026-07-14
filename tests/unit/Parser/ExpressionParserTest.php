@@ -30,6 +30,20 @@ final class ExpressionParserTest extends TestCase
         $s = Type::string();
         $b = Type::bool();
         $i = Type::int();
+        /**
+         * One expression that spans the entire cascade: || is its loosest level, and the postfix . of a field access
+         * and of a call its tightest. A position that parses it has to run every level in between, because that's the
+         * only way down from || to the dot. Nesting it below is therefore a stronger statement than nesting any single
+         * operator would be, and the reason there's no case per operator down there.
+         */
+        $wholeCascade = 'o:{ n: string }.n === s:string.substr:string(0, 1) || b:bool';
+        $wholeCascadeExpr = Expr::or_(
+            Expr::eq(
+                Expr::fieldAccess(Expr::get('o', Type::struct(['n' => $s])), 'n', Span::char(1, 1)),
+                Expr::get('s', $s)->call('substr', $s, [Expr::literal(0), Expr::literal(1)]),
+            ),
+            Expr::get('b', $b),
+        );
         $cases = [
             ['foo:string', Expr::get('foo', $s)],
             ['"my-literal"', Expr::literal('my-literal')],
@@ -136,6 +150,25 @@ final class ExpressionParserTest extends TestCase
                     'substr',
                     $s,
                     [Expr::subtract(Expr::literal(5), Expr::literal(3)), Expr::literal(2)],
+                ),
+            ],
+            // A call argument, a list item and a struct field value are full expressions, like a lambda body: each is
+            // parsed by parseExpression() rather than by some smaller grammar of its own. The item and field cases put
+            // a second element after the nested expression, because the operators in it must not swallow the comma
+            // that ends it.
+            [
+                sprintf('xs:list<bool>.contains:bool(%s)', $wholeCascade),
+                Expr::get('xs', Type::listOf($b))->call('contains', $b, [$wholeCascadeExpr]),
+            ],
+            [
+                sprintf('[%s, false]', $wholeCascade),
+                Expr::listLiteral([$wholeCascadeExpr, Expr::literal(false)], Span::char(1, 1)),
+            ],
+            [
+                sprintf('{matches: %s, fallback: b:bool}', $wholeCascade),
+                Expr::structLiteral(
+                    ['matches' => $wholeCascadeExpr, 'fallback' => Expr::get('b', $b)],
+                    Span::char(1, 1),
                 ),
             ],
         ];

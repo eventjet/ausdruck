@@ -93,13 +93,16 @@ As in most languages, `&&` binds tighter than `||`, so `a:bool && b:bool || c:bo
 
 There are no grouping parentheses yet, so you can't override the precedence.
 
-Operators are allowed anywhere an expression is expected, not only at the top level. List items, struct field values,
-function arguments, and lambda bodies are all full expressions:
+Anywhere an expression is expected, it can be a whole one, not only at the top level. List items, struct field values,
+function arguments, and lambda bodies are all full expressions, so operators, calls, and field access are available in
+all of them:
 
 ```
 [a:int - 1, 10]
 {total: a:int - b:int}
 foo:string.substr(a:int - 1, 2)
+names:list<string>.contains:bool(user:{ name: string }.name)
+{matches: needle:string === haystack:string.substr:string(0, 1) || always:bool}
 ```
 
 ### Types

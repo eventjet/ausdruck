@@ -1,0 +1,9 @@
+{matches: o:{ n: string }.n === s:string.substr:string(0, 1) || b:bool, fallback: b:bool}
+-- Input --
+{
+  o: {n: "a"},
+  s: "xyz",
+  b: true,
+}
+-- Output --
+{matches: true, fallback: true}
