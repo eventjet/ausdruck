@@ -18,9 +18,14 @@ use function sprintf;
  */
 final class FieldAccess extends Expression
 {
+    /**
+     * @param Type $type The type {@see $field} is declared as on {@see $struct}. {@see Expr::fieldAccess()} resolves it,
+     *     which is also where we know the field exists at all.
+     */
     public function __construct(
         public readonly Expression $struct,
         public readonly string $field,
+        private readonly Type $type,
         private readonly Span $location,
     ) {
     }
@@ -61,8 +66,6 @@ final class FieldAccess extends Expression
     #[Override]
     public function getType(): Type
     {
-        $structType = $this->struct->getType();
-        return $structType->getFieldType($this->field)
-            ?? throw new EvaluationError(sprintf('Unknown field "%s" on type %s', $this->field, $structType));
+        return $this->type;
     }
 }

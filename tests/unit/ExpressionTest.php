@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
+use Eventjet\Ausdruck\And_;
 use Eventjet\Ausdruck\EvaluationError;
 use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
+use Eventjet\Ausdruck\FieldAccess;
 use Eventjet\Ausdruck\Literal;
+use Eventjet\Ausdruck\Negative;
+use Eventjet\Ausdruck\Or_;
 use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Scope;
+use Eventjet\Ausdruck\Subtract;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -239,31 +244,19 @@ final class ExpressionTest extends TestCase
             ['{name: "John"}.name', new Scope(), 'John'],
             ['{name: "John", age: 37}.age', new Scope(), 37],
             ['{name: "John", age: 37,}.age', new Scope(), 37],
-            [
-                Expr::eq(Expr::structLiteral(['name' => Expr::literal('John')], self::span()), Expr::literal('John')),
-                new Scope(),
-                false,
-            ],
-            [
-                Expr::eq(Expr::literal('John'), Expr::structLiteral(['name' => Expr::literal('John')], self::span())),
-                new Scope(),
-                false,
-            ],
+            // Two operands only have to be of the same type to be compared, and any is a type. Structs are therefore the
+            // one place where === has to compare values it knows nothing about statically.
+            ['left:any === right:any', new Scope(['left' => (object)['name' => 'John'], 'right' => 'John']), false],
+            ['left:any === right:any', new Scope(['left' => 'John', 'right' => (object)['name' => 'John']]), false],
             ['{name: "John"} === {name: "Jane"}', new Scope(), false],
             [
-                Expr::eq(
-                    Expr::structLiteral(['a' => Expr::literal('A'), 'b' => Expr::literal('B')], self::span()),
-                    Expr::structLiteral(['a' => Expr::literal('A'), 'c' => Expr::literal('C')], self::span()),
-                ),
-                new Scope(),
+                'left:any === right:any',
+                new Scope(['left' => (object)['a' => 'A', 'b' => 'B'], 'right' => (object)['a' => 'A', 'c' => 'C']]),
                 false,
             ],
             [
-                Expr::eq(
-                    Expr::structLiteral(['a' => Expr::literal('A'), 'c' => Expr::literal('C')], self::span()),
-                    Expr::structLiteral(['a' => Expr::literal('A'), 'b' => Expr::literal('B')], self::span()),
-                ),
-                new Scope(),
+                'left:any === right:any',
+                new Scope(['left' => (object)['a' => 'A', 'c' => 'C'], 'right' => (object)['a' => 'A', 'b' => 'B']]),
                 false,
             ],
             [
@@ -404,53 +397,62 @@ final class ExpressionTest extends TestCase
             new Scope(['foo' => 'test'], ['chars' => static fn(string $text): string => $text]),
             'Expected int, got string',
         ];
+        /**
+         * The operand checks below are what the nodes fall back on when they are constructed behind {@see Expr}'s back.
+         * Expr rejects all of these outright, so the cases have to build the nodes by hand to reach them at all.
+         */
         yield 'Subtracting a float from an integer' => [
-            Expr::subtract(Expr::get('myint', Type::int()), Expr::get('myfloat', Type::float())),
+            new Subtract(Expr::get('myint', Type::int()), Expr::get('myfloat', Type::float())),
             new Scope(['myint' => 42, 'myfloat' => 23.42]),
             'Expected operands to be of the same type, got int and float',
         ];
         yield 'Subtracting an integer from a float' => [
-            Expr::subtract(Expr::get('myfloat', Type::float()), Expr::get('myint', Type::int())),
+            new Subtract(Expr::get('myfloat', Type::float()), Expr::get('myint', Type::int())),
             new Scope(['myint' => 42, 'myfloat' => 23.42]),
             'Expected operands to be of the same type, got float and int',
         ];
         yield 'Subtracting a string from a string' => [
-            Expr::subtract(Expr::get('mystr', Type::string()), Expr::get('mystr2', Type::string())),
+            new Subtract(Expr::get('mystr', Type::string()), Expr::get('mystr2', Type::string())),
             new Scope(['mystr' => 'foo', 'mystr2' => 'bar']),
             'Expected operands to be of type int or float, got string and string',
         ];
         yield 'Logical or with string on the left' => [
-            Expr::get('foo', Type::string())->or_(Expr::get('bar', Type::bool())),
+            new Or_(Expr::get('foo', Type::string()), Expr::get('bar', Type::bool())),
             new Scope(['foo' => 'foo', 'bar' => true]),
             'Expected boolean operands, got string and bool',
         ];
         yield 'Logical or with string on the right' => [
-            Expr::get('foo', Type::bool())->or_(Expr::get('bar', Type::string())),
+            new Or_(Expr::get('foo', Type::bool()), Expr::get('bar', Type::string())),
             new Scope(['foo' => true, 'bar' => 'bar']),
             'Expected boolean operands, got bool and string',
         ];
         yield 'Logical and with string on the left' => [
-            Expr::get('foo', Type::string())->and_(Expr::get('bar', Type::bool())),
+            new And_(Expr::get('foo', Type::string()), Expr::get('bar', Type::bool())),
             new Scope(['foo' => 'foo', 'bar' => true]),
             'Expected boolean operands, got string and bool',
         ];
         yield 'Logical and with string on the right' => [
-            Expr::get('foo', Type::bool())->and_(Expr::get('bar', Type::string())),
+            new And_(Expr::get('foo', Type::bool()), Expr::get('bar', Type::string())),
             new Scope(['foo' => true, 'bar' => 'bar']),
             'Expected boolean operands, got bool and string',
         ];
         yield 'Negative bool' => [
-            Expr::negative(Expr::get('foo', Type::bool())),
+            new Negative(Expr::get('foo', Type::bool()), self::span()),
             new Scope(['foo' => true]),
             'Expected operand to be of type int or float',
         ];
         yield 'Access non-existent struct field' => [
-            Expr::fieldAccess(Expr::get('user', Type::struct(['name' => Type::string()])), 'age', self::span()),
+            new FieldAccess(
+                Expr::get('user', Type::struct(['name' => Type::string()])),
+                'age',
+                Type::int(),
+                self::span(),
+            ),
             new Scope(['user' => (object)['name' => 'John']]),
             'Unknown field "age"',
         ];
         yield 'Access field non non-struct' => [
-            Expr::fieldAccess(Expr::get('user', Type::string()), 'name', self::span()),
+            new FieldAccess(Expr::get('user', Type::string()), 'name', Type::string(), self::span()),
             new Scope(['user' => 'John']),
             'Expected object, got string',
         ];

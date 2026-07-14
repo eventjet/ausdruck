@@ -65,19 +65,13 @@ final class ExpressionParser
     public static function parseTyped(string $expression, Type $type, Declarations|Types|null $types = null): Expression
     {
         $expr = self::parse($expression, $types);
-        return self::assertExpressionType($expr, $type, sprintf(
-            'Expected parsed expression to be of type %s, got %s',
-            $type,
-            $expr->getType(),
-        ));
-    }
-
-    private static function assertExpressionType(Expression $expr, Type $type, string $errorMessage): Expression
-    {
         if ($expr->matchesType($type)) {
             return $expr;
         }
-        throw TypeError::create($errorMessage, $expr->location());
+        throw TypeError::create(
+            sprintf('Expected parsed expression to be of type %s, got %s', $type, $expr->getType()),
+            $expr->location(),
+        );
     }
 
     private static function unexpectedToken(ParsedToken $token): never
@@ -88,31 +82,6 @@ final class ExpressionParser
                 : sprintf('Unexpected %s', Token::print($token->token)),
             $token->location(),
         );
-    }
-
-    private static function fieldAccess(Expression $target, string $name, Span $location): FieldAccess
-    {
-        $targetType = $target->getType();
-        if (!$targetType->isStruct()) {
-            throw TypeError::create(sprintf('Can\'t access field "%s" on non-struct type %s', $name, $targetType), $location);
-        }
-        if ($targetType->getFieldType($name) === null) {
-            throw TypeError::create(sprintf('Unknown field "%s" on type %s', $name, $targetType), $location);
-        }
-        return Expr::fieldAccess($target, $name, $location);
-    }
-
-    /**
-     * @param 'left' | 'right' $side
-     */
-    private static function assertBooleanOperand(Expression $expr, Token $operator, string $side): Expression
-    {
-        return self::assertExpressionType($expr, Type::bool(), sprintf(
-            'The expression on the %s side of %s must be boolean, got %s',
-            $side,
-            Token::print($operator),
-            $expr->getType(),
-        ));
     }
 
     private function parseComplete(): Expression
@@ -139,9 +108,7 @@ final class ExpressionParser
         $left = $this->parseAnd();
         while ($this->nextToken() === Token::Or) {
             $this->tokens->next();
-            $left = self::assertBooleanOperand($left, Token::Or, 'left');
-            $right = self::assertBooleanOperand($this->parseAnd(), Token::Or, 'right');
-            $left = $left->or_($right);
+            $left = $left->or_($this->parseAnd());
         }
         return $left;
     }
@@ -155,9 +122,7 @@ final class ExpressionParser
         $left = $this->parseComparison();
         while ($this->nextToken() === Token::And) {
             $this->tokens->next();
-            $left = self::assertBooleanOperand($left, Token::And, 'left');
-            $right = self::assertBooleanOperand($this->parseComparison(), Token::And, 'right');
-            $left = $left->and_($right);
+            $left = $left->and_($this->parseComparison());
         }
         return $left;
     }
@@ -175,30 +140,11 @@ final class ExpressionParser
         $operator = $this->nextToken();
         if ($operator === Token::TripleEquals) {
             $this->tokens->next();
-            $right = $this->parseAdditive();
-            $right = self::assertExpressionType($right, $left->getType(), sprintf(
-                'The expressions of both sides of === must be of the same type. Left: %s, right: %s',
-                $left->getType(),
-                $right->getType(),
-            ));
-            return $left->eq($right);
+            return $left->eq($this->parseAdditive());
         }
         if ($operator === Token::CloseAngle) {
             $this->tokens->next();
-            $right = $this->parseAdditive();
-            if (!$right->matchesType(Type::int()) && !$right->matchesType(Type::float())) {
-                throw TypeError::create(
-                    sprintf('Can\'t compare %s to %s', $right->getType(), $left->getType()),
-                    $right->location(),
-                );
-            }
-            if (!$left->matchesType($right->getType())) {
-                throw TypeError::create(
-                    sprintf('Can\'t compare %s to %s', $left->getType(), $right->getType()),
-                    $left->location()->to($right->location()),
-                );
-            }
-            return $left->gt($right);
+            return $left->gt($this->parseAdditive());
         }
         return $left;
     }
@@ -212,20 +158,7 @@ final class ExpressionParser
         $left = $this->parseUnary();
         while ($this->nextToken() === Token::Minus) {
             $this->tokens->next();
-            $right = $this->parseUnary();
-            if (!$right->matchesType(Type::int()) && !$right->matchesType(Type::float())) {
-                throw TypeError::create(
-                    sprintf('Can\'t subtract %s from %s', $right->getType(), $left->getType()),
-                    $right->location(),
-                );
-            }
-            if (!$left->getType()->equals($right->getType())) {
-                throw TypeError::create(
-                    sprintf('Can\'t subtract %s from %s', $right->getType(), $left->getType()),
-                    $left->location(),
-                );
-            }
-            $left = $left->subtract($right);
+            $left = $left->subtract($this->parseUnary());
         }
         return $left;
     }
@@ -255,9 +188,6 @@ final class ExpressionParser
             }
         }
         $operand = $this->parseUnary();
-        if (!$operand->matchesType(Type::int()) && !$operand->matchesType(Type::float())) {
-            throw TypeError::create(sprintf('Can\'t negate %s', $operand->getType()), $operand->location());
-        }
         return Expr::negative($operand, $minus->location()->to($operand->location()));
     }
 
@@ -432,7 +362,7 @@ final class ExpressionParser
         $token = $this->nextToken();
         return match ($token) {
             Token::Colon, Token::OpenParen => $this->call($name, $nameLocation, $target),
-            default => self::fieldAccess($target, $name, $target->location()->to($nameLocation)),
+            default => Expr::fieldAccess($target, $name, $target->location()->to($nameLocation)),
         };
     }
 
