@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Eventjet\Ausdruck\BuiltinFunctions;
 use Eventjet\Ausdruck\Type;
 use InvalidArgumentException;
 
@@ -24,21 +25,15 @@ final class Declarations
         public readonly array $variables = [],
         array $functions = [],
     ) {
-        $fns = [
-            'contains' => Type::func(Type::bool(), [Type::listOf(Type::any()), Type::any()]),
-            'count' => Type::func(Type::int(), [Type::listOf(Type::any())]),
-            // Can't declare filter until we have generics
-            // 'filter' => Type::func(Type::listOf(Type::any()), [Type::listOf(Type::any()), Type::func(Type::bool(), [Type::any()])]),
-            'isSome' => Type::func(Type::bool(), [Type::option(Type::any())]),
-            // Can't declare map until we have generics
-            // 'map' => Type::func(Type::listOf(Type::any()), [Type::listOf(Type::any()), Type::func(Type::any(), [Type::any()])]),
-            'some' => Type::func(Type::bool(), [Type::listOf(Type::any()), Type::func(Type::bool(), [Type::any()])]),
-            'substr' => Type::func(Type::string(), [Type::string(), Type::int(), Type::int()]),
-            'take' => Type::func(Type::listOf(Type::any()), [Type::listOf(Type::any()), Type::int()]),
-            'unique' => Type::func(Type::listOf(Type::any()), [Type::listOf(Type::any())]),
-            // Can't declare unwrap until we have generics
-            // 'unwrap' => Type::func(Type::some(Type::any()), [Type::option(Type::any())]),
-        ];
+        $fns = [];
+        foreach (BuiltinFunctions::all() as $name => $fn) {
+            // filter, head, map, tail and unwrap can't be declared until we have generics; they carry a null type and
+            // rely on the parser's inline-return-type escape hatch instead.
+            if ($fn['type'] === null) {
+                continue;
+            }
+            $fns[$name] = $fn['type'];
+        }
         foreach ($functions as $name => $type) {
             if (array_key_exists($name, $fns)) {
                 throw new InvalidArgumentException(sprintf('Can\'t override built-in function %s', $name));

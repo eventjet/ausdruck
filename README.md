@@ -139,6 +139,7 @@ The target can be any expression. It will be passed as the first argument to the
 |------------|------------------------------------------------------------------------|--------------------------------------------------|
 | `count`    | Returns the number of elements in a list                               | `foo:list<string>.count:int()`                   |
 | `contains` | Returns whether a list contains a value                                | `foo:list<string>.contains:bool("bar")`          |
+| `filter`   | Returns a new list of the elements matching a [predicate](#lambdas)    | `foo:list<int>.filter:list<int>(\|i\| i:int > 2)`|
 | `head`     | Returns the first element of a list as an `Option`                     | `foo:list<string>.head:Option<string>()`         |
 | `isSome`   | Takes an Option and returns whether it is `Some`                       | `foo:Option<int>.isSome:bool()`                  |
 | `map`      | Returns a new list with the results of applying a [function](#lambdas) | `foo:list<int>.map:list<int>(\|i\| i:int - 2)`   |
@@ -147,6 +148,7 @@ The target can be any expression. It will be passed as the first argument to the
 | `tail`     | Returns all elements of a list except the first                        | `foo:list<string>.tail:list<string>()`           |
 | `take`     | Returns the first n elements of a list                                 | `foo:list<string>.take:list<string>(5)`          |
 | `unique`   | Returns a list with duplicate elements removed                         | `foo:list<string>.unique:list<string>()`         |
+| `unwrap`   | Returns the value contained in an `Option`                             | `foo:Option<int>.unwrap:int()`                   |
 
 #### Custom Functions
 
