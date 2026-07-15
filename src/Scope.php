@@ -4,20 +4,14 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use Countable;
 use LogicException;
 
 use function array_intersect;
-use function array_is_list;
 use function array_keys;
 use function array_map;
-use function array_slice;
-use function array_values;
-use function count;
 use function get_debug_type;
 use function get_object_vars;
 use function implode;
-use function in_array;
 use function is_bool;
 use function is_int;
 use function is_object;
@@ -42,20 +36,7 @@ final class Scope
      */
     public function __construct(private readonly array $vars = [], array $funcs = [], private readonly Scope|null $parent = null)
     {
-        $predefinedFuncs = $this->parent === null ? [
-            'contains' => self::contains(...),
-            'count' => self::count(...),
-            'filter' => self::filter(...),
-            'head' => self::head(...),
-            'isSome' => self::isSome(...),
-            'map' => self::map(...),
-            'some' => self::some(...),
-            'substr' => substr(...),
-            'tail' => self::tail(...),
-            'take' => self::take(...),
-            'unique' => self::unique(...),
-            'unwrap' => self::identity(...),
-        ] : [];
+        $predefinedFuncs = $this->parent === null ? BuiltinFunctions::implementations() : [];
         $shadowed = array_intersect(array_keys($predefinedFuncs), array_keys($funcs));
         if ($shadowed !== []) {
             throw new LogicException(sprintf('Can\'t shadow predefined functions: %s', implode(', ', $shadowed)));
@@ -76,145 +57,6 @@ final class Scope
             }
             throw new LogicException(sprintf('Can\'t shadow function "%s" in ancestor scope', $name));
         }
-    }
-
-    /**
-     * @template K of array-key
-     * @template From
-     * @template To
-     * @param array<K, From> $items
-     * @param callable(From): To $f
-     * @return array<K, To>
-     */
-    private static function map(array $items, callable $f): array
-    {
-        return array_map($f, $items);
-    }
-
-    /**
-     * @template T
-     * @param array<array-key, T> $haystack
-     * @param callable(T): bool $predicate
-     */
-    private static function some(array $haystack, callable $predicate): bool
-    {
-        foreach ($haystack as $item) {
-            if (!$predicate($item)) {
-                continue;
-            }
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * @template T
-     * @param list<T> $items
-     * @return list<T>
-     */
-    private static function tail(array $items): array
-    {
-        return array_slice($items, 1);
-    }
-
-    /**
-     * @template T
-     * @param array<array-key, T> $haystack
-     * @param T $needle
-     */
-    private static function contains(array $haystack, mixed $needle): bool
-    {
-        foreach ($haystack as $item) {
-            if ($item !== $needle) {
-                continue;
-            }
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * @param Countable|array<array-key, mixed> $items
-     */
-    private static function count(Countable|array $items): int
-    {
-        return count($items);
-    }
-
-    /**
-     * @template K of array-key
-     * @template V
-     * @param array<K, V> $items
-     * @param callable(V): bool $predicate
-     * @return ($items is list<K> ? list<K> : array<K, V>)
-     */
-    private static function filter(array $items, callable $predicate): array
-    {
-        $out = [];
-        foreach ($items as $key => $item) {
-            if (!$predicate($item)) {
-                continue;
-            }
-            $out[$key] = $item;
-        }
-        return array_is_list($items) ? array_values($out) : $out;
-    }
-
-    /**
-     * @template T
-     * @param list<T> $items
-     * @return T | null
-     */
-    private static function head(array $items): mixed
-    {
-        return $items[0] ?? null;
-    }
-
-    /**
-     * @template U
-     * @param U | null $option
-     * @return ($option is null ? false : true)
-     */
-    private static function isSome(mixed $option): bool
-    {
-        return $option !== null;
-    }
-
-    /**
-     * @template T
-     * @param list<T> $items
-     * @return list<T>
-     */
-    private static function take(array $items, int $n): array
-    {
-        return array_slice($items, 0, $n);
-    }
-
-    /**
-     * @template T
-     * @param list<T> $items
-     * @return list<T>
-     */
-    private static function unique(array $items): array
-    {
-        $unique = [];
-        foreach ($items as $item) {
-            if (in_array($item, $unique, true)) {
-                continue;
-            }
-            $unique[] = $item;
-        }
-        return $unique;
-    }
-
-    /**
-     * @template T
-     * @param T $value
-     * @return T
-     */
-    private static function identity(mixed $value): mixed
-    {
-        return $value;
     }
 
     /**
