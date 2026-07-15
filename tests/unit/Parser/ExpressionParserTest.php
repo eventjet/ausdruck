@@ -171,6 +171,53 @@ final class ExpressionParserTest extends TestCase
                     Span::char(1, 1),
                 ),
             ],
+            // Parentheses group without leaving a node of their own, so a grouped tree prints with exactly the
+            // parentheses needed to parse it back the same way: one per operand that would otherwise be captured by a
+            // tighter operator around it. There's a canonical case for each level of the cascade being forced to sit
+            // inside a looser one, which is the grouping that level's precedence would never produce on its own.
+            [
+                'a:bool && (b:bool || c:bool)',
+                Expr::and_(Expr::get('a', $b), Expr::or_(Expr::get('b', $b), Expr::get('c', $b))),
+            ],
+            [
+                '(a:bool || b:bool) && c:bool',
+                Expr::and_(Expr::or_(Expr::get('a', $b), Expr::get('b', $b)), Expr::get('c', $b)),
+            ],
+            [
+                'a:bool || (b:bool || c:bool)',
+                Expr::or_(Expr::get('a', $b), Expr::or_(Expr::get('b', $b), Expr::get('c', $b))),
+            ],
+            [
+                'a:bool && (b:bool && c:bool)',
+                Expr::and_(Expr::get('a', $b), Expr::and_(Expr::get('b', $b), Expr::get('c', $b))),
+            ],
+            [
+                'a:int - (b:int - c:int)',
+                Expr::subtract(Expr::get('a', $i), Expr::subtract(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            [
+                '-(a:int - b:int)',
+                Expr::negative(Expr::subtract(Expr::get('a', $i), Expr::get('b', $i))),
+            ],
+            // === and > are non-associative, so a parenthesized comparison is the only way one ends up inside another.
+            [
+                '(a:int === b:int) === c:bool',
+                Expr::eq(Expr::eq(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $b)),
+            ],
+            [
+                '(a:int > b:int) === c:bool',
+                Expr::eq(Expr::gt(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $b)),
+            ],
+            // A method can be called on a grouped expression, so the postfix dot has to parenthesize a target looser
+            // than a call's own — everything from a subtraction down to a negation.
+            [
+                '(a:int - b:int).abs:int()',
+                Expr::subtract(Expr::get('a', $i), Expr::get('b', $i))->call('abs', $i, []),
+            ],
+            [
+                '(-a:int).abs:int()',
+                Expr::negative(Expr::get('a', $i))->call('abs', $i, []),
+            ],
         ];
         foreach ($cases as $case) {
             yield $case[0] => $case;
@@ -218,6 +265,33 @@ final class ExpressionParserTest extends TestCase
             // Negating a number literal folds into a negative literal, so the fold survives being nested.
             ['[-2]', Expr::listLiteral([Expr::literal(-2)], Span::char(1, 1))],
             ['- -1', Expr::literal(1)],
+            // Parentheses that only restate the default grouping leave no trace: the tree is the one the operators
+            // would have built anyway, so it prints back without them. A single atom in parentheses is the same atom.
+            ['(a:bool)', Expr::get('a', Type::bool())],
+            ['((a:bool))', Expr::get('a', Type::bool())],
+            [
+                '(a:int - b:int) - c:int',
+                Expr::subtract(
+                    Expr::subtract(Expr::get('a', Type::int()), Expr::get('b', Type::int())),
+                    Expr::get('c', Type::int()),
+                ),
+            ],
+            [
+                '(a:bool && b:bool) || c:bool',
+                Expr::or_(
+                    Expr::and_(Expr::get('a', Type::bool()), Expr::get('b', Type::bool())),
+                    Expr::get('c', Type::bool()),
+                ),
+            ],
+            // The grouping the issue asks for: left-associative subtraction already means (a - 1) - 2, so the
+            // parentheses are redundant, but they now parse instead of being a syntax error.
+            [
+                '(a:int - 1) - 2',
+                Expr::subtract(
+                    Expr::subtract(Expr::get('a', Type::int()), Expr::literal(1)),
+                    Expr::literal(2),
+                ),
+            ],
         ];
         foreach ($cases as $case) {
             yield $case[0] => $case;
@@ -296,6 +370,13 @@ final class ExpressionParserTest extends TestCase
         yield 'trailing operator' => ['a:int -', 'Expected expression, got end of input'];
         yield 'missing comma between list items' => ['[1 2]', 'Expected ], got 2'];
         yield 'missing comma between function arguments' => ['foo:string.substr(0 3)', 'Expected ), got 3'];
+        // A group is a whole expression between the parentheses: empty ones have nothing to group, and an unclosed one
+        // is missing its ). A close paren with no group of its own to end is junk after a complete expression.
+        yield 'empty parentheses' => ['()', 'Expected expression, got )'];
+        yield 'unclosed parenthesis' => ['(a:bool', 'Expected ), got end of input'];
+        yield 'unclosed parenthesis around a subtraction' => ['(a:int - b:int', 'Expected ), got end of input'];
+        yield 'comma inside parentheses' => ['(a:bool, b:bool)', 'Expected ), got ,'];
+        yield 'unmatched close parenthesis' => ['(a:bool))', 'Unexpected )'];
     }
 
     /**
@@ -511,6 +592,16 @@ final class ExpressionParserTest extends TestCase
             [
                 'foo:bool && bar::bool',
                 '                =    ',
+            ],
+            // An empty group is blamed at the close paren, where the expression it should have held is missing. A
+            // surplus close paren is blamed at itself, the token with nothing left to close.
+            [
+                '()',
+                ' =',
+            ],
+            [
+                '(a:bool))',
+                '        =',
             ],
         ];
         foreach ($cases as [$expression, $location]) {

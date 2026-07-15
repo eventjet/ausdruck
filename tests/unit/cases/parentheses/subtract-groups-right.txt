@@ -1,0 +1,9 @@
+a:int - (b:int - c:int)
+-- Input --
+{
+  a: 10,
+  b: 5,
+  c: 2,
+}
+-- Output --
+7

@@ -21,7 +21,11 @@ final class Or_ extends Expression
 
     public function __toString(): string
     {
-        return sprintf('%s || %s', $this->left, $this->right);
+        return sprintf(
+            '%s || %s',
+            Precedence::parenthesize($this->left, Precedence::OR),
+            Precedence::parenthesize($this->right, Precedence::AND),
+        );
     }
 
     /**

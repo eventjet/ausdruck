@@ -25,8 +25,10 @@ use function str_split;
  *
  * Each level consumes only its own operators and delegates to the next tighter level for its operands. Precedence and
  * associativity are therefore expressed by the call graph, and a level never needs to know which operators sit above
- * it. Anywhere a full expression is expected—a lambda body, a call argument, a list item, a struct field value—call
- * {@see self::parseExpression()} rather than one of the levels, so that operators are allowed there too.
+ * it. Anywhere a full expression is expected—a lambda body, a call argument, a list item, a struct field value, a
+ * parenthesized group—call {@see self::parseExpression()} rather than one of the levels, so that operators are allowed
+ * there too. A parenthesized group is the one such place that is itself an operand: it re-enters the cascade at the
+ * top from {@see self::parsePrimary()}, its tightest level, which is what lets parentheses override precedence.
  *
  * @api
  */
@@ -219,10 +221,29 @@ final class ExpressionParser
         if ($token === Token::OpenBrace) {
             return $this->parseStructLiteral();
         }
+        if ($token === Token::OpenParen) {
+            return $this->parenthesized();
+        }
         throw SyntaxError::create(
             sprintf('Expected expression, got %s', Token::print($token)),
             $parsedToken->location(),
         );
+    }
+
+    /**
+     * (a:bool || b:bool) && c:bool
+     * ==================
+     *
+     * Grouping adds no node of its own: it starts the cascade over, so the group is a whole expression whatever
+     * surrounds it, and the tree it produces is the same one the grouped operators would build at the top level. Which
+     * grouping overrode the default precedence is recovered by {@see Precedence}, not stored here.
+     */
+    private function parenthesized(): Expression
+    {
+        $this->expect(Token::OpenParen);
+        $inner = $this->parseExpression();
+        $this->expect(Token::CloseParen);
+        return $inner;
     }
 
     /**
