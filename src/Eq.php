@@ -54,8 +54,8 @@ final class Eq extends Expression
     {
         return sprintf(
             '%s === %s',
-            Precedence::parenthesize($this->left, Precedence::ADDITIVE),
-            Precedence::parenthesize($this->right, Precedence::ADDITIVE),
+            Precedence::parenthesize($this->left, Precedence::Additive),
+            Precedence::parenthesize($this->right, Precedence::Additive),
         );
     }
 

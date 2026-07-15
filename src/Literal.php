@@ -11,6 +11,8 @@ use function array_is_list;
 use function array_map;
 use function implode;
 use function is_array;
+use function is_float;
+use function is_int;
 use function is_null;
 use function is_string;
 use function sprintf;
@@ -57,6 +59,16 @@ final class Literal extends AbstractLiteral
     public function __toString(): string
     {
         return self::dumpValue($this->value);
+    }
+
+    /**
+     * A number prints as bare digits, so an immediately following `.` would be read as a decimal point rather than a
+     * field or method access. {@see Precedence::parenthesizeTarget()} wraps such a receiver in parentheses because of
+     * it.
+     */
+    public function isNumber(): bool
+    {
+        return is_int($this->value) || is_float($this->value);
     }
 
     #[Override]

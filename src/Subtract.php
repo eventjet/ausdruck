@@ -23,8 +23,8 @@ final class Subtract extends Expression
     {
         return sprintf(
             '%s - %s',
-            Precedence::parenthesize($this->minuend, Precedence::ADDITIVE),
-            Precedence::parenthesize($this->subtrahend, Precedence::UNARY),
+            Precedence::parenthesize($this->minuend, Precedence::Additive),
+            Precedence::parenthesize($this->subtrahend, Precedence::Unary),
         );
     }
 

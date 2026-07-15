@@ -23,8 +23,8 @@ final class And_ extends Expression
     {
         return sprintf(
             '%s && %s',
-            Precedence::parenthesize($this->left, Precedence::AND),
-            Precedence::parenthesize($this->right, Precedence::COMPARISON),
+            Precedence::parenthesize($this->left, Precedence::And),
+            Precedence::parenthesize($this->right, Precedence::Comparison),
         );
     }
 

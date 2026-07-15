@@ -224,6 +224,20 @@ final class ExpressionParserTest extends TestCase
                 '(|x| x:bool).foo:bool()',
                 Expr::lambda(Expr::get('x', $b), ['x'])->call('foo', $b, []),
             ],
+            // A number literal is primary-tight, yet a method call on one still has to wrap it: `2.abs:int()` would
+            // read the `.` as a decimal point, and `-2.abs:int()` would bind the `.` tighter than the leading minus.
+            [
+                '(2).abs:int()',
+                Expr::literal(2)->call('abs', $i, []),
+            ],
+            [
+                '(-2).abs:int()',
+                Expr::literal(-2)->call('abs', $i, []),
+            ],
+            [
+                '(2.5).floor:int()',
+                Expr::literal(2.5)->call('floor', $i, []),
+            ],
         ];
         foreach ($cases as $case) {
             yield $case[0] => $case;

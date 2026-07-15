@@ -23,8 +23,8 @@ final class Or_ extends Expression
     {
         return sprintf(
             '%s || %s',
-            Precedence::parenthesize($this->left, Precedence::OR),
-            Precedence::parenthesize($this->right, Precedence::AND),
+            Precedence::parenthesize($this->left, Precedence::Or),
+            Precedence::parenthesize($this->right, Precedence::And),
         );
     }
 

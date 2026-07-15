@@ -222,7 +222,7 @@ final class ExpressionParser
             return $this->parseStructLiteral();
         }
         if ($token === Token::OpenParen) {
-            return $this->parenthesized();
+            return $this->group();
         }
         throw SyntaxError::create(
             sprintf('Expected expression, got %s', Token::print($token)),
@@ -238,7 +238,7 @@ final class ExpressionParser
      * surrounds it, and the tree it produces is the same one the grouped operators would build at the top level. Which
      * grouping overrode the default precedence is recovered by {@see Precedence}, not stored here.
      */
-    private function parenthesized(): Expression
+    private function group(): Expression
     {
         $this->expect(Token::OpenParen);
         $inner = $this->parseExpression();

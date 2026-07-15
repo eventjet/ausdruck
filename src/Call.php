@@ -57,7 +57,7 @@ final class Call extends Expression
     {
         return sprintf(
             '%s.%s:%s(%s)',
-            Precedence::parenthesize($this->target, Precedence::PRIMARY),
+            Precedence::parenthesizeTarget($this->target),
             $this->name,
             $this->type,
             implode(', ', $this->arguments),
