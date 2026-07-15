@@ -44,6 +44,44 @@ final class TypeParser
     }
 
     /**
+     * A sequence of `Name: <type>` declarations. A type ends where it is complete, so the next declaration's name is
+     * simply the next token; no separator is needed between them.
+     *
+     * @return array<string, TypeNode>
+     */
+    public static function parseDeclarations(string $src): array
+    {
+        $tokens = new Peekable(Tokenizer::tokenize($src === '' ? [] : str_split($src)));
+        $declarations = [];
+        while (($nameToken = $tokens->peek()) !== null) {
+            $name = $nameToken->token;
+            if (!is_string($name)) {
+                throw SyntaxError::create(
+                    sprintf('Expected type name, got %s', Token::print($name)),
+                    $nameToken->location(),
+                );
+            }
+            $tokens->next();
+            self::expect($tokens, Token::Colon);
+            $node = self::parse($tokens);
+            if ($node === null) {
+                throw SyntaxError::create(
+                    sprintf('Expected a type for %s, got end of input', $name),
+                    $nameToken->location(),
+                );
+            }
+            if (!$node instanceof TypeNode) {
+                throw SyntaxError::create(
+                    sprintf('Expected a type for %s, got %s', $name, Token::print($node->token)),
+                    $node->location(),
+                );
+            }
+            $declarations[$name] = $node;
+        }
+        return $declarations;
+    }
+
+    /**
      * @param Peekable<ParsedToken> $tokens
      */
     public static function parse(Peekable $tokens): TypeNode|ParsedToken|null

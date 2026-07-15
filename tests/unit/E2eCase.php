@@ -6,11 +6,7 @@ namespace Eventjet\Ausdruck\Test\Unit;
 
 use Eventjet\Ausdruck\AbstractLiteral;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
-use Eventjet\Ausdruck\Parser\Peekable;
-use Eventjet\Ausdruck\Parser\Token;
-use Eventjet\Ausdruck\Parser\Tokenizer;
 use Eventjet\Ausdruck\Parser\TypeError;
-use Eventjet\Ausdruck\Parser\TypeNode;
 use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\StructLiteral;
@@ -25,11 +21,9 @@ use function array_key_exists;
 use function explode;
 use function file_get_contents;
 use function implode;
-use function is_string;
 use function sprintf;
 use function str_ends_with;
 use function str_replace;
-use function str_split;
 use function str_starts_with;
 use function strlen;
 use function substr;
@@ -125,42 +119,25 @@ final readonly class E2eCase
     }
 
     /**
-     * A Types section is a sequence of `Name: <type>` declarations. They're read off a single token stream, because
-     * that's what the type parser works on: it stops when the type is complete and leaves the stream on the next
-     * declaration's name. Each type is resolved against the aliases declared before it, so `Bag` can be a struct of
-     * `Item`s.
+     * A Types section is a sequence of `Name: <type>` declarations. Each type is resolved against the aliases declared
+     * before it, so `Bag` can be a struct of `Item`s.
      *
      * @return array<string, Type>
      */
     private static function parseTypes(string $src): array
     {
-        $tokens = new Peekable(Tokenizer::tokenize($src === '' ? [] : str_split($src)));
         $aliases = [];
-        while (true) {
-            $name = $tokens->next();
-            if ($name === null) {
-                return $aliases;
-            }
-            if (!is_string($name->token)) {
-                throw new RuntimeException(sprintf('Expected a type name, got %s', Token::print($name->token)));
-            }
-            $colon = $tokens->next();
-            if ($colon?->token !== Token::Colon) {
-                throw new RuntimeException(sprintf('Expected a colon after the type name %s', $name->token));
-            }
-            /**
-             * @psalm-suppress InternalClass
-             * @psalm-suppress InternalMethod
-             */
-            $node = TypeParser::parse($tokens);
-            if (!$node instanceof TypeNode) {
-                throw new RuntimeException(sprintf('Expected a type for %s', $name->token));
-            }
+        /**
+         * @psalm-suppress InternalClass
+         * @psalm-suppress InternalMethod
+         */
+        foreach (TypeParser::parseDeclarations($src) as $name => $node) {
             $type = (new Types($aliases))->resolve($node);
             if ($type instanceof TypeError) {
                 throw $type;
             }
-            $aliases[$name->token] = $type;
+            $aliases[$name] = $type;
         }
+        return $aliases;
     }
 }
