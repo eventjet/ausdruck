@@ -21,7 +21,11 @@ final class Subtract extends Expression
 
     public function __toString(): string
     {
-        return sprintf('%s - %s', $this->minuend, $this->subtrahend);
+        return sprintf(
+            '%s - %s',
+            Precedence::parenthesize($this->minuend, Precedence::Additive),
+            Precedence::parenthesize($this->subtrahend, Precedence::Unary),
+        );
     }
 
     /**

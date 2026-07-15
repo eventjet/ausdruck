@@ -30,7 +30,7 @@ final class FieldAccess extends Expression
 
     public function __toString(): string
     {
-        return sprintf('%s.%s', $this->struct, $this->field);
+        return sprintf('%s.%s', Precedence::parenthesizeTarget($this->struct), $this->field);
     }
 
     #[Override]

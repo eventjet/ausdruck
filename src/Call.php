@@ -55,7 +55,13 @@ final class Call extends Expression
 
     public function __toString(): string
     {
-        return sprintf('%s.%s:%s(%s)', $this->target, $this->name, $this->type, implode(', ', $this->arguments));
+        return sprintf(
+            '%s.%s:%s(%s)',
+            Precedence::parenthesizeTarget($this->target),
+            $this->name,
+            $this->type,
+            implode(', ', $this->arguments),
+        );
     }
 
     #[Override]

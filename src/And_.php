@@ -21,7 +21,11 @@ final class And_ extends Expression
 
     public function __toString(): string
     {
-        return sprintf('%s && %s', $this->left, $this->right);
+        return sprintf(
+            '%s && %s',
+            Precedence::parenthesize($this->left, Precedence::And),
+            Precedence::parenthesize($this->right, Precedence::Comparison),
+        );
     }
 
     /**

@@ -91,7 +91,20 @@ As in most languages, `&&` binds tighter than `||`, so `a:bool && b:bool || c:bo
 `===` and `>` are non-associative: `a:int > b:int > c:int` is a syntax error rather than a comparison against the
 `bool` that the first comparison produces. Chain with `&&` instead.
 
-There are no grouping parentheses yet, so you can't override the precedence.
+#### Grouping
+
+Wrap a sub-expression in parentheses to override the precedence:
+
+```
+a:bool && (b:bool || c:bool)
+(a:int - b:int) - c:int
+(a:int > b:int) === c:bool
+(a:int - b:int).abs:int()
+```
+
+Parentheses only group; they add no node of their own. Redundant ones — a group the precedence would have produced
+anyway, like `(a:int - b:int) - c:int` — parse fine and simply disappear, so printing an expression back out adds a
+pair of parentheses exactly where one is needed to parse it back into the same expression, and nowhere else.
 
 Anywhere an expression is expected, it can be a whole one, not only at the top level. List items, struct field values,
 function arguments, and lambda bodies are all full expressions, so operators, calls, and field access are available in

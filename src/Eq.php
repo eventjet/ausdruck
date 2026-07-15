@@ -52,7 +52,11 @@ final class Eq extends Expression
 
     public function __toString(): string
     {
-        return sprintf('%s === %s', $this->left, $this->right);
+        return sprintf(
+            '%s === %s',
+            Precedence::parenthesize($this->left, Precedence::Additive),
+            Precedence::parenthesize($this->right, Precedence::Additive),
+        );
     }
 
     #[Override]

@@ -1,0 +1,9 @@
+(a:bool || b:bool) && c:bool
+-- Input --
+{
+  a: true,
+  b: false,
+  c: false,
+}
+-- Output --
+false

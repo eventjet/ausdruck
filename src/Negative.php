@@ -23,7 +23,7 @@ final class Negative extends Expression
 
     public function __toString(): string
     {
-        return sprintf('-%s', $this->expression);
+        return sprintf('-%s', Precedence::parenthesize($this->expression, Precedence::Unary));
     }
 
     #[Override]
