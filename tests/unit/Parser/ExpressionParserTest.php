@@ -218,6 +218,12 @@ final class ExpressionParserTest extends TestCase
                 '(-a:int).abs:int()',
                 Expr::negative(Expr::get('a', $i))->call('abs', $i, []),
             ],
+            // A lambda is the loosest target of all: its body runs rightward, so without the parentheses the printed
+            // form would fold the `.foo` into the body and re-parse as a different tree.
+            [
+                '(|x| x:bool).foo:bool()',
+                Expr::lambda(Expr::get('x', $b), ['x'])->call('foo', $b, []),
+            ],
         ];
         foreach ($cases as $case) {
             yield $case[0] => $case;

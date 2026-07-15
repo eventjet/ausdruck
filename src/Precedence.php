@@ -29,14 +29,21 @@ use function sprintf;
  */
 final class Precedence
 {
+    /**
+     * The loosest level, looser even than `||`: a lambda's body runs to the right until something outside stops it, so
+     * `|x| x:bool` used as an operand always has to be wrapped—`(|x| x:bool).foo:bool()` would otherwise print as
+     * `|x| x:bool.foo:bool()` and re-parse with the `.foo` swallowed into the body.
+     */
+    public const LAMBDA = 0;
     public const OR = 1;
     public const AND = 2;
     public const COMPARISON = 3;
     public const ADDITIVE = 4;
     public const UNARY = 5;
     /**
-     * Calls, field accesses and the atomic expressions (literals, variables, lists, structs, lambdas) all share the
-     * tightest level: none of them can have an operand stolen, so none is ever parenthesized as an operand.
+     * Calls, field accesses and the atomic expressions (literals, variables, lists, structs) all share the tightest
+     * level: none of them can have an operand stolen, so none is ever parenthesized as an operand. Lambdas look atomic
+     * but are not—see {@see self::LAMBDA}.
      */
     public const PRIMARY = 6;
 
@@ -49,9 +56,18 @@ final class Precedence
         return self::of($operand) < $level ? sprintf('(%s)', $operand) : (string)$operand;
     }
 
+    /**
+     * Only the nodes that bind loosely enough to ever need wrapping are named; everything else is primary-tight. The
+     * default is deliberately forgiving rather than a hard error: {@see Expression} is public API, so a consumer can
+     * add nodes this class has never heard of, and an unknown node is almost always atomic—the safe reading is to
+     * treat it as {@see self::PRIMARY} rather than reject it. A node whose text runs past its own operands, though —
+     * any operator, and every lambda — has to be listed here, or printing it as an operand would drop the parentheses
+     * it needs.
+     */
     private static function of(Expression $expr): int
     {
         return match (true) {
+            $expr instanceof Lambda => self::LAMBDA,
             $expr instanceof Or_ => self::OR,
             $expr instanceof And_ => self::AND,
             $expr instanceof Eq, $expr instanceof Gt => self::COMPARISON,
