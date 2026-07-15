@@ -36,9 +36,7 @@ final class Scope
      */
     public function __construct(private readonly array $vars = [], array $funcs = [], private readonly Scope|null $parent = null)
     {
-        $predefinedFuncs = $this->parent === null
-            ? array_map(static fn(array $fn): callable => $fn['impl'], BuiltinFunctions::all())
-            : [];
+        $predefinedFuncs = $this->parent === null ? BuiltinFunctions::implementations() : [];
         $shadowed = array_intersect(array_keys($predefinedFuncs), array_keys($funcs));
         if ($shadowed !== []) {
             throw new LogicException(sprintf('Can\'t shadow predefined functions: %s', implode(', ', $shadowed)));

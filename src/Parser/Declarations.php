@@ -25,15 +25,7 @@ final class Declarations
         public readonly array $variables = [],
         array $functions = [],
     ) {
-        $fns = [];
-        foreach (BuiltinFunctions::all() as $name => $fn) {
-            // filter, head, map, tail and unwrap can't be declared until we have generics; they carry a null type and
-            // rely on the parser's inline-return-type escape hatch instead.
-            if ($fn['type'] === null) {
-                continue;
-            }
-            $fns[$name] = $fn['type'];
-        }
+        $fns = BuiltinFunctions::types();
         foreach ($functions as $name => $type) {
             if (array_key_exists($name, $fns)) {
                 throw new InvalidArgumentException(sprintf('Can\'t override built-in function %s', $name));

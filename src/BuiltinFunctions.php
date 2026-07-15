@@ -17,21 +17,51 @@ use function substr;
 /**
  * The single source of truth for the library's built-in functions.
  *
- * Every built-in has an implementation, used at evaluation time by {@see Scope}. Where the signature can be expressed
- * without generics, it also has a declared {@see Type}, used at parse time by {@see Parser\Declarations};
- * the rest (`filter`, `head`, `map`, `tail`, `unwrap`) declare `null` and rely on the parser's inline-return-type escape
- * hatch until generics land.
+ * Every built-in has an implementation, exposed to evaluation ({@see Scope}) via {@see self::implementations()}. Where
+ * the signature can be expressed without generics, it also has a declared {@see Type}, exposed to parsing
+ * ({@see Parser\Declarations}) via {@see self::types()}; the rest (`filter`, `head`, `map`, `tail`, `unwrap`) declare
+ * `null` and rely on the parser's inline-return-type escape hatch until generics land.
  *
- * Keeping the name, implementation and signature together here prevents the three from drifting apart.
+ * Keeping the name, implementation and signature together in one table here prevents the three from drifting apart.
  *
  * @internal
  */
 final class BuiltinFunctions
 {
     /**
+     * The implementation of every built-in, keyed by name, for use at evaluation time.
+     *
+     * @return array<string, callable>
+     */
+    public static function implementations(): array
+    {
+        return array_map(static fn(array $fn): callable => $fn['impl'], self::definitions());
+    }
+
+    /**
+     * The declared signatures of the built-ins that can be expressed without generics, keyed by name, for use at parse
+     * time. The generic ones (`filter`, `head`, `map`, `tail`, `unwrap`) are omitted.
+     *
+     * @return array<string, Type>
+     */
+    public static function types(): array
+    {
+        $types = [];
+        foreach (self::definitions() as $name => $fn) {
+            if ($fn['type'] === null) {
+                continue;
+            }
+            $types[$name] = $fn['type'];
+        }
+        return $types;
+    }
+
+    /**
+     * The single source of truth: name, implementation and (where expressible) declared signature, together.
+     *
      * @return array<string, array{impl: callable, type: Type|null}>
      */
-    public static function all(): array
+    private static function definitions(): array
     {
         return [
             'contains' => ['impl' => self::contains(...), 'type' => Type::func(Type::bool(), [Type::listOf(Type::any()), Type::any()])],

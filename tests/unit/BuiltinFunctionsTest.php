@@ -21,7 +21,7 @@ use function trim;
 
 /**
  * Guards the single source of truth for built-in functions against drift: {@see Scope} (implementations),
- * {@see Declarations} (parse-time signatures) and the README table must all agree with {@see BuiltinFunctions::all()}.
+ * {@see Declarations} (parse-time signatures) and the README table must all agree with {@see BuiltinFunctions}.
  */
 final class BuiltinFunctionsTest extends TestCase
 {
@@ -60,20 +60,14 @@ final class BuiltinFunctionsTest extends TestCase
     {
         $scope = new Scope();
 
-        foreach (array_keys(BuiltinFunctions::all()) as $name) {
+        foreach (array_keys(BuiltinFunctions::implementations()) as $name) {
             self::assertNotNull($scope->func($name), sprintf('Built-in "%s" has no implementation in Scope', $name));
         }
     }
 
     public function testDeclarationsExposeExactlyTheBuiltinsWithADeclaredType(): void
     {
-        $expected = [];
-        foreach (BuiltinFunctions::all() as $name => $fn) {
-            if ($fn['type'] === null) {
-                continue;
-            }
-            $expected[] = $name;
-        }
+        $expected = array_keys(BuiltinFunctions::types());
         sort($expected);
 
         $declared = array_keys((new Declarations())->functions);
@@ -87,9 +81,9 @@ final class BuiltinFunctionsTest extends TestCase
         $documented = self::readmeBuiltinNames();
         sort($documented);
 
-        $expected = array_keys(BuiltinFunctions::all());
+        $expected = array_keys(BuiltinFunctions::implementations());
         sort($expected);
 
-        self::assertSame($expected, $documented, 'The README built-in table has drifted from BuiltinFunctions::all()');
+        self::assertSame($expected, $documented, 'The README built-in table has drifted from the built-in functions');
     }
 }
