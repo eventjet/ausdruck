@@ -69,22 +69,16 @@ final class ExpressionParser
         );
     }
 
-    private static function unexpectedToken(ParsedToken $token): never
-    {
-        throw SyntaxError::create(
-            is_string($token->token)
-                ? sprintf('Unexpected identifier %s', $token->token)
-                : sprintf('Unexpected %s', Token::print($token->token)),
-            $token->location(),
-        );
-    }
-
+    /**
+     * The entire input has to be a single expression. Stopping at the first complete one and dropping the rest would
+     * make `42 < 23` — a comparison the language doesn't have — a roundabout way of writing `42`.
+     */
     private function parseComplete(): Expression
     {
         $expression = $this->parseExpression();
         $trailing = $this->tokens->peek();
         if ($trailing !== null) {
-            self::unexpectedToken($trailing);
+            throw SyntaxError::unexpectedToken($trailing);
         }
         return $expression;
     }

@@ -13,6 +13,7 @@ use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
+use function array_keys;
 use function explode;
 use function implode;
 use function preg_match;
@@ -90,6 +91,19 @@ final class TypeParserTest extends TestCase
         yield 'Struct: no comma between fields' => [
             '{name: string age: int}',
             'Expected }, got age',
+        ];
+        // A type string is a whole type, so anything after the first complete one is an error rather than ignored.
+        yield 'Trailing identifier' => [
+            'int foo',
+            'Unexpected identifier foo',
+        ];
+        yield 'Trailing identifier after a generic type' => [
+            'list<int> bar',
+            'Unexpected identifier bar',
+        ];
+        yield 'Trailing literal' => [
+            'string 42',
+            'Unexpected 42',
         ];
     }
 
@@ -191,6 +205,17 @@ final class TypeParserTest extends TestCase
         ];
     }
 
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function declarationErrorCases(): iterable
+    {
+        yield 'Name is not an identifier' => ['42: int', 'Expected type name, got 42'];
+        yield 'Missing colon after name' => ['Foo int', 'Expected :, got int'];
+        yield 'End of input after colon' => ['Foo:', 'Expected a type for Foo, got end of input'];
+        yield 'Non-type token after colon' => ['Foo: ->', 'Expected a type for Foo, got ->'];
+    }
+
     #[DataProvider('syntaxErrorCases')]
     public function testSyntaxErrors(string $type, string $expectedMessage): void
     {
@@ -244,5 +269,49 @@ final class TypeParserTest extends TestCase
 
         self::assertInstanceOf(Type::class, $actual);
         self::assertTrue($actual->equals($expected));
+    }
+
+    public function testParseDeclarationsReadsBackToBackTypesOffOneStream(): void
+    {
+        /**
+         * @psalm-suppress InternalClass
+         * @psalm-suppress InternalMethod
+         */
+        $declarations = TypeParser::parseDeclarations(
+            <<<'AUSDRUCK'
+                Item: {
+                    tags: list<string>,
+                }
+                Bag: {
+                    items: list<Item>,
+                }
+                AUSDRUCK,
+        );
+
+        self::assertSame(['Item', 'Bag'], array_keys($declarations));
+        self::assertSame('{ tags: list<string> }', (string)$declarations['Item']);
+        self::assertSame('{ items: list<Item> }', (string)$declarations['Bag']);
+    }
+
+    public function testParseDeclarationsAcceptsEmptyInput(): void
+    {
+        /**
+         * @psalm-suppress InternalClass
+         * @psalm-suppress InternalMethod
+         */
+        self::assertSame([], TypeParser::parseDeclarations('   '));
+    }
+
+    #[DataProvider('declarationErrorCases')]
+    public function testParseDeclarationsRejectsMalformedInput(string $src, string $expectedMessage): void
+    {
+        $this->expectException(SyntaxError::class);
+        $this->expectExceptionMessage($expectedMessage);
+
+        /**
+         * @psalm-suppress InternalClass
+         * @psalm-suppress InternalMethod
+         */
+        TypeParser::parseDeclarations($src);
     }
 }

@@ -285,7 +285,14 @@ final class ExpressionParserTest extends TestCase
         // === and > are non-associative, so a chain of them is a syntax error rather than a confusing type error.
         yield 'chained ===' => ['a:int === b:int === c:int', 'Unexpected ==='];
         yield 'chained >' => ['a:int > b:int > c:int', 'Unexpected >'];
+        // Whatever follows a complete expression is a mistake, not something to drop: silently returning the expression
+        // parsed so far turns a typo or an operator we don't have into a valid expression with a surprising value.
         yield 'trailing literal' => ['1 2', 'Unexpected 2'];
+        yield 'trailing literal after a complete subtraction' => ['1 - 1 999', 'Unexpected 999'];
+        yield 'trailing string literal' => ['"a" "b"', 'Unexpected "b"'];
+        yield 'trailing keyword' => ['true false', 'Unexpected identifier false'];
+        // `<` is not an operator, so this is a literal followed by junk rather than a comparison.
+        yield 'less than' => ['42 < 23', 'Unexpected <'];
         yield 'trailing operator' => ['a:int -', 'Expected expression, got end of input'];
         yield 'missing comma between list items' => ['[1 2]', 'Expected ], got 2'];
         yield 'missing comma between function arguments' => ['foo:string.substr(0 3)', 'Expected ), got 3'];

@@ -6,7 +6,6 @@ namespace Eventjet\Ausdruck\Test\Unit;
 
 use Eventjet\Ausdruck\AbstractLiteral;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
-use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
@@ -19,8 +18,6 @@ use RuntimeException;
 use SplFileInfo;
 
 use function array_key_exists;
-use function array_splice;
-use function count;
 use function explode;
 use function file_get_contents;
 use function implode;
@@ -30,7 +27,6 @@ use function str_replace;
 use function str_starts_with;
 use function strlen;
 use function substr;
-use function trim;
 
 use const DIRECTORY_SEPARATOR;
 
@@ -123,35 +119,24 @@ final readonly class E2eCase
     }
 
     /**
+     * A Types section is a sequence of `Name: <type>` declarations. Each type is resolved against the aliases declared
+     * before it, so `Bag` can be a struct of `Item`s.
+     *
      * @return array<string, Type>
      */
     private static function parseTypes(string $src): array
     {
         $aliases = [];
-        $types = new Types();
-        while (true) {
-            $parts = explode(':', $src, 2);
-            if (count($parts) !== 2) {
-                break;
-            }
-            [$name, $src] = $parts;
-            /**
-             * @psalm-suppress InternalClass
-             * @psalm-suppress InternalMethod
-             */
-            $node = TypeParser::parseString($src);
-            if ($node instanceof SyntaxError) {
-                throw $node;
-            }
-            $type = $types->resolve($node);
+        /**
+         * @psalm-suppress InternalClass
+         * @psalm-suppress InternalMethod
+         */
+        foreach (TypeParser::parseDeclarations($src) as $name => $node) {
+            $type = (new Types($aliases))->resolve($node);
             if ($type instanceof TypeError) {
                 throw $type;
             }
-            $aliases[trim($name)] = $type;
-            $types = new Types($aliases);
-            $lines = explode("\n", $src);
-            array_splice($lines, 0, $node->location->endLine);
-            $src = implode("\n", $lines);
+            $aliases[$name] = $type;
         }
         return $aliases;
     }

@@ -16,11 +16,17 @@ use function str_split;
  */
 final class TypeParser
 {
+    /**
+     * A whole string is a whole type: unlike {@see self::parse()}, which reads one type off a stream the expression
+     * parser keeps using afterwards, nothing here comes after the type, so a leftover token is an error rather than the
+     * caller's business.
+     */
     public static function parseString(string $str): TypeNode|SyntaxError
     {
         $chars = $str === '' ? [] : str_split($str);
+        $tokens = new Peekable(Tokenizer::tokenize($chars));
         try {
-            $node = self::parse(new Peekable(Tokenizer::tokenize($chars)));
+            $node = self::parse($tokens);
         } catch (SyntaxError $e) {
             return $e;
         }
@@ -30,7 +36,49 @@ final class TypeParser
         if ($node === null) {
             return SyntaxError::create('Invalid type ""', Span::char(1, 1));
         }
+        $trailing = $tokens->peek();
+        if ($trailing !== null) {
+            return SyntaxError::unexpectedToken($trailing);
+        }
         return $node;
+    }
+
+    /**
+     * A sequence of `Name: <type>` declarations. A type ends where it is complete, so the next declaration's name is
+     * simply the next token; no separator is needed between them.
+     *
+     * @return array<string, TypeNode>
+     */
+    public static function parseDeclarations(string $src): array
+    {
+        $tokens = new Peekable(Tokenizer::tokenize($src === '' ? [] : str_split($src)));
+        $declarations = [];
+        while (($nameToken = $tokens->peek()) !== null) {
+            $name = $nameToken->token;
+            if (!is_string($name)) {
+                throw SyntaxError::create(
+                    sprintf('Expected type name, got %s', Token::print($name)),
+                    $nameToken->location(),
+                );
+            }
+            $tokens->next();
+            self::expect($tokens, Token::Colon);
+            $node = self::parse($tokens);
+            if ($node === null) {
+                throw SyntaxError::create(
+                    sprintf('Expected a type for %s, got end of input', $name),
+                    $nameToken->location(),
+                );
+            }
+            if (!$node instanceof TypeNode) {
+                throw SyntaxError::create(
+                    sprintf('Expected a type for %s, got %s', $name, Token::print($node->token)),
+                    $node->location(),
+                );
+            }
+            $declarations[$name] = $node;
+        }
+        return $declarations;
     }
 
     /**
