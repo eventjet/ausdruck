@@ -47,7 +47,7 @@ final class Types
     {
         $constructor = TypeConstructor::tryFrom($node->name);
         if ($constructor === null) {
-            return $this->resolveAlias($node->name) ?? TypeError::create(
+            return $this->resolveAlias($node) ?? TypeError::create(
                 sprintf('Unknown type %s', $node->name),
                 $node->location,
             );
@@ -154,13 +154,18 @@ final class Types
         return Type::mapOf($keyType, $valueType);
     }
 
-    private function resolveAlias(string $name): Type|null
+    /**
+     * An alias is a name for one complete type, so like the argument-less built-ins, it rejects type arguments instead
+     * of silently dropping them—`Foo<int>` is as invalid as `int<string>`. {@see TypeParser::parse()} counts on that:
+     * it reads a closed argument list after any name and leaves rejecting it to this resolver.
+     */
+    private function resolveAlias(TypeNode $node): Type|TypeError|null
     {
-        $type = $this->aliases[$name] ?? null;
+        $type = $this->aliases[$node->name] ?? null;
         if ($type === null) {
             return null;
         }
-        return Type::alias($name, $type);
+        return self::noArgs(Type::alias($node->name, $type), $node);
     }
 
     private function resolveOption(Type|TypeError $arg): Type|TypeError

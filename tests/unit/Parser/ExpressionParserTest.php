@@ -11,6 +11,7 @@ use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
+use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -483,6 +484,13 @@ final class ExpressionParserTest extends TestCase
             'The expressions of both sides of !== must be of the same type. Left: string, right: int',
         ];
         yield 'generic syntax on string' => ['foo:string<int>'];
+        // An alias is a name for one complete type: like the argument-less built-ins, it rejects type arguments
+        // instead of silently dropping them.
+        yield 'generic syntax on an alias' => [
+            'foo:Foo<int>',
+            'Invalid type "Foo<int>": Foo does not accept arguments',
+            new Declarations(types: new Types(['Foo' => Type::int()])),
+        ];
         yield 'unknown variable type' => ['foo:notavalidtype'];
         yield 'map with no type arguments' => ['foo:map', 'The map type requires two arguments, none given'];
         yield 'map with one type argument' => ['foo:map<string>', 'Invalid type "map<string>"'];
