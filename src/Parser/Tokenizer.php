@@ -89,21 +89,31 @@ final class Tokenizer
                 yield new ParsedToken(self::notEquals($chars, $line, $column), $line, $startCol);
                 continue;
             }
+            // `<` and `>` each stand for two things: on their own they are the angle brackets of a generic type (which
+            // the expression parser also reads as less-than and greater-than), and followed by `=` they are the
+            // comparison operators `<=` and `>=`, which are never anything else.
             if ($char === '<') {
                 $startCol = $column;
-                $token = self::angleOrComparison($chars, $column, Token::OpenAngle, Token::LessThanEquals);
+                $token = self::bareOrPair($chars, $column, '=', Token::OpenAngle, Token::LessThanEquals);
                 yield new ParsedToken($token, $line, $startCol);
                 continue;
             }
             if ($char === '>') {
                 $startCol = $column;
-                $token = self::angleOrComparison($chars, $column, Token::CloseAngle, Token::GreaterThanEquals);
+                $token = self::bareOrPair($chars, $column, '=', Token::CloseAngle, Token::GreaterThanEquals);
                 yield new ParsedToken($token, $line, $startCol);
                 continue;
             }
+            /**
+             * The sign is never folded into a number literal: a `-` always yields Token::Minus, and
+             * {@see \Eventjet\Ausdruck\Expr::negative()} turns a negated number literal back into a negative one. If
+             * the sign were folded in here, whitespace would silently decide the meaning of `a -2`: subtraction, or
+             * `a` followed by the literal -2.
+             */
             if ($char === '-') {
                 $startCol = $column;
-                yield new ParsedToken(self::minusOrArrow($chars, $column), $line, $startCol);
+                $token = self::bareOrPair($chars, $column, '>', Token::Minus, Token::Arrow);
+                yield new ParsedToken($token, $line, $startCol);
                 continue;
             }
             if (is_numeric($char)) {
@@ -112,16 +122,9 @@ final class Tokenizer
                 continue;
             }
             if ($char === '|') {
-                $chars->next();
-                $char = $chars->peek();
-                if ($char === '|') {
-                    $chars->next();
-                    yield new ParsedToken(Token::Or, $line, $column);
-                    $column += 2;
-                } else {
-                    yield new ParsedToken(Token::Pipe, $line, $column);
-                    $column++;
-                }
+                $startCol = $column;
+                $token = self::bareOrPair($chars, $column, '|', Token::Pipe, Token::Or);
+                yield new ParsedToken($token, $line, $startCol);
                 continue;
             }
             if ($char === '&') {
@@ -215,23 +218,24 @@ final class Tokenizer
     }
 
     /**
-     * `<` and `>` each stand for two things: on their own they are the angle brackets of a generic type (which the
-     * expression parser also reads as less-than and greater-than), and followed by `=` they are the comparison operators
-     * `<=` and `>=`, which are never anything else.
+     * A character that means one token on its own and another when $second completes it: `<` and `<=`, `>` and `>=`,
+     * `-` and `->`, `|` and `||`. None of the pairs is ever ambiguous, so the longer reading always wins where it's
+     * there.
      *
      * @param Peekable<string> $chars
      * @param positive-int $column
+     * @param non-empty-string $second The character that, if it comes next, makes this $pair instead of $bare.
      */
-    private static function angleOrComparison(Peekable $chars, int &$column, Token $bare, Token $orEquals): Token
+    private static function bareOrPair(Peekable $chars, int &$column, string $second, Token $bare, Token $pair): Token
     {
         $chars->next();
         $column++;
-        if ($chars->peek() !== '=') {
+        if ($chars->peek() !== $second) {
             return $bare;
         }
         $chars->next();
         $column++;
-        return $orEquals;
+        return $pair;
     }
 
     /**
@@ -261,26 +265,6 @@ final class Tokenizer
             $column++;
             $expected = substr($expected, 1);
         }
-    }
-
-    /**
-     * The sign is never folded into a number literal: a `-` always yields Token::Minus, and
-     * {@see \Eventjet\Ausdruck\Expr::negative()} turns a negated number literal back into a negative one. If the sign
-     * were folded in here, whitespace would silently decide the meaning of `a -2`: subtraction, or `a` followed by the
-     * literal -2.
-     *
-     * @param Peekable<string> $chars
-     * @param positive-int $column
-     */
-    private static function minusOrArrow(Peekable $chars, int &$column): Token
-    {
-        $chars->next();
-        $column++;
-        if ($chars->peek() !== '>') {
-            return Token::Minus;
-        }
-        $chars->next();
-        return Token::Arrow;
     }
 
     /**

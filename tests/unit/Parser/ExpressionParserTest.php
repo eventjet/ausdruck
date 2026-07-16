@@ -664,6 +664,11 @@ final class ExpressionParserTest extends TestCase
                 '(a:bool))',
                 '        =',
             ],
+            // The `>` of an arrow is a column like any other: what follows it is blamed where it actually is.
+            [
+                'x:fn(int) -> int &',
+                '                 =',
+            ],
         ];
         foreach ($cases as [$expression, $location]) {
             preg_match('/^(?<spaces> *)(?<underline>=+)/', $location, $matches);
