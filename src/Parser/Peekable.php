@@ -6,7 +6,15 @@ namespace Eventjet\Ausdruck\Parser;
 
 use Generator;
 
+use function array_key_exists;
+use function count;
+
 /**
+ * A single-item-lookahead cursor over an iterable, with the ability to rewind. Items pulled from the underlying
+ * generator are buffered as they are read, so {@see self::snapshot()} can record the current position and
+ * {@see self::restore()} can return to it later—which is what lets a parser try one reading of the tokens ahead and
+ * fall back to another. Everything already read stays available; nothing is pulled from the generator twice.
+ *
  * @template T
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -14,9 +22,10 @@ use Generator;
 final class Peekable
 {
     /** @var Generator<mixed, T> */
-    private readonly iterable $items;
-    /** @var T | null */
-    private mixed $previous = null;
+    private readonly Generator $items;
+    /** @var list<T> The items pulled from the generator so far; {@see self::$cursor} indexes into it. */
+    private array $buffer = [];
+    private int $cursor = 0;
 
     /**
      * @param iterable<mixed, T> $items
@@ -43,20 +52,28 @@ final class Peekable
      */
     public function peek(): mixed
     {
-        return $this->items->current();
+        if ($this->cursor === count($this->buffer)) {
+            if (!$this->items->valid()) {
+                return null;
+            }
+            $this->buffer[] = $this->items->current();
+            $this->items->next();
+        }
+        return $this->buffer[$this->cursor];
     }
 
     /**
-     * Advances the underlying generator, so subsequent peeks return a different item.
+     * Advances past the current item, so subsequent peeks return the next one.
      *
      * @return T | null
      * @phpstan-impure
      */
     public function next(): mixed
     {
-        $value = $this->items->current();
-        $this->previous = $value;
-        $this->items->next();
+        $value = $this->peek();
+        if ($value !== null) {
+            $this->cursor++;
+        }
         return $value;
     }
 
@@ -65,6 +82,20 @@ final class Peekable
      */
     public function previous(): mixed
     {
-        return $this->previous;
+        $index = $this->cursor - 1;
+        return array_key_exists($index, $this->buffer) ? $this->buffer[$index] : null;
+    }
+
+    /**
+     * The current position, to be handed back to {@see self::restore()}.
+     */
+    public function snapshot(): int
+    {
+        return $this->cursor;
+    }
+
+    public function restore(int $snapshot): void
+    {
+        $this->cursor = $snapshot;
     }
 }

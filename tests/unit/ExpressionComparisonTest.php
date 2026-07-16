@@ -12,10 +12,14 @@ use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\FieldAccess;
 use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Gt;
+use Eventjet\Ausdruck\Gte;
 use Eventjet\Ausdruck\Lambda;
 use Eventjet\Ausdruck\ListLiteral;
 use Eventjet\Ausdruck\Literal;
+use Eventjet\Ausdruck\Lt;
+use Eventjet\Ausdruck\Lte;
 use Eventjet\Ausdruck\Negative;
+use Eventjet\Ausdruck\Neq;
 use Eventjet\Ausdruck\Or_;
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\StructLiteral;
@@ -54,6 +58,22 @@ final class ExpressionComparisonTest extends TestCase
         yield [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
             Expr::gt(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield [
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield [
+            Expr::gte(Expr::literal(1), Expr::literal(2)),
+            Expr::gte(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield [
+            Expr::lte(Expr::literal(1), Expr::literal(2)),
+            Expr::lte(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield [
+            Expr::neq(Expr::literal('a'), Expr::literal('b')),
+            Expr::neq(Expr::literal('a'), Expr::literal('b')),
         ];
         yield [
             Expr::negative(Expr::get('a', Type::int())),
@@ -233,6 +253,54 @@ final class ExpressionComparisonTest extends TestCase
         ];
         yield Gt::class . ': different type' => [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
+            Expr::eq(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield Lt::class . ': left is different' => [
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+            Expr::lt(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield Lt::class . ': right is different' => [
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+            Expr::lt(Expr::literal(1), Expr::literal(1)),
+        ];
+        yield Lt::class . ': different type' => [
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+            Expr::gt(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield Gte::class . ': left is different' => [
+            Expr::gte(Expr::literal(1), Expr::literal(2)),
+            Expr::gte(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield Gte::class . ': right is different' => [
+            Expr::gte(Expr::literal(1), Expr::literal(2)),
+            Expr::gte(Expr::literal(1), Expr::literal(1)),
+        ];
+        yield Gte::class . ': different type' => [
+            Expr::gte(Expr::literal(1), Expr::literal(2)),
+            Expr::gt(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield Lte::class . ': left is different' => [
+            Expr::lte(Expr::literal(1), Expr::literal(2)),
+            Expr::lte(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield Lte::class . ': right is different' => [
+            Expr::lte(Expr::literal(1), Expr::literal(2)),
+            Expr::lte(Expr::literal(1), Expr::literal(1)),
+        ];
+        yield Lte::class . ': different type' => [
+            Expr::lte(Expr::literal(1), Expr::literal(2)),
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield Neq::class . ': left is different' => [
+            Expr::neq(Expr::literal(1), Expr::literal(2)),
+            Expr::neq(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield Neq::class . ': right is different' => [
+            Expr::neq(Expr::literal(1), Expr::literal(2)),
+            Expr::neq(Expr::literal(1), Expr::literal(1)),
+        ];
+        yield Neq::class . ': different type' => [
+            Expr::neq(Expr::literal(1), Expr::literal(2)),
             Expr::eq(Expr::literal(1), Expr::literal(2)),
         ];
         yield Negative::class . ': different type' => [

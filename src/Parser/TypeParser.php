@@ -104,10 +104,36 @@ final class TypeParser
         if ($tokens->peek()?->token !== Token::OpenAngle) {
             return new TypeNode($name, [], $parsedToken->location());
         }
+        // `<` is both the opening angle bracket of a generic type and the less-than operator, so a `<` after a type
+        // name is only sometimes part of the type. It is when the name is a generic constructor (`list<string>`), and
+        // when a non-generic name is nonetheless written with a closed argument list (`int<string>`, a mistake we let
+        // through so the resolver can reject it by name). It is not when the `<...>` never closes: `a:int < b:int` is a
+        // comparison, so we rewind and hand the `<` back to the expression parser. A generic constructor whose
+        // arguments never close is a genuine error, though, reported below where the `>` should have been.
+        $snapshot = $tokens->snapshot();
         $tokens->next();
         $args = self::parseTypeList($tokens);
+        $closed = $tokens->peek()?->token === Token::CloseAngle;
+        if (!$closed && !self::takesTypeArguments($name)) {
+            $tokens->restore($snapshot);
+            return new TypeNode($name, [], $parsedToken->location());
+        }
         $closeAngle = self::expect($tokens, Token::CloseAngle);
         return new TypeNode($name, $args, $parsedToken->location()->to($closeAngle->location()));
+    }
+
+    /**
+     * The built-in type constructors that take angle-bracket arguments, and so the only names after which a `<` always
+     * opens a generic argument list rather than possibly being a less-than operator. `fn` also takes arguments, but in
+     * parentheses (handled above), and no user-defined type (an alias) is generic, so this set is a closed, fixed fact
+     * of the grammar, kept here beside the `fn` special case it mirrors.
+     */
+    private static function takesTypeArguments(string $name): bool
+    {
+        return match ($name) {
+            'list', 'map', 'Option', 'Some' => true,
+            default => false,
+        };
     }
 
     /**

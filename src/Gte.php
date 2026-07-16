@@ -13,16 +13,16 @@ use function sprintf;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class Eq extends Expression
+final class Gte extends Expression
 {
-    public function __construct(public readonly Expression $left, public readonly Expression $right)
+    public function __construct(private readonly Expression $left, private readonly Expression $right)
     {
     }
 
     public function __toString(): string
     {
         return sprintf(
-            '%s === %s',
+            '%s >= %s',
             Precedence::parenthesize($this->left, Precedence::Additive),
             Precedence::parenthesize($this->right, Precedence::Additive),
         );
@@ -31,7 +31,7 @@ final class Eq extends Expression
     #[Override]
     public function evaluate(Scope $scope): bool
     {
-        return ValueEquality::equals($this->left->evaluate($scope), $this->right->evaluate($scope));
+        return Operand::number($this->left->evaluate($scope)) >= Operand::number($this->right->evaluate($scope));
     }
 
     #[Override]

@@ -46,8 +46,6 @@ final class Tokenizer
                 '.' => Token::Dot,
                 '(' => Token::OpenParen,
                 ')' => Token::CloseParen,
-                '<' => Token::OpenAngle,
-                '>' => Token::CloseAngle,
                 ':' => Token::Colon,
                 ',' => Token::Comma,
                 '[' => Token::OpenBracket,
@@ -83,6 +81,23 @@ final class Tokenizer
             if ($char === '=') {
                 $startCol = $column;
                 $token = self::equals($chars, $line, $column);
+                yield new ParsedToken($token, $line, $startCol);
+                continue;
+            }
+            if ($char === '!') {
+                $startCol = $column;
+                yield new ParsedToken(self::notEquals($chars, $line, $column), $line, $startCol);
+                continue;
+            }
+            if ($char === '<') {
+                $startCol = $column;
+                $token = self::angleOrComparison($chars, $column, Token::OpenAngle, Token::LessThanEquals);
+                yield new ParsedToken($token, $line, $startCol);
+                continue;
+            }
+            if ($char === '>') {
+                $startCol = $column;
+                $token = self::angleOrComparison($chars, $column, Token::CloseAngle, Token::GreaterThanEquals);
                 yield new ParsedToken($token, $line, $startCol);
                 continue;
             }
@@ -171,6 +186,52 @@ final class Tokenizer
         $column++;
         self::expect($chars, '==', $line, $column);
         return Token::TripleEquals;
+    }
+
+    /**
+     * The only operator that begins with `!` is `!==`, the negation of `===`. A lone `!` or a `!=` is a mistake, blamed
+     * at the `!` so the caret sits where `!==` would go.
+     *
+     * @param Peekable<string> $chars
+     * @param positive-int $line
+     * @param positive-int $column
+     */
+    private static function notEquals(Peekable $chars, int $line, int &$column): Token
+    {
+        $startColumn = $column;
+        $chars->next();
+        $column++;
+        if ($chars->peek() !== '=') {
+            throw SyntaxError::create('Unexpected character !', Span::char($line, $startColumn));
+        }
+        $chars->next();
+        $column++;
+        if ($chars->peek() !== '=') {
+            throw SyntaxError::create('Expected !==, got !=', Span::char($line, $startColumn));
+        }
+        $chars->next();
+        $column++;
+        return Token::NotEquals;
+    }
+
+    /**
+     * `<` and `>` each stand for two things: on their own they are the angle brackets of a generic type (which the
+     * expression parser also reads as less-than and greater-than), and followed by `=` they are the comparison operators
+     * `<=` and `>=`, which are never anything else.
+     *
+     * @param Peekable<string> $chars
+     * @param positive-int $column
+     */
+    private static function angleOrComparison(Peekable $chars, int &$column, Token $bare, Token $orEquals): Token
+    {
+        $chars->next();
+        $column++;
+        if ($chars->peek() !== '=') {
+            return $bare;
+        }
+        $chars->next();
+        $column++;
+        return $orEquals;
     }
 
     /**

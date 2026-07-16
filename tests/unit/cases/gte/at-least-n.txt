@@ -1,0 +1,5 @@
+quantity:int >= 3
+-- Input --
+{ quantity: 3 }
+-- Output --
+true

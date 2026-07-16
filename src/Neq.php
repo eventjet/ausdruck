@@ -10,10 +10,12 @@ use Override;
 use function sprintf;
 
 /**
+ * The negation of {@see Eq}: `!==` is true exactly where `===` is false, deep struct comparison included.
+ *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class Eq extends Expression
+final class Neq extends Expression
 {
     public function __construct(public readonly Expression $left, public readonly Expression $right)
     {
@@ -22,7 +24,7 @@ final class Eq extends Expression
     public function __toString(): string
     {
         return sprintf(
-            '%s === %s',
+            '%s !== %s',
             Precedence::parenthesize($this->left, Precedence::Additive),
             Precedence::parenthesize($this->right, Precedence::Additive),
         );
@@ -31,7 +33,7 @@ final class Eq extends Expression
     #[Override]
     public function evaluate(Scope $scope): bool
     {
-        return ValueEquality::equals($this->left->evaluate($scope), $this->right->evaluate($scope));
+        return !ValueEquality::equals($this->left->evaluate($scope), $this->right->evaluate($scope));
     }
 
     #[Override]

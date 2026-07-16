@@ -40,17 +40,14 @@ final class Expr
 
     public static function eq(Expression $left, Expression $right): Eq
     {
-        if (!$right->matchesType($left->getType())) {
-            throw TypeError::create(
-                sprintf(
-                    'The expressions of both sides of === must be of the same type. Left: %s, right: %s',
-                    $left->getType(),
-                    $right->getType(),
-                ),
-                $right->location(),
-            );
-        }
+        self::assertSameType($left, $right, '===');
         return new Eq($left, $right);
+    }
+
+    public static function neq(Expression $left, Expression $right): Neq
+    {
+        self::assertSameType($left, $right, '!==');
+        return new Neq($left, $right);
     }
 
     public static function get(string $name, TypeHint|Type $type, Span|null $location = null): Get
@@ -145,12 +142,26 @@ final class Expr
 
     public static function gt(Expression $left, Expression $right): Gt
     {
-        self::assertSameNumberType($left, $right, static fn(Expression $bad, Expression $good): string => sprintf(
-            'Can\'t compare %s to %s',
-            $bad->getType(),
-            $good->getType(),
-        ));
+        self::assertComparable($left, $right);
         return new Gt($left, $right);
+    }
+
+    public static function lt(Expression $left, Expression $right): Lt
+    {
+        self::assertComparable($left, $right);
+        return new Lt($left, $right);
+    }
+
+    public static function gte(Expression $left, Expression $right): Gte
+    {
+        self::assertComparable($left, $right);
+        return new Gte($left, $right);
+    }
+
+    public static function lte(Expression $left, Expression $right): Lte
+    {
+        self::assertComparable($left, $right);
+        return new Lte($left, $right);
     }
 
     /**
@@ -209,6 +220,40 @@ final class Expr
     {
         $type = $expr->getType();
         return $type->equals(Type::int()) || $type->equals(Type::float());
+    }
+
+    /**
+     * The rule both `===` and `!==` follow: the two sides have to be of the same type, whatever that type is. The error
+     * points at the right-hand side, the one measured against the left.
+     */
+    private static function assertSameType(Expression $left, Expression $right, string $operator): void
+    {
+        if ($right->matchesType($left->getType())) {
+            return;
+        }
+        throw TypeError::create(
+            sprintf(
+                'The expressions of both sides of %s must be of the same type. Left: %s, right: %s',
+                $operator,
+                $left->getType(),
+                $right->getType(),
+            ),
+            $right->location(),
+        );
+    }
+
+    /**
+     * The rule every ordering operator (`>`, `<`, `>=`, `<=`) follows. They all compare two numbers the same way, so
+     * they share one check and one wording, and can't drift into blaming different parts of the expression for the same
+     * mistake.
+     */
+    private static function assertComparable(Expression $left, Expression $right): void
+    {
+        self::assertSameNumberType($left, $right, static fn(Expression $bad, Expression $good): string => sprintf(
+            'Can\'t compare %s to %s',
+            $bad->getType(),
+            $good->getType(),
+        ));
     }
 
     /**
