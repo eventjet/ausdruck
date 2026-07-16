@@ -14,15 +14,15 @@ use function sprintf;
  * evaluating, type-checking, comparing itself to another expression—is the same whichever operator it holds, and lives
  * here; the operator only supplies the symbol and the rule that decides it, both carried by {@see ComparisonOperator}.
  *
- * The six operators still each have their own final subclass ({@see Eq}, {@see Neq}, {@see Gt}, {@see Lt}, {@see Gte},
- * {@see Lte}), but only to name the type—a subclass adds nothing but the operator it binds in its constructor. `===`
- * and `>` keep a dedicated type because {@see Expression::eq()} and {@see Expression::gt()} have returned {@see Eq} and
- * {@see Gt} since before this node existed; the rest follow the same shape so the six read alike.
+ * Four of the six operators are plain instances of this class, which is why it isn't abstract. `===` and `>` are the
+ * exceptions: each keeps a final subclass of its own ({@see Eq}, {@see Gt}), only because {@see Expression::eq()} and
+ * {@see Expression::gt()} have declared those return types since before this class existed—see {@see Eq} for why that
+ * pins them.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-abstract class Comparison extends Expression
+class Comparison extends Expression
 {
     public function __construct(
         private readonly ComparisonOperator $operator,

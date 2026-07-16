@@ -44,10 +44,10 @@ final class Expr
         return new Eq($left, $right);
     }
 
-    public static function neq(Expression $left, Expression $right): Neq
+    public static function neq(Expression $left, Expression $right): Comparison
     {
         self::assertSameType($left, $right, ComparisonOperator::NotEquals->value);
-        return new Neq($left, $right);
+        return new Comparison(ComparisonOperator::NotEquals, $left, $right);
     }
 
     public static function get(string $name, TypeHint|Type $type, Span|null $location = null): Get
@@ -146,22 +146,22 @@ final class Expr
         return new Gt($left, $right);
     }
 
-    public static function lt(Expression $left, Expression $right): Lt
+    public static function lt(Expression $left, Expression $right): Comparison
     {
         self::assertComparable($left, $right);
-        return new Lt($left, $right);
+        return new Comparison(ComparisonOperator::LessThan, $left, $right);
     }
 
-    public static function gte(Expression $left, Expression $right): Gte
+    public static function gte(Expression $left, Expression $right): Comparison
     {
         self::assertComparable($left, $right);
-        return new Gte($left, $right);
+        return new Comparison(ComparisonOperator::GreaterThanOrEqual, $left, $right);
     }
 
-    public static function lte(Expression $left, Expression $right): Lte
+    public static function lte(Expression $left, Expression $right): Comparison
     {
         self::assertComparable($left, $right);
-        return new Lte($left, $right);
+        return new Comparison(ComparisonOperator::LessThanOrEqual, $left, $right);
     }
 
     /**

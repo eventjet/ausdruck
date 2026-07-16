@@ -18,7 +18,7 @@ abstract class Expression implements Stringable
         return Expr::eq($this, $other);
     }
 
-    public function neq(self $other): Neq
+    public function neq(self $other): self
     {
         return Expr::neq($this, $other);
     }
@@ -33,17 +33,17 @@ abstract class Expression implements Stringable
         return Expr::gt($this, $right);
     }
 
-    public function lt(self $right): Lt
+    public function lt(self $right): self
     {
         return Expr::lt($this, $right);
     }
 
-    public function gte(self $right): Gte
+    public function gte(self $right): self
     {
         return Expr::gte($this, $right);
     }
 
-    public function lte(self $right): Lte
+    public function lte(self $right): self
     {
         return Expr::lte($this, $right);
     }
