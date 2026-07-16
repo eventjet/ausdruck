@@ -22,6 +22,7 @@ use function is_string;
 use function md5;
 use function sprintf;
 
+use const PHP_INT_MAX;
 use const PHP_INT_MIN;
 
 final class ExpressionTest extends TestCase
@@ -449,6 +450,13 @@ final class ExpressionTest extends TestCase
             ['(a:int / b:int).unwrap:int()'],
             new Scope(['a' => 1, 'b' => 0]),
             'Expected int, got None',
+        ];
+        // PHP's int arithmetic isn't closed: a sum past PHP_INT_MAX evaluates to a float, and a value that has left
+        // int has no int quotient to give. See Operand::int().
+        yield 'Dividing an int sum that overflowed' => [
+            ['(a:int + b:int) / c:int'],
+            new Scope(['a' => PHP_INT_MAX, 'b' => 1, 'c' => 2]),
+            'Expected an int operand, got float',
         ];
     }
 
