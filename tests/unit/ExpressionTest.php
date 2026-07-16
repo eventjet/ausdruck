@@ -22,6 +22,8 @@ use function is_string;
 use function md5;
 use function sprintf;
 
+use const PHP_INT_MIN;
+
 final class ExpressionTest extends TestCase
 {
     /**
@@ -121,6 +123,12 @@ final class ExpressionTest extends TestCase
             ['a:int / b:int', new Scope(['a' => 1, 'b' => 0]), null],
             ['a:float / b:float', new Scope(['a' => 1.0, 'b' => 0.0]), null],
             ['x:float / negZero:float', new Scope(['x' => 1.0, 'negZero' => -0.0]), null],
+            // PHP_INT_MIN / -1 is the other quotient int doesn't have: it overflows by one, and intdiv() would throw.
+            // Its neighbors — same dividend, same divisor — divide normally, and the matching remainder exists: it's 0.
+            ['a:int / b:int', new Scope(['a' => PHP_INT_MIN, 'b' => -1]), null],
+            ['a:int / b:int', new Scope(['a' => PHP_INT_MIN, 'b' => 1]), PHP_INT_MIN],
+            ['a:int / b:int', new Scope(['a' => 7, 'b' => -1]), -7],
+            ['a:int % b:int', new Scope(['a' => PHP_INT_MIN, 'b' => -1]), 0],
             ['(a:int / b:int).isSome()', new Scope(['a' => 1, 'b' => 0]), false],
             ['(a:int / b:int).isSome()', new Scope(['a' => 1, 'b' => 2]), true],
             ['(a:int / b:int).unwrap:int()', new Scope(['a' => 9, 'b' => 2]), 4],

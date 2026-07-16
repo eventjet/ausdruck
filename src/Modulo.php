@@ -11,8 +11,9 @@ use function is_int;
 
 /**
  * Like {@see Divide}, modulo is total: the remainder is an option of the operand type, and a zero divisor makes it
- * none rather than throwing. The remainder takes the dividend's sign. A float remainder is {@see fmod()}, whose
- * NAN-on-zero quirk stays inside: the divisor is checked before it's called.
+ * none rather than throwing. A zero divisor is also the only operand pair without a remainder — the division whose
+ * quotient overflows int still has one, since PHP_INT_MIN % -1 is 0. The remainder takes the dividend's sign. A float
+ * remainder is {@see fmod()}, whose NAN-on-zero quirk stays inside: the divisor is checked before it's called.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck

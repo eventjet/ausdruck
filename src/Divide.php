@@ -9,10 +9,13 @@ use Override;
 use function intdiv;
 use function is_int;
 
+use const PHP_INT_MIN;
+
 /**
- * Division is total: the quotient is an option of the operand type, and a zero divisor makes it none rather than
- * throwing — the same shape the `head` builtin gives an empty list. An int quotient is {@see intdiv()}, truncated
- * toward zero.
+ * Division is total: the quotient is an option of the operand type, and operands whose quotient doesn't exist in that
+ * type evaluate to none rather than throwing — the same shape the `head` builtin gives an empty list. That's every
+ * zero divisor, plus PHP_INT_MIN / -1, the one int division whose result overflows int and the one input
+ * {@see intdiv()} throws for. An int quotient is {@see intdiv()}, truncated toward zero.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -34,9 +37,14 @@ final class Divide extends BinaryOperator
         if ($divisor === 0 || $divisor === 0.0) {
             return null;
         }
-        return is_int($divisor)
-            ? intdiv(Operand::int($dividend), $divisor)
-            : Operand::float($dividend) / $divisor;
+        if (!is_int($divisor)) {
+            return Operand::float($dividend) / $divisor;
+        }
+        $dividend = Operand::int($dividend);
+        // The one nonzero divisor without an int quotient: -PHP_INT_MIN is one past PHP_INT_MAX, and intdiv() throws.
+        return $dividend === PHP_INT_MIN && $divisor === -1
+            ? null
+            : intdiv($dividend, $divisor);
     }
 
     #[Override]
