@@ -39,13 +39,14 @@ enum Precedence: int
     case And = 2;
     case Comparison = 3;
     case Additive = 4;
-    case Unary = 5;
+    case Multiplicative = 5;
+    case Unary = 6;
     /**
      * Calls, field accesses and the atomic expressions (literals, variables, lists, structs) all share the tightest
      * level: none of them can have an operand stolen, so none is ever parenthesized as an operand. Lambdas look atomic
      * but are not—see {@see self::Lambda}.
      */
-    case Primary = 6;
+    case Primary = 7;
 
     /**
      * Prints $operand as it appears in an operand slot that the parser reads at $slot, wrapping it in parentheses when
@@ -88,7 +89,8 @@ enum Precedence: int
             $expr instanceof Or_ => self::Or,
             $expr instanceof And_ => self::And,
             $expr instanceof Eq, $expr instanceof Gt => self::Comparison,
-            $expr instanceof Subtract => self::Additive,
+            $expr instanceof Add, $expr instanceof Subtract => self::Additive,
+            $expr instanceof Multiply, $expr instanceof Divide, $expr instanceof Modulo => self::Multiplicative,
             $expr instanceof Negative => self::Unary,
             default => self::Primary,
         };

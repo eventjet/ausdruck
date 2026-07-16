@@ -23,6 +23,32 @@ abstract class Expression implements Stringable
         return Expr::subtract($this, $subtrahend);
     }
 
+    public function add(self $addend): Add
+    {
+        return Expr::add($this, $addend);
+    }
+
+    public function multiply(self $multiplier): Multiply
+    {
+        return Expr::multiply($this, $multiplier);
+    }
+
+    /**
+     * The quotient is an option of the operands' type: none when the divisor evaluates to zero. See {@see Divide}.
+     */
+    public function divide(self $divisor): Divide
+    {
+        return Expr::divide($this, $divisor);
+    }
+
+    /**
+     * The remainder is an option of the operands' type: none when the divisor evaluates to zero. See {@see Modulo}.
+     */
+    public function modulo(self $divisor): Modulo
+    {
+        return Expr::modulo($this, $divisor);
+    }
+
     public function gt(self $right): Gt
     {
         return Expr::gt($this, $right);

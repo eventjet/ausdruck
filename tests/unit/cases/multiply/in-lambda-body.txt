@@ -1,0 +1,7 @@
+ints:list<int>.map:list<int>(|i| i:int * 2)
+-- Input --
+{
+  ints: [1, 2, 3],
+}
+-- Output --
+[2, 4, 6]

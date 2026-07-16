@@ -134,13 +134,62 @@ final class Expr
 
     public static function subtract(Expression $minuend, Expression $subtrahend): Subtract
     {
-        // Which operand is at fault doesn't change how we name the mistake, only which one we point at.
+        // Which operand is at fault doesn't change how we name the mistake, only which one we point at. The same goes
+        // for the other arithmetic operators below.
         self::assertSameNumberType($minuend, $subtrahend, static fn(): string => sprintf(
             'Can\'t subtract %s from %s',
             $subtrahend->getType(),
             $minuend->getType(),
         ));
         return new Subtract($minuend, $subtrahend);
+    }
+
+    public static function add(Expression $augend, Expression $addend): Add
+    {
+        self::assertSameNumberType($augend, $addend, static fn(): string => sprintf(
+            'Can\'t add %s to %s',
+            $addend->getType(),
+            $augend->getType(),
+        ));
+        return new Add($augend, $addend);
+    }
+
+    public static function multiply(Expression $multiplicand, Expression $multiplier): Multiply
+    {
+        self::assertSameNumberType($multiplicand, $multiplier, static fn(): string => sprintf(
+            'Can\'t multiply %s by %s',
+            $multiplicand->getType(),
+            $multiplier->getType(),
+        ));
+        return new Multiply($multiplicand, $multiplier);
+    }
+
+    /**
+     * The quotient's type is an option of the operands' type: division is total, and a zero divisor evaluates to none.
+     * See {@see Divide}.
+     */
+    public static function divide(Expression $dividend, Expression $divisor): Divide
+    {
+        self::assertSameNumberType($dividend, $divisor, static fn(): string => sprintf(
+            'Can\'t divide %s by %s',
+            $dividend->getType(),
+            $divisor->getType(),
+        ));
+        return new Divide($dividend, $divisor);
+    }
+
+    /**
+     * The remainder's type is an option of the operands' type: modulo is total, and a zero divisor evaluates to none.
+     * See {@see Modulo}.
+     */
+    public static function modulo(Expression $dividend, Expression $divisor): Modulo
+    {
+        self::assertSameNumberType($dividend, $divisor, static fn(): string => sprintf(
+            'Can\'t take %s modulo %s',
+            $dividend->getType(),
+            $divisor->getType(),
+        ));
+        return new Modulo($dividend, $divisor);
     }
 
     public static function gt(Expression $left, Expression $right): Gt

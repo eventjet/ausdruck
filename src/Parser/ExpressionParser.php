@@ -21,7 +21,7 @@ use function str_split;
 /**
  * Expressions are parsed as a cascade of precedence levels, from loosest to tightest binding:
  *
- *     expression → or → and → comparison → additive → unary → postfix → primary
+ *     expression → or → and → comparison → additive → multiplicative → unary → postfix → primary
  *
  * Each level consumes only its own operators and delegates to the next tighter level for its operands. Precedence and
  * associativity are therefore expressed by the call graph, and a level never needs to know which operators sit above
@@ -141,17 +141,43 @@ final class ExpressionParser
     }
 
     /**
-     * a:int - b:int - c:int
+     * a:int + b:int - c:int
      * =====================
      */
     private function parseAdditive(): Expression
     {
-        $left = $this->parseUnary();
-        while ($this->nextToken() === Token::Minus) {
+        $left = $this->parseMultiplicative();
+        while (true) {
+            $operator = $this->nextToken();
+            if ($operator !== Token::Plus && $operator !== Token::Minus) {
+                return $left;
+            }
             $this->tokens->next();
-            $left = $left->subtract($this->parseUnary());
+            $right = $this->parseMultiplicative();
+            $left = $operator === Token::Plus ? $left->add($right) : $left->subtract($right);
         }
-        return $left;
+    }
+
+    /**
+     * a:int * b:int / c:int
+     * =====================
+     */
+    private function parseMultiplicative(): Expression
+    {
+        $left = $this->parseUnary();
+        while (true) {
+            $operator = $this->nextToken();
+            if ($operator !== Token::Asterisk && $operator !== Token::Slash && $operator !== Token::Percent) {
+                return $left;
+            }
+            $this->tokens->next();
+            $right = $this->parseUnary();
+            $left = match ($operator) {
+                Token::Asterisk => $left->multiply($right),
+                Token::Slash => $left->divide($right),
+                Token::Percent => $left->modulo($right),
+            };
+        }
     }
 
     /**

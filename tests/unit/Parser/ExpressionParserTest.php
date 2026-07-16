@@ -76,6 +76,32 @@ final class ExpressionParserTest extends TestCase
                     Expr::get('c', Type::int()),
                 ),
             ],
+            // + and - share the additive level, * / % the multiplicative one, so a chain mixing operators of one
+            // level is still left-associative across them.
+            [
+                'a:int + b:int + c:int',
+                Expr::add(Expr::add(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
+            ],
+            [
+                'a:int + b:int - c:int',
+                Expr::subtract(Expr::add(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
+            ],
+            [
+                'a:int - b:int + c:int',
+                Expr::add(Expr::subtract(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
+            ],
+            [
+                'a:int * b:int * c:int',
+                Expr::multiply(Expr::multiply(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
+            ],
+            [
+                'a:int * b:int / c:int',
+                Expr::divide(Expr::multiply(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
+            ],
+            [
+                'a:int * b:int % c:int',
+                Expr::modulo(Expr::multiply(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
+            ],
             ['"💩"', Expr::literal('💩')],
             ['foo:map<string, int>', Expr::get('foo', Type::mapOf(Type::string(), Type::int()))],
             [
@@ -130,10 +156,28 @@ final class ExpressionParserTest extends TestCase
                     Expr::get('d', $b),
                 ),
             ],
+            // Multiplicative binds tighter than additive.
+            [
+                'a:int + b:int * c:int',
+                Expr::add(Expr::get('a', $i), Expr::multiply(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            [
+                'a:int * b:int - c:int',
+                Expr::subtract(Expr::multiply(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
+            ],
             // Unary binds tighter than additive, so this subtracts a negation rather than negating a subtraction.
             [
                 'a:int - -b:int',
                 Expr::subtract(Expr::get('a', $i), Expr::negative(Expr::get('b', $i))),
+            ],
+            [
+                'a:int + -b:int',
+                Expr::add(Expr::get('a', $i), Expr::negative(Expr::get('b', $i))),
+            ],
+            // ...and tighter than multiplicative, so this multiplies by a negation.
+            [
+                'a:int * -b:int',
+                Expr::multiply(Expr::get('a', $i), Expr::negative(Expr::get('b', $i))),
             ],
             // Operators are allowed wherever an expression is expected, not just at the top level.
             [
@@ -196,8 +240,40 @@ final class ExpressionParserTest extends TestCase
                 Expr::subtract(Expr::get('a', $i), Expr::subtract(Expr::get('b', $i), Expr::get('c', $i))),
             ],
             [
+                'a:int + (b:int + c:int)',
+                Expr::add(Expr::get('a', $i), Expr::add(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            [
+                'a:int * (b:int * c:int)',
+                Expr::multiply(Expr::get('a', $i), Expr::multiply(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            [
+                '(a:int + b:int) * c:int',
+                Expr::multiply(Expr::add(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
+            ],
+            [
+                'a:int * (b:int + c:int)',
+                Expr::multiply(Expr::get('a', $i), Expr::add(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            [
+                'a:int / (b:int * c:int)',
+                Expr::divide(Expr::get('a', $i), Expr::multiply(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            [
+                'a:int % (b:int - c:int)',
+                Expr::modulo(Expr::get('a', $i), Expr::subtract(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            [
+                'a:int - (b:int + c:int)',
+                Expr::subtract(Expr::get('a', $i), Expr::add(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            [
                 '-(a:int - b:int)',
                 Expr::negative(Expr::subtract(Expr::get('a', $i), Expr::get('b', $i))),
+            ],
+            [
+                '-(a:int * b:int)',
+                Expr::negative(Expr::multiply(Expr::get('a', $i), Expr::get('b', $i))),
             ],
             // === and > are non-associative, so a parenthesized comparison is the only way one ends up inside another.
             [
@@ -213,6 +289,23 @@ final class ExpressionParserTest extends TestCase
             [
                 '(a:int - b:int).abs:int()',
                 Expr::subtract(Expr::get('a', $i), Expr::get('b', $i))->call('abs', $i, []),
+            ],
+            [
+                '(a:int * b:int).abs:int()',
+                Expr::multiply(Expr::get('a', $i), Expr::get('b', $i))->call('abs', $i, []),
+            ],
+            // The way to get at a quotient: / makes an Option, and isSome/unwrap are calls on it.
+            [
+                '(a:int / b:int).isSome:bool()',
+                Expr::divide(Expr::get('a', $i), Expr::get('b', $i))->call('isSome', $b, []),
+            ],
+            [
+                '(a:int / b:int).unwrap:int()',
+                Expr::divide(Expr::get('a', $i), Expr::get('b', $i))->call('unwrap', $i, []),
+            ],
+            [
+                '(a:int % b:int).unwrap:int()',
+                Expr::modulo(Expr::get('a', $i), Expr::get('b', $i))->call('unwrap', $i, []),
             ],
             [
                 '(-a:int).abs:int()',
@@ -259,6 +352,13 @@ final class ExpressionParserTest extends TestCase
             ['foo:int-2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
             ['foo:int -2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
             ['foo:int- 2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
+            // The other arithmetic operators don't double as a literal's sign, so whitespace has nothing to decide;
+            // it just must not matter.
+            ['foo:int+2', Expr::add(Expr::get('foo', Type::int()), Expr::literal(2))],
+            ['foo:int +2', Expr::add(Expr::get('foo', Type::int()), Expr::literal(2))],
+            ['foo:int*2', Expr::multiply(Expr::get('foo', Type::int()), Expr::literal(2))],
+            ['foo:int/2', Expr::divide(Expr::get('foo', Type::int()), Expr::literal(2))],
+            ['foo:int%2', Expr::modulo(Expr::get('foo', Type::int()), Expr::literal(2))],
             // Trailing commas are allowed in argument and list literal element lists.
             [
                 'foo:string.substr:string(0, 3,)',
@@ -312,6 +412,20 @@ final class ExpressionParserTest extends TestCase
                     Expr::literal(2),
                 ),
             ],
+            [
+                '(a:int + b:int) + c:int',
+                Expr::add(
+                    Expr::add(Expr::get('a', Type::int()), Expr::get('b', Type::int())),
+                    Expr::get('c', Type::int()),
+                ),
+            ],
+            [
+                '(a:int * b:int) * c:int',
+                Expr::multiply(
+                    Expr::multiply(Expr::get('a', Type::int()), Expr::get('b', Type::int())),
+                    Expr::get('c', Type::int()),
+                ),
+            ],
         ];
         foreach ($cases as $case) {
             yield $case[0] => $case;
@@ -356,6 +470,14 @@ final class ExpressionParserTest extends TestCase
             'Expected ), got end of input',
         ];
         yield 'missing right hand side of minus' => ['foo:int -'];
+        yield 'missing right hand side of plus' => ['foo:int +'];
+        yield 'missing right hand side of star' => ['foo:int *'];
+        yield 'missing right hand side of slash' => ['foo:int /'];
+        yield 'missing right hand side of percent' => ['foo:int %'];
+        yield 'missing left hand side of plus' => ['+ foo:int', 'Expected expression, got +'];
+        yield 'missing left hand side of star' => ['* foo:int', 'Expected expression, got *'];
+        // Unlike -, + is not a unary operator.
+        yield 'plus as a sign' => ['a:int + + 2', 'Expected expression, got +'];
         yield 'empty string' => ['', 'Expected expression, got end of input'];
         yield 'missing left hand side of >' => ['> foo:int'];
         yield 'missing right hand side of >' => ['foo:int >'];
@@ -427,6 +549,36 @@ final class ExpressionParserTest extends TestCase
         yield 'subtract string from string' => ['foo:string - bar:string', 'Can\'t subtract string from string'];
         yield 'subtract string from int' => ['foo:int - bar:string', 'Can\'t subtract string from int'];
         yield 'subtract int from string' => ['foo:string - bar:int', 'Can\'t subtract int from string'];
+        yield 'add float to int' => ['foo:int + bar:float', 'Can\'t add float to int'];
+        yield 'add int to float' => ['foo:float + bar:int', 'Can\'t add int to float'];
+        yield 'add string to string' => ['foo:string + bar:string', 'Can\'t add string to string'];
+        yield 'add string to int' => ['foo:int + bar:string', 'Can\'t add string to int'];
+        yield 'add int to string' => ['foo:string + bar:int', 'Can\'t add int to string'];
+        yield 'multiply int by float' => ['foo:int * bar:float', 'Can\'t multiply int by float'];
+        yield 'multiply float by int' => ['foo:float * bar:int', 'Can\'t multiply float by int'];
+        yield 'multiply string by string' => ['foo:string * bar:string', 'Can\'t multiply string by string'];
+        yield 'multiply string by int' => ['foo:string * bar:int', 'Can\'t multiply string by int'];
+        yield 'multiply int by string' => ['foo:int * bar:string', 'Can\'t multiply int by string'];
+        yield 'divide int by float' => ['foo:int / bar:float', 'Can\'t divide int by float'];
+        yield 'divide float by int' => ['foo:float / bar:int', 'Can\'t divide float by int'];
+        yield 'divide string by string' => ['foo:string / bar:string', 'Can\'t divide string by string'];
+        yield 'divide string by int' => ['foo:string / bar:int', 'Can\'t divide string by int'];
+        yield 'divide int by string' => ['foo:int / bar:string', 'Can\'t divide int by string'];
+        yield 'int modulo float' => ['foo:int % bar:float', 'Can\'t take int modulo float'];
+        yield 'float modulo int' => ['foo:float % bar:int', 'Can\'t take float modulo int'];
+        yield 'string modulo string' => ['foo:string % bar:string', 'Can\'t take string modulo string'];
+        yield 'string modulo int' => ['foo:string % bar:int', 'Can\'t take string modulo int'];
+        yield 'int modulo string' => ['foo:int % bar:string', 'Can\'t take int modulo string'];
+        // A quotient is an Option of the operand type, so it doesn't chain into further arithmetic, comparison or
+        // negation without an unwrap.
+        yield 'chained division' => ['a:int / b:int / c:int', 'Can\'t divide Option<int> by int'];
+        yield 'chained modulo' => ['a:int % b:int % c:int', 'Can\'t take Option<int> modulo int'];
+        yield 'subtracting from a quotient' => ['a:int / b:int - c:int', 'Can\'t subtract int from Option<int>'];
+        yield 'negating a quotient' => ['-(a:int / b:int)', 'Can\'t negate Option<int>'];
+        yield 'comparing a quotient to its operand type' => [
+            'a:int / b:int === 3',
+            'The expressions of both sides of === must be of the same type. Left: Option<int>, right: int',
+        ];
         yield 'int > float' => ['foo:int > bar:float', 'Can\'t compare int to float'];
         yield 'float > int' => ['foo:float > bar:int', 'Can\'t compare float to int'];
         yield 'string > string' => ['foo:string > bar:string', 'Can\'t compare string to string'];
@@ -701,6 +853,22 @@ final class ExpressionParserTest extends TestCase
             ],
             [
                 '"foo" === 72 - 23',
+                '          =======',
+            ],
+            [
+                '"foo" === 72 + 23',
+                '          =======',
+            ],
+            [
+                '"foo" === 72 * 23',
+                '          =======',
+            ],
+            [
+                '"foo" === 72 / 23',
+                '          =======',
+            ],
+            [
+                '"foo" === 72 % 23',
                 '          =======',
             ],
             [

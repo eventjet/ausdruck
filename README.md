@@ -62,31 +62,57 @@ See [Types](#types)
 
 Both operands must be of the same type.
 
-| Operator | Description  | Example                  | Note                                      |
-|----------|--------------|--------------------------|-------------------------------------------|
-| `===`    | Equality     | `foo:string === "bar"`   |                                           |
-| `-`      | Subtraction  | `foo:int - bar:int`      | Operands must be of type `int` or `float` |
-| `>`      | Greater than | `foo:int > bar:int`      | Operands must be of type `int` or `float` |
-| `\|\|`   | Logical OR   | `foo:bool \|\| bar:bool` | Operands must be of type `bool`           |
-| &&       | Logical AND  | `foo:bool && bar:bool`   | Operands must be of type `bool`           |
+| Operator | Description    | Example                  | Note                                             |
+|----------|----------------|--------------------------|--------------------------------------------------|
+| `===`    | Equality       | `foo:string === "bar"`   |                                                  |
+| `-`      | Subtraction    | `foo:int - bar:int`      | Operands must be of type `int` or `float`        |
+| `+`      | Addition       | `foo:int + bar:int`      | Operands must be of type `int` or `float`        |
+| `*`      | Multiplication | `foo:int * bar:int`      | Operands must be of type `int` or `float`        |
+| `/`      | Division       | `foo:int / bar:int`      | See [Division and modulo](#division-and-modulo)  |
+| `%`      | Modulo         | `foo:int % bar:int`      | See [Division and modulo](#division-and-modulo)  |
+| `>`      | Greater than   | `foo:int > bar:int`      | Operands must be of type `int` or `float`        |
+| `\|\|`   | Logical OR     | `foo:bool \|\| bar:bool` | Operands must be of type `bool`                  |
+| &&       | Logical AND    | `foo:bool && bar:bool`   | Operands must be of type `bool`                  |
 
 Where's the rest? We're implementing more as we need them.
+
+#### Division and modulo
+
+Like the other arithmetic operators, `/` and `%` take two operands of the same numeric type — but the result is an
+`Option` of that type: `int / int` is an `Option<int>`, and a zero divisor makes it `none` rather than an error. Get
+at the value the same way you would with `head`:
+
+```
+(a:int / b:int).unwrap:int()
+(a:int / b:int).isSome:bool()
+(i:int % 3).unwrap:int() === 0
+```
+
+`unwrap` fails evaluation on `none`, so use it where a zero divisor can't happen or should be loud; check with
+`isSome` where it's a case to handle. Because the result is an `Option`, it doesn't chain into further arithmetic or
+comparison without an `unwrap`: `a:int / b:int / c:int` is a type error.
+
+An `int` quotient truncates toward zero: `7 / 2` is `3`, and `-7 / 2` is `-3`. The remainder takes the dividend's
+sign: `-7 % 3` is `-1`. A `float` remainder is PHP's `fmod()`.
 
 #### Precedence
 
 Operators bind from tightest to loosest in this order:
 
-| Operator            | Associativity   |
-|---------------------|-----------------|
-| `.` (field, method) | Left            |
-| `-` (negation)      | Right           |
-| `-` (subtraction)   | Left            |
-| `===`, `>`          | Non-associative |
-| `&&`                | Left            |
-| `\|\|`              | Left            |
+| Operator               | Associativity   |
+|------------------------|-----------------|
+| `.` (field, method)    | Left            |
+| `-` (negation)         | Right           |
+| `*`, `/`, `%`          | Left            |
+| `-` (subtraction), `+` | Left            |
+| `===`, `>`             | Non-associative |
+| `&&`                   | Left            |
+| `\|\|`                 | Left            |
 
 As in most languages, `&&` binds tighter than `||`, so `a:bool && b:bool || c:bool` means
-`(a:bool && b:bool) || c:bool`, and `a:int - b:int - c:int` means `(a:int - b:int) - c:int`.
+`(a:bool && b:bool) || c:bool`; `*`, `/` and `%` bind tighter than `+` and binary `-`, so `a:int + b:int * c:int`
+means `a:int + (b:int * c:int)`. Operators that share a level are left-associative across it:
+`a:int - b:int + c:int` means `(a:int - b:int) + c:int`.
 
 `===` and `>` are non-associative: `a:int > b:int > c:int` is a syntax error rather than a comparison against the
 `bool` that the first comparison produces. Chain with `&&` instead.
@@ -98,6 +124,7 @@ Wrap a sub-expression in parentheses to override the precedence:
 ```
 a:bool && (b:bool || c:bool)
 (a:int - b:int) - c:int
+(a:int + b:int) * c:int
 (a:int > b:int) === c:bool
 (a:int - b:int).abs:int()
 ```

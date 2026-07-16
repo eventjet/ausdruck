@@ -1,0 +1,8 @@
+(a:int / b:int).unwrap:int()
+-- Input --
+{
+  a: -7,
+  b: 2,
+}
+-- Output --
+-3

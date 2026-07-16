@@ -55,6 +55,26 @@ final class Operand
     /**
      * @infection-ignore-all Unreachable; see the class docblock.
      */
+    public static function int(mixed $value): int
+    {
+        return is_int($value)
+            ? $value
+            : throw new EvaluationError(sprintf('Expected an int operand, got %s', get_debug_type($value)));
+    }
+
+    /**
+     * @infection-ignore-all Unreachable; see the class docblock.
+     */
+    public static function float(mixed $value): float
+    {
+        return is_float($value)
+            ? $value
+            : throw new EvaluationError(sprintf('Expected a float operand, got %s', get_debug_type($value)));
+    }
+
+    /**
+     * @infection-ignore-all Unreachable; see the class docblock.
+     */
     public static function struct(mixed $value): object
     {
         return is_object($value)

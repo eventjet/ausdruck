@@ -109,6 +109,34 @@ final class ExpressionTest extends TestCase
             ['nums:list<int>.some:bool(|item| item:int === 5)', new Scope(['nums' => [4, 5, 6]]), true],
             ['"Rudolph".substr:string(1, 3)', new Scope(), 'udo'],
             ['a:int - b:int - c:int', new Scope(['a' => 10, 'b' => 3, 'c' => 4]), 3],
+            ['a:int + b:int', new Scope(['a' => 2, 'b' => 3]), 5],
+            ['a:float + b:float', new Scope(['a' => 1.5, 'b' => 2.25]), 3.75],
+            ['a:int * b:int', new Scope(['a' => 4, 'b' => 6]), 24],
+            ['a:float * b:float', new Scope(['a' => 1.5, 'b' => 2.0]), 3.0],
+            // An int quotient truncates toward zero.
+            ['a:int / b:int', new Scope(['a' => 7, 'b' => 2]), 3],
+            ['a:int / b:int', new Scope(['a' => -7, 'b' => 2]), -3],
+            ['a:float / b:float', new Scope(['a' => 7.0, 'b' => 2.0]), 3.5],
+            // A zero divisor makes the quotient none, whatever the number type. Negative zero counts as zero.
+            ['a:int / b:int', new Scope(['a' => 1, 'b' => 0]), null],
+            ['a:float / b:float', new Scope(['a' => 1.0, 'b' => 0.0]), null],
+            ['x:float / negZero:float', new Scope(['x' => 1.0, 'negZero' => -0.0]), null],
+            ['(a:int / b:int).isSome()', new Scope(['a' => 1, 'b' => 0]), false],
+            ['(a:int / b:int).isSome()', new Scope(['a' => 1, 'b' => 2]), true],
+            ['(a:int / b:int).unwrap:int()', new Scope(['a' => 9, 'b' => 2]), 4],
+            // The remainder takes the dividend's sign, for floats (fmod) just like for ints (%).
+            ['a:int % b:int', new Scope(['a' => 7, 'b' => 3]), 1],
+            ['a:int % b:int', new Scope(['a' => -7, 'b' => 3]), -1],
+            ['a:float % b:float', new Scope(['a' => 5.5, 'b' => 2.0]), 1.5],
+            ['a:float % b:float', new Scope(['a' => -5.5, 'b' => 2.0]), -1.5],
+            ['a:int % b:int', new Scope(['a' => 7, 'b' => 0]), null],
+            ['a:float % b:float', new Scope(['a' => 5.5, 'b' => 0.0]), null],
+            ['(a:int % 3).unwrap:int() === 0', new Scope(['a' => 9]), true],
+            ['(a:int % 3).unwrap:int() === 0', new Scope(['a' => 10]), false],
+            ['a:int + b:int * c:int', new Scope(['a' => 2, 'b' => 3, 'c' => 4]), 14],
+            ['(a:int + b:int) * c:int', new Scope(['a' => 2, 'b' => 3, 'c' => 4]), 20],
+            ['a:int - b:int + c:int', new Scope(['a' => 10, 'b' => 3, 'c' => 4]), 11],
+            ['a:int * b:int / c:int', new Scope(['a' => 10, 'b' => 3, 'c' => 4]), 7],
             ['"foo" === "bar"', new Scope(), false],
             ['"foo" === "foo"', new Scope(), true],
             ['foo:any === bar:any', new Scope(['foo' => 12.34, 'bar' => 12.34]), true],
@@ -403,6 +431,17 @@ final class ExpressionTest extends TestCase
             new Scope(['foo' => []]),
             'Expected variable "foo" to be of type string, got array: Expected string, got list<never>',
         ];
+        // Operands evaluate left to right, so the dividend runs even when the divisor turns out to be zero.
+        yield 'Division evaluates its dividend even when the divisor is zero' => [
+            ['a:int / b:int'],
+            new Scope(['b' => 0]),
+            'Unknown variable "a"',
+        ];
+        yield 'Unwrapping a none quotient' => [
+            ['(a:int / b:int).unwrap:int()'],
+            new Scope(['a' => 1, 'b' => 0]),
+            'Expected int, got None',
+        ];
     }
 
     /**
@@ -471,6 +510,14 @@ final class ExpressionTest extends TestCase
         yield 'List literal with strings' => ['["foo", myVar:string]', Type::listOf(Type::string())];
         yield 'List literal with strings and ints' => ['["foo", "bar", 42, myVar:string]', Type::listOf(Type::any())];
         yield 'Empty list literal' => ['[]', Type::listOf(Type::any())];
+        yield 'Add ints' => ['a:int + b:int', Type::int()];
+        yield 'Add floats' => ['a:float + b:float', Type::float()];
+        yield 'Multiply ints' => ['a:int * b:int', Type::int()];
+        yield 'Multiply floats' => ['a:float * b:float', Type::float()];
+        yield 'Divide ints' => ['a:int / b:int', Type::option(Type::int())];
+        yield 'Divide floats' => ['a:float / b:float', Type::option(Type::float())];
+        yield 'Modulo ints' => ['a:int % b:int', Type::option(Type::int())];
+        yield 'Modulo floats' => ['a:float % b:float', Type::option(Type::float())];
     }
 
     /**
