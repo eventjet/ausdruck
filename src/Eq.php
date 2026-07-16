@@ -11,7 +11,6 @@ use function array_key_exists;
 use function count;
 use function get_object_vars;
 use function is_object;
-use function sprintf;
 
 /**
  * @internal
@@ -52,11 +51,7 @@ final class Eq extends Expression
 
     public function __toString(): string
     {
-        return sprintf(
-            '%s === %s',
-            Precedence::parenthesize($this->left, Precedence::Additive),
-            Precedence::parenthesize($this->right, Precedence::Additive),
-        );
+        return Precedence::nonAssociative($this->left, '===', $this->right, Precedence::Comparison);
     }
 
     #[Override]

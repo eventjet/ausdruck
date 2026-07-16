@@ -7,8 +7,6 @@ namespace Eventjet\Ausdruck;
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
 
-use function sprintf;
-
 /**
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -21,11 +19,7 @@ final class Multiply extends Expression
 
     public function __toString(): string
     {
-        return sprintf(
-            '%s * %s',
-            Precedence::parenthesize($this->multiplicand, Precedence::Multiplicative),
-            Precedence::parenthesize($this->multiplier, Precedence::Unary),
-        );
+        return Precedence::leftAssociative($this->multiplicand, '*', $this->multiplier, Precedence::Multiplicative);
     }
 
     /**

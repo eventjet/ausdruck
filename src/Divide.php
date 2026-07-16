@@ -9,7 +9,6 @@ use Override;
 
 use function intdiv;
 use function is_int;
-use function sprintf;
 
 /**
  * Division is total: the quotient is an option of the operand type, and a zero divisor makes it none rather than
@@ -27,11 +26,7 @@ final class Divide extends Expression
 
     public function __toString(): string
     {
-        return sprintf(
-            '%s / %s',
-            Precedence::parenthesize($this->dividend, Precedence::Multiplicative),
-            Precedence::parenthesize($this->divisor, Precedence::Unary),
-        );
+        return Precedence::leftAssociative($this->dividend, '/', $this->divisor, Precedence::Multiplicative);
     }
 
     #[Override]

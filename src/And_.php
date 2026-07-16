@@ -7,8 +7,6 @@ namespace Eventjet\Ausdruck;
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
 
-use function sprintf;
-
 /**
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -21,11 +19,7 @@ final class And_ extends Expression
 
     public function __toString(): string
     {
-        return sprintf(
-            '%s && %s',
-            Precedence::parenthesize($this->left, Precedence::And),
-            Precedence::parenthesize($this->right, Precedence::Comparison),
-        );
+        return Precedence::leftAssociative($this->left, '&&', $this->right, Precedence::And);
     }
 
     /**

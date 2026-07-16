@@ -165,6 +165,11 @@ final class ExpressionParserTest extends TestCase
                 'a:int * b:int - c:int',
                 Expr::subtract(Expr::multiply(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
             ],
+            // ...and on the right of - just like on the right of +: a multiplicative subtrahend prints bare.
+            [
+                'a:int - b:int * c:int',
+                Expr::subtract(Expr::get('a', $i), Expr::multiply(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
             // Unary binds tighter than additive, so this subtracts a negation rather than negating a subtraction.
             [
                 'a:int - -b:int',
@@ -262,6 +267,12 @@ final class ExpressionParserTest extends TestCase
             [
                 'a:int % (b:int - c:int)',
                 Expr::modulo(Expr::get('a', $i), Expr::subtract(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            // A multiplicative-level divisor keeps its parentheses too: dropped, a:int % b:int * c:int would re-parse
+            // as (a:int % b:int) * c:int — a different tree.
+            [
+                'a:int % (b:int * c:int)',
+                Expr::modulo(Expr::get('a', $i), Expr::multiply(Expr::get('b', $i), Expr::get('c', $i))),
             ],
             [
                 'a:int - (b:int + c:int)',

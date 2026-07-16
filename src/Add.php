@@ -7,8 +7,6 @@ namespace Eventjet\Ausdruck;
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
 
-use function sprintf;
-
 /**
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -21,11 +19,7 @@ final class Add extends Expression
 
     public function __toString(): string
     {
-        return sprintf(
-            '%s + %s',
-            Precedence::parenthesize($this->augend, Precedence::Additive),
-            Precedence::parenthesize($this->addend, Precedence::Multiplicative),
-        );
+        return Precedence::leftAssociative($this->augend, '+', $this->addend, Precedence::Additive);
     }
 
     /**

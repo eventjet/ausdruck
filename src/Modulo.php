@@ -9,7 +9,6 @@ use Override;
 
 use function fmod;
 use function is_int;
-use function sprintf;
 
 /**
  * Like {@see Divide}, modulo is total: the remainder is an option of the operand type, and a zero divisor makes it
@@ -27,11 +26,7 @@ final class Modulo extends Expression
 
     public function __toString(): string
     {
-        return sprintf(
-            '%s %% %s',
-            Precedence::parenthesize($this->dividend, Precedence::Multiplicative),
-            Precedence::parenthesize($this->divisor, Precedence::Unary),
-        );
+        return Precedence::leftAssociative($this->dividend, '%', $this->divisor, Precedence::Multiplicative);
     }
 
     #[Override]
