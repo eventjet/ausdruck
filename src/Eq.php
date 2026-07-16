@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use Eventjet\Ausdruck\Parser\Span;
 use Override;
 
 use function array_key_exists;
@@ -16,12 +15,8 @@ use function is_object;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class Eq extends Expression
+final class Eq extends BinaryOperator
 {
-    public function __construct(public readonly Expression $left, public readonly Expression $right)
-    {
-    }
-
     private static function compareStructs(object $left, object $right): bool
     {
         $leftVars = get_object_vars($left);
@@ -49,9 +44,10 @@ final class Eq extends Expression
         return $left === $right;
     }
 
-    public function __toString(): string
+    #[Override]
+    public function symbol(): string
     {
-        return Precedence::nonAssociative($this->left, '===', $this->right, Precedence::Comparison);
+        return '===';
     }
 
     #[Override]
@@ -61,22 +57,8 @@ final class Eq extends Expression
     }
 
     #[Override]
-    public function equals(Expression $other): bool
-    {
-        return $other instanceof self
-            && $this->left->equals($other->left)
-            && $this->right->equals($other->right);
-    }
-
-    #[Override]
     public function getType(): Type
     {
         return Type::bool();
-    }
-
-    #[Override]
-    public function location(): Span
-    {
-        return $this->left->location()->to($this->right->location());
     }
 }

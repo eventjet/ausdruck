@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use Eventjet\Ausdruck\Parser\Span;
 use Override;
 
 use function intdiv;
@@ -18,23 +17,20 @@ use function is_int;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class Divide extends Expression
+final class Divide extends BinaryOperator
 {
-    public function __construct(public readonly Expression $dividend, public readonly Expression $divisor)
+    #[Override]
+    public function symbol(): string
     {
-    }
-
-    public function __toString(): string
-    {
-        return Precedence::leftAssociative($this->dividend, '/', $this->divisor, Precedence::Multiplicative);
+        return '/';
     }
 
     #[Override]
     public function evaluate(Scope $scope): int|float|null
     {
         /** @psalm-suppress MixedAssignment It's narrowed in the branches below, once the divisor has decided which number type both operands share. */
-        $dividend = $this->dividend->evaluate($scope);
-        $divisor = Operand::number($this->divisor->evaluate($scope));
+        $dividend = $this->left->evaluate($scope);
+        $divisor = Operand::number($this->right->evaluate($scope));
         if ($divisor === 0 || $divisor === 0.0) {
             return null;
         }
@@ -44,22 +40,8 @@ final class Divide extends Expression
     }
 
     #[Override]
-    public function equals(Expression $other): bool
-    {
-        return $other instanceof self
-            && $this->dividend->equals($other->dividend)
-            && $this->divisor->equals($other->divisor);
-    }
-
-    #[Override]
     public function getType(): Type
     {
-        return Type::option($this->dividend->getType());
-    }
-
-    #[Override]
-    public function location(): Span
-    {
-        return $this->dividend->location()->to($this->divisor->location());
+        return Type::option($this->left->getType());
     }
 }

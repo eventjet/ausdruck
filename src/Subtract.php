@@ -4,22 +4,18 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use Eventjet\Ausdruck\Parser\Span;
 use Override;
 
 /**
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class Subtract extends Expression
+final class Subtract extends BinaryOperator
 {
-    public function __construct(public readonly Expression $minuend, public readonly Expression $subtrahend)
+    #[Override]
+    public function symbol(): string
     {
-    }
-
-    public function __toString(): string
-    {
-        return Precedence::leftAssociative($this->minuend, '-', $this->subtrahend, Precedence::Additive);
+        return '-';
     }
 
     /**
@@ -30,27 +26,13 @@ final class Subtract extends Expression
     #[Override]
     public function evaluate(Scope $scope): int|float
     {
-        return Operand::number($this->minuend->evaluate($scope))
-            - Operand::number($this->subtrahend->evaluate($scope));
-    }
-
-    #[Override]
-    public function equals(Expression $other): bool
-    {
-        return $other instanceof self
-            && $this->minuend->equals($other->minuend)
-            && $this->subtrahend->equals($other->subtrahend);
+        return Operand::number($this->left->evaluate($scope))
+            - Operand::number($this->right->evaluate($scope));
     }
 
     #[Override]
     public function getType(): Type
     {
-        return $this->minuend->getType();
-    }
-
-    #[Override]
-    public function location(): Span
-    {
-        return $this->minuend->location()->to($this->subtrahend->location());
+        return $this->left->getType();
     }
 }
