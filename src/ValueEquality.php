@@ -10,8 +10,8 @@ use function get_object_vars;
 use function is_object;
 
 /**
- * The deep, structural equality that both `===` ({@see Eq}) and `!==` ({@see Neq}) are defined in terms of: scalars
- * compare by identity, structs field by field, recursively. It lives here rather than on either node so that `!==` can
+ * The deep, structural equality that both `===` and `!==` ({@see ComparisonOperator}) are defined in terms of: scalars
+ * compare by identity, structs field by field, recursively. It lives here rather than on the operator so that `!==` can
  * be exactly the negation of `===` without either one restating the rule.
  *
  * @internal

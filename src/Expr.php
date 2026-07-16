@@ -40,13 +40,13 @@ final class Expr
 
     public static function eq(Expression $left, Expression $right): Eq
     {
-        self::assertSameType($left, $right, '===');
+        self::assertSameType($left, $right, ComparisonOperator::Equals->value);
         return new Eq($left, $right);
     }
 
     public static function neq(Expression $left, Expression $right): Neq
     {
-        self::assertSameType($left, $right, '!==');
+        self::assertSameType($left, $right, ComparisonOperator::NotEquals->value);
         return new Neq($left, $right);
     }
 
