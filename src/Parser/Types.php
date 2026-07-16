@@ -24,22 +24,6 @@ final class Types
     {
     }
 
-    /**
-     * The built-in type constructors that take angle-bracket arguments (`list<...>`, `map<...>`, `Option<...>`,
-     * `Some<...>`), and so the only names after which a `<` opens a generic argument list rather than possibly being a
-     * less-than operator. This is the same set the generic arms of {@see self::resolve()} handle, named here for
-     * {@see TypeParser}, which has to decide whether a `<` belongs to the type before there is a resolved type to ask.
-     * `fn` also takes arguments, but in parentheses, and no user-defined type (an alias) is generic, so this set is a
-     * closed, fixed fact of the grammar.
-     */
-    public static function takesTypeArguments(string $name): bool
-    {
-        return match ($name) {
-            'list', 'map', 'Option', 'Some' => true,
-            default => false,
-        };
-    }
-
     private static function noArgs(Type $type, TypeNode $node): Type|TypeError
     {
         if ($node->args === []) {
@@ -55,25 +39,32 @@ final class Types
         return Span::char(1, 1);
     }
 
+    /**
+     * A name the language spells itself is one of the {@see TypeConstructor}s; anything else is a consumer's alias, or
+     * nothing at all.
+     */
     public function resolve(TypeNode $node): Type|TypeError
     {
-        return match ($node->name) {
-            'fn' => $this->resolveFunction($node),
-            'string' => self::noArgs(Type::string(), $node),
-            'int' => self::noArgs(Type::int(), $node),
-            'float' => self::noArgs(Type::float(), $node),
-            'bool' => self::noArgs(Type::bool(), $node),
-            'any' => self::noArgs(Type::any(), $node),
-            'map' => $this->resolveMap($node),
-            'list' => $this->resolveList($node),
-            'Option' => $this->resolveOption($this->exactlyOneTypeArg($node)),
-            'Some' => $this->exactlyOneTypeArg($node),
-            'None' => self::noArgs(Type::none(), $node),
-            '' => $this->resolveStruct($node),
-            default => $this->resolveAlias($node->name) ?? TypeError::create(
+        $constructor = TypeConstructor::tryFrom($node->name);
+        if ($constructor === null) {
+            return $this->resolveAlias($node->name) ?? TypeError::create(
                 sprintf('Unknown type %s', $node->name),
                 $node->location,
-            ),
+            );
+        }
+        return match ($constructor) {
+            TypeConstructor::Fn => $this->resolveFunction($node),
+            TypeConstructor::String => self::noArgs(Type::string(), $node),
+            TypeConstructor::Int => self::noArgs(Type::int(), $node),
+            TypeConstructor::Float => self::noArgs(Type::float(), $node),
+            TypeConstructor::Bool => self::noArgs(Type::bool(), $node),
+            TypeConstructor::Any => self::noArgs(Type::any(), $node),
+            TypeConstructor::Map => $this->resolveMap($node),
+            TypeConstructor::List => $this->resolveList($node),
+            TypeConstructor::Option => $this->resolveOption($this->exactlyOneTypeArg($node)),
+            TypeConstructor::Some => $this->exactlyOneTypeArg($node),
+            TypeConstructor::None => self::noArgs(Type::none(), $node),
+            TypeConstructor::Struct => $this->resolveStruct($node),
         };
     }
 

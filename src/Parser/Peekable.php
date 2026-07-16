@@ -15,6 +15,9 @@ use function count;
  * {@see self::restore()} can return to it later—which is what lets a parser try one reading of the tokens ahead and
  * fall back to another. Everything already read stays available; nothing is pulled from the generator twice.
  *
+ * The cursor only moves where it's told; deciding when a reading has failed, and rewinding if it has, is the caller's
+ * business. See {@see TypeParser::tryTypeArguments()} for the one place that does.
+ *
  * @template T
  * @internal
  * @psalm-internal Eventjet\Ausdruck

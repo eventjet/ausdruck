@@ -664,6 +664,14 @@ final class ExpressionParserTest extends TestCase
                 '(a:bool))',
                 '        =',
             ],
+            // Reading `int <` as the start of a type argument list fails on the `list<int` that follows, but that
+            // failure is not the error: it only means the `<` was a less-than after all. So the attempt is rewound and
+            // the blame lands on the undeclared variable that really is there, not on the `>` the abandoned reading
+            // wanted.
+            [
+                'a:int < list<int',
+                '        ====    ',
+            ],
             // The `>` of an arrow is a column like any other: what follows it is blamed where it actually is.
             [
                 'x:fn(int) -> int &',
