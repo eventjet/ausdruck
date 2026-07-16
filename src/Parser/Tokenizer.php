@@ -78,61 +78,32 @@ final class Tokenizer
                 yield new ParsedToken(self::string($chars, $line, $column), $startLine, $startCol);
                 continue;
             }
-            if ($char === '=') {
-                $startCol = $column;
-                $token = self::exact($chars, $line, $column, '===', Token::TripleEquals);
-                yield new ParsedToken($token, $line, $startCol);
-                continue;
-            }
-            if ($char === '!') {
-                $startCol = $column;
-                $token = self::exact($chars, $line, $column, '!==', Token::NotEquals);
-                yield new ParsedToken($token, $line, $startCol);
-                continue;
-            }
-            if ($char === '<') {
-                $startCol = $column;
-                $token = self::angle($chars, $column, Token::OpenAngle, Token::LessThanEquals);
-                yield new ParsedToken($token, $line, $startCol);
-                continue;
-            }
-            if ($char === '>') {
-                $startCol = $column;
-                $token = self::angle($chars, $column, Token::CloseAngle, Token::GreaterThanEquals);
-                yield new ParsedToken($token, $line, $startCol);
-                continue;
-            }
-            /**
-             * The sign is never folded into a number literal: a `-` always yields Token::Minus, and
-             * {@see \Eventjet\Ausdruck\Expr::negative()} turns a negated number literal back into a negative one. If
-             * the sign were folded in here, whitespace would silently decide the meaning of `a -2`: subtraction, or
-             * `a` followed by the literal -2.
-             */
-            if ($char === '-') {
-                $startCol = $column;
-                $token = self::bareOrPair($chars, $column, '>', Token::Minus, Token::Arrow);
-                yield new ParsedToken($token, $line, $startCol);
+            $startCol = $column;
+            $multiCharToken = match ($char) {
+                '=' => self::exact($chars, $line, $column, '===', Token::TripleEquals),
+                '!' => self::exact($chars, $line, $column, '!==', Token::NotEquals),
+                '&' => self::exact($chars, $line, $column, '&&', Token::And),
+                '<' => self::angle($chars, $column, Token::OpenAngle, Token::LessThanEquals),
+                '>' => self::angle($chars, $column, Token::CloseAngle, Token::GreaterThanEquals),
+                /**
+                 * The sign is never folded into a number literal: a `-` always yields Token::Minus, and
+                 * {@see \Eventjet\Ausdruck\Expr::negative()} turns a negated number literal back into a negative one.
+                 * If the sign were folded in here, whitespace would silently decide the meaning of `a -2`:
+                 * subtraction, or `a` followed by the literal -2.
+                 */
+                '-' => self::bareOrPair($chars, $column, '>', Token::Minus, Token::Arrow),
+                '|' => self::bareOrPair($chars, $column, '|', Token::Pipe, Token::Or),
+                default => null,
+            };
+            if ($multiCharToken !== null) {
+                yield new ParsedToken($multiCharToken, $line, $startCol);
                 continue;
             }
             if (is_numeric($char)) {
-                $startCol = $column;
                 yield new ParsedToken(self::number($chars, $column), $line, $startCol);
                 continue;
             }
-            if ($char === '|') {
-                $startCol = $column;
-                $token = self::bareOrPair($chars, $column, '|', Token::Pipe, Token::Or);
-                yield new ParsedToken($token, $line, $startCol);
-                continue;
-            }
-            if ($char === '&') {
-                $startCol = $column;
-                $token = self::exact($chars, $line, $column, '&&', Token::And);
-                yield new ParsedToken($token, $line, $startCol);
-                continue;
-            }
             if (self::isIdentifierChar($char, first: true)) {
-                $startCol = $column;
                 yield new ParsedToken(self::identifier($chars, $line, $column), $line, $startCol);
                 continue;
             }
