@@ -154,7 +154,10 @@ final class ExpressionParser
             }
             $this->tokens->next();
             $right = $this->parseMultiplicative();
-            $left = $operator === Token::Plus ? $left->add($right) : $left->subtract($right);
+            $left = match ($operator) {
+                Token::Plus => $left->add($right),
+                Token::Minus => $left->subtract($right),
+            };
         }
     }
 
