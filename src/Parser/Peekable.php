@@ -10,7 +10,7 @@ use function array_key_exists;
 use function count;
 
 /**
- * A single-item-lookahead cursor over an iterable, with the ability to rewind. Items pulled from the underlying
+ * A lookahead cursor over an iterable, with the ability to rewind. Items pulled from the underlying
  * generator are buffered as they are read, so {@see self::snapshot()} can record the current position and
  * {@see self::restore()} can return to it later—which is what lets a parser try one reading of the tokens ahead and
  * fall back to another. Everything already read stays available; nothing is pulled from the generator twice.
@@ -28,6 +28,7 @@ final class Peekable
     private readonly Generator $items;
     /** @var list<T> The items pulled from the generator so far; {@see self::$cursor} indexes into it. */
     private array $buffer = [];
+    /** @var non-negative-int */
     private int $cursor = 0;
 
     /**
@@ -51,18 +52,21 @@ final class Peekable
     }
 
     /**
+     * @param non-negative-int $ahead How far past the next item to look: peek() shows the next item, peek(1) the one
+     *     after it.
      * @return T | null
      */
-    public function peek(): mixed
+    public function peek(int $ahead = 0): mixed
     {
-        if ($this->cursor === count($this->buffer)) {
+        $target = $this->cursor + $ahead;
+        while (count($this->buffer) <= $target) {
             if (!$this->items->valid()) {
                 return null;
             }
             $this->buffer[] = $this->items->current();
             $this->items->next();
         }
-        return $this->buffer[$this->cursor];
+        return $this->buffer[$target];
     }
 
     /**
@@ -91,12 +95,17 @@ final class Peekable
 
     /**
      * The current position, to be handed back to {@see self::restore()}.
+     *
+     * @return non-negative-int
      */
     public function snapshot(): int
     {
         return $this->cursor;
     }
 
+    /**
+     * @param non-negative-int $snapshot
+     */
     public function restore(int $snapshot): void
     {
         $this->cursor = $snapshot;

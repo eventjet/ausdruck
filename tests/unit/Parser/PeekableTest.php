@@ -91,4 +91,15 @@ final class PeekableTest extends TestCase
         /** @phpstan-ignore-next-line Wow, PHPStan, you're actually really smart. But I want to test it anyway. */
         self::assertNull($p->peek());
     }
+
+    public function testPeekAheadLooksPastTheNextItemWithoutMovingTheCursor(): void
+    {
+        $p = new Peekable(new ArrayIterator(['a', 'b', 'c']));
+
+        self::assertSame('b', $p->peek(1));
+        self::assertSame('c', $p->peek(2));
+        self::assertNull($p->peek(3));
+        self::assertSame('a', $p->next());
+        self::assertSame('c', $p->peek(1));
+    }
 }

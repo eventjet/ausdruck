@@ -319,6 +319,19 @@ final class ExpressionParserTest extends TestCase
                     Expr::literal(2),
                 ),
             ],
+            // A generic's closing angle glued to `===` or `!==`: the `>` must stay a bare close-angle instead of
+            // munching a `>=` that would orphan a `==`, which is no token at all.
+            [
+                'foo:list<int>===bar:list<int>',
+                Expr::eq(Expr::get('foo', Type::listOf(Type::int())), Expr::get('bar', Type::listOf(Type::int()))),
+            ],
+            [
+                'foo:list<int>!==bar:list<int>',
+                Expr::get('foo', Type::listOf(Type::int()))->neq(Expr::get('bar', Type::listOf(Type::int()))),
+            ],
+            // ...but one `=` after the angle is still `>=`/`<=`.
+            ['a:int>=1', Expr::get('a', Type::int())->gte(Expr::literal(1))],
+            ['a:int<=1', Expr::get('a', Type::int())->lte(Expr::literal(1))],
         ];
         foreach ($cases as $case) {
             yield $case[0] => $case;
@@ -332,11 +345,12 @@ final class ExpressionParserTest extends TestCase
     {
         yield 'string: missing closing quote' => ['"foo'];
         yield 'single pipe' => ['foo:bool | bar:bool'];
-        yield 'single equals' => ['foo:string = bar:string'];
-        yield 'double equals' => ['foo:string == bar:string'];
-        yield 'double length fat arrow' => ['foo:string ==> bar:string'];
+        // Equality is `===`; a `=` or `==` is blamed as the beginning of one, with the missing rest named.
+        yield 'single equals' => ['foo:string = bar:string', 'Expected ===, got ='];
+        yield 'double equals' => ['foo:string == bar:string', 'Expected ===, got =='];
+        yield 'double length fat arrow' => ['foo:string ==> bar:string', 'Expected ===, got =='];
         yield 'end after single pipe' => ['foo:bool |'];
-        yield 'end after single equals' => ['foo:bool =', 'Expected ==, got end of input'];
+        yield 'end after single equals' => ['foo:bool =', 'Expected ===, got ='];
         yield 'end after double equals' => ['foo:bool =='];
         yield 'close brace after triple equals' => ['foo:bool === )'];
         yield 'lambda: missing closing brace' => ['(foo, bar => foo:string'];
@@ -375,10 +389,14 @@ final class ExpressionParserTest extends TestCase
         yield 'missing right hand side of >=' => ['foo:int >='];
         yield 'missing right hand side of <=' => ['foo:int <='];
         yield 'missing right hand side of !==' => ['foo:int !=='];
-        // Equality is `===`, so inequality is `!==`; a bare `!` or `!=` is blamed at the `!`, with a hint at the fix.
+        // Equality is `===`, so inequality is `!==`; a bare `!` or `!=` is read as the beginning of one, and the
+        // error says how far it got.
         yield 'not equals with one equals' => ['a:int != 1', 'Expected !==, got !='];
-        yield 'lone bang' => ['a:int ! 1', 'Unexpected character !'];
-        yield 'bang at end of input' => ['a:int !', 'Unexpected character !'];
+        yield 'lone bang' => ['a:int ! 1', 'Expected !==, got !'];
+        yield 'bang at end of input' => ['a:int !', 'Expected !==, got !'];
+        // Two `=` after a `>` keep the angle bare, whatever comes next (see the `foo:list<int>===bar` parse case), so
+        // the `==` here is blamed as its own broken `===` rather than a `>=` eating its first `=`.
+        yield 'greater-equals with an extra equals' => ['a:int >== 1', 'Expected ===, got =='];
         yield 'end of string variable and colon' => ['foo:'];
         yield 'end of string after function call and colon' => ['foo:string.substr:'];
         yield 'end of string after function dot' => ['foo:string.'];
@@ -392,7 +410,7 @@ final class ExpressionParserTest extends TestCase
         yield 'end of string after struct field value' => ['{name: "John"'];
         yield 'missing value in struct literal' => ['{name: }'];
         yield 'missing comma between struct fields' => ['{name: "John" age: 42}'];
-        yield 'single ampersand' => ['foo:bool & bar:bool'];
+        yield 'single ampersand' => ['foo:bool & bar:bool', 'Expected &&, got &'];
         yield 'non-token, non-identifier symbol' => ['foo:bool € bar:bool'];
         yield 'identifier starting with a number' => ['42foo:bool', 'Unexpected identifier foo'];
         yield 'identifier starting with an underscore' => ['_foo:bool', 'Unexpected character _'];
@@ -641,14 +659,19 @@ final class ExpressionParserTest extends TestCase
                 'foo:bool & bar:bool',
                 '         =         ',
             ],
-            // A `!` that isn't the start of `!==` is blamed at the `!` itself, whether it's a bare `!` or a `!=`.
+            // A `!` or `=` that isn't the start of `!==`/`===` is blamed with everything read after it: the operator
+            // that is actually there is underlined whole.
             [
                 'a:int != 1',
-                '      =   ',
+                '      ==  ',
             ],
             [
                 'a:int ! 1',
                 '      =  ',
+            ],
+            [
+                'foo:string == bar:string',
+                '           ==           ',
             ],
             [
                 'foo:bool && bar::bool',
