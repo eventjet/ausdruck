@@ -114,26 +114,12 @@ final class TypeParser
         $tokens->next();
         $args = self::parseTypeList($tokens);
         $closed = $tokens->peek()?->token === Token::CloseAngle;
-        if (!$closed && !self::takesTypeArguments($name)) {
+        if (!$closed && !Types::takesTypeArguments($name)) {
             $tokens->restore($snapshot);
             return new TypeNode($name, [], $parsedToken->location());
         }
         $closeAngle = self::expect($tokens, Token::CloseAngle);
         return new TypeNode($name, $args, $parsedToken->location()->to($closeAngle->location()));
-    }
-
-    /**
-     * The built-in type constructors that take angle-bracket arguments, and so the only names after which a `<` always
-     * opens a generic argument list rather than possibly being a less-than operator. `fn` also takes arguments, but in
-     * parentheses (handled above), and no user-defined type (an alias) is generic, so this set is a closed, fixed fact
-     * of the grammar, kept here beside the `fn` special case it mirrors.
-     */
-    private static function takesTypeArguments(string $name): bool
-    {
-        return match ($name) {
-            'list', 'map', 'Option', 'Some' => true,
-            default => false,
-        };
     }
 
     /**

@@ -24,6 +24,22 @@ final class Types
     {
     }
 
+    /**
+     * The built-in type constructors that take angle-bracket arguments (`list<...>`, `map<...>`, `Option<...>`,
+     * `Some<...>`), and so the only names after which a `<` opens a generic argument list rather than possibly being a
+     * less-than operator. This is the same set the generic arms of {@see self::resolve()} handle, named here for
+     * {@see TypeParser}, which has to decide whether a `<` belongs to the type before there is a resolved type to ask.
+     * `fn` also takes arguments, but in parentheses, and no user-defined type (an alias) is generic, so this set is a
+     * closed, fixed fact of the grammar.
+     */
+    public static function takesTypeArguments(string $name): bool
+    {
+        return match ($name) {
+            'list', 'map', 'Option', 'Some' => true,
+            default => false,
+        };
+    }
+
     private static function noArgs(Type $type, TypeNode $node): Type|TypeError
     {
         if ($node->args === []) {
