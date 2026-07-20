@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
-use function assert;
 use function ctype_space;
 use function is_numeric;
 use function ord;
@@ -27,21 +26,26 @@ final class Tokenizer
     private const UNDERSCORE = 95;
 
     /**
+     * Every branch reads the same way: note where the token starts, scan it, then ask the source how far it got. No
+     * scanner keeps a line or column of its own, so none of them can disagree about what reading a character does—see
+     * {@see Source}.
+     *
      * @param iterable<mixed, string> $chars
      * @return iterable<ParsedToken>
      */
     public static function tokenize(iterable $chars): iterable
     {
-        /** @var positive-int $line */
-        $line = 1;
-        /** @var positive-int $column */
-        $column = 1;
-        $chars = new Peekable($chars);
+        $source = new Source($chars);
         while (true) {
-            $char = $chars->peek();
+            $char = $source->peek();
             if ($char === null) {
                 break;
             }
+            if (ctype_space($char)) {
+                $source->take();
+                continue;
+            }
+            $start = $source->position();
             $singleCharToken = match ($char) {
                 '.' => Token::Dot,
                 '(' => Token::OpenParen,
@@ -55,97 +59,56 @@ final class Tokenizer
                 default => null,
             };
             if ($singleCharToken !== null) {
-                $chars->next();
-                yield new ParsedToken($singleCharToken, Span::char($line, $column));
-                $column++;
-                continue;
-            }
-            if (ctype_space($char)) {
-                $chars->next();
-                if ($char === "\n") {
-                    $line++;
-                    $column = 1;
-                } else {
-                    $column++;
-                }
+                $source->take();
+                yield new ParsedToken($singleCharToken, $source->spanFrom($start));
                 continue;
             }
             if ($char === '"') {
-                $startLine = $line;
-                $startCol = $column;
-                $chars->next();
-                $column++;
-                // Scanned before the span is built, not inside the ParsedToken() call: it is what moves $line and
-                // $column to the end of the token, and reading them as arguments alongside it would make the extent
-                // depend on PHP evaluating the arguments left to right.
-                $string = self::string($chars, $line, $column);
-                yield new ParsedToken($string, self::spanTo($startLine, $startCol, $line, $column));
+                $source->take();
+                $string = self::string($source);
+                yield new ParsedToken($string, $source->spanFrom($start));
                 continue;
             }
-            $startCol = $column;
             $multiCharToken = match ($char) {
-                '=' => self::exact($chars, $line, $column, '===', Token::TripleEquals),
-                '!' => self::exact($chars, $line, $column, '!==', Token::NotEquals),
-                '&' => self::exact($chars, $line, $column, '&&', Token::And),
-                '<' => self::angle($chars, $column, Token::OpenAngle, Token::LessThanEquals),
-                '>' => self::angle($chars, $column, Token::CloseAngle, Token::GreaterThanEquals),
+                '=' => self::exact($source, '===', Token::TripleEquals),
+                '!' => self::exact($source, '!==', Token::NotEquals),
+                '&' => self::exact($source, '&&', Token::And),
+                '<' => self::angle($source, Token::OpenAngle, Token::LessThanEquals),
+                '>' => self::angle($source, Token::CloseAngle, Token::GreaterThanEquals),
                 /**
                  * The sign is never folded into a number literal: a `-` always yields Token::Minus, and
                  * {@see \Eventjet\Ausdruck\Expr::negative()} turns a negated number literal back into a negative one.
                  * If the sign were folded in here, whitespace would silently decide the meaning of `a -2`:
                  * subtraction, or `a` followed by the literal -2.
                  */
-                '-' => self::bareOrPair($chars, $column, '>', Token::Minus, Token::Arrow),
-                '|' => self::bareOrPair($chars, $column, '|', Token::Pipe, Token::Or),
+                '-' => self::bareOrPair($source, '>', Token::Minus, Token::Arrow),
+                '|' => self::bareOrPair($source, '|', Token::Pipe, Token::Or),
                 default => null,
             };
             if ($multiCharToken !== null) {
-                yield new ParsedToken($multiCharToken, self::spanTo($line, $startCol, $line, $column));
+                yield new ParsedToken($multiCharToken, $source->spanFrom($start));
                 continue;
             }
             if (is_numeric($char)) {
-                $number = self::number($chars, $column);
-                yield new ParsedToken($number, self::spanTo($line, $startCol, $line, $column));
+                $number = self::number($source);
+                yield new ParsedToken($number, $source->spanFrom($start));
                 continue;
             }
             if (self::isIdentifierChar($char, first: true)) {
-                $identifier = self::identifier($chars, $line, $column);
-                yield new ParsedToken($identifier, self::spanTo($line, $startCol, $line, $column));
+                $identifier = self::identifier($source);
+                yield new ParsedToken($identifier, $source->spanFrom($start));
                 continue;
             }
-            throw SyntaxError::create(sprintf('Unexpected character %s', $char), Span::char($line, $column));
+            throw SyntaxError::create(sprintf('Unexpected character %s', $char), $start->span());
         }
     }
 
-    /**
-     * The extent of a token that has just been scanned. Every scanner stops on the character after the token it read,
-     * so that is where the extent ends: one column back.
-     *
-     * @param positive-int $startLine
-     * @param positive-int $startColumn
-     * @param positive-int $line Where the scanner stopped.
-     * @param positive-int $column Where the scanner stopped: one past the token's last character.
-     */
-    private static function spanTo(int $startLine, int $startColumn, int $line, int $column): Span
-    {
-        $endColumn = $column - 1;
-        // A scanner is only entered on a character that belongs to the token, and consumes it, so it always leaves
-        // $column at least one past the start of a line.
-        assert($endColumn >= 1);
-        return new Span($startLine, $startColumn, $line, $endColumn);
-    }
-
-    /**
-     * @param Peekable<string> $chars
-     * @param positive-int $line
-     * @param positive-int $column
-     */
-    private static function identifier(Peekable $chars, int $line, int &$column): string
+    private static function identifier(Source $source): string
     {
         $identifier = '';
 
         while (true) {
-            $char = $chars->peek();
+            $char = $source->peek();
 
             if ($char === null) {
                 break;
@@ -158,8 +121,7 @@ final class Tokenizer
             }
 
             $identifier .= $char;
-            $chars->next();
-            $column++;
+            $source->take();
         }
 
         return $identifier;
@@ -170,28 +132,23 @@ final class Tokenizer
      * first character is there, the whole sequence is required; anything short of it is an error naming the operator
      * that was expected and underlining the characters that were actually read.
      *
-     * @param Peekable<string> $chars
-     * @param positive-int $line
-     * @param positive-int $column
      * @param non-empty-string $sequence
      */
-    private static function exact(Peekable $chars, int $line, int &$column, string $sequence, Token $token): Token
+    private static function exact(Source $source, string $sequence, Token $token): Token
     {
-        $startColumn = $column;
+        $start = $source->position();
         $read = '';
         foreach (str_split($sequence) as $char) {
-            if ($chars->peek() !== $char) {
-                $endColumn = $column - 1;
-                // The main loop only dispatches here after peeking $sequence's first character, so that one matched.
-                assert($endColumn >= 1);
+            if ($source->peek() !== $char) {
+                // The main loop only dispatches here after peeking $sequence's first character, so that one matched
+                // and was taken: the span always covers at least it.
                 throw SyntaxError::create(
                     sprintf('Expected %s, got %s', $sequence, $read),
-                    new Span($line, $startColumn, $line, $endColumn),
+                    $source->spanFrom($start),
                 );
             }
             $read .= $char;
-            $chars->next();
-            $column++;
+            $source->take();
         }
         return $token;
     }
@@ -202,19 +159,14 @@ final class Tokenizer
      * operators `<=` and `>=`. The pair reading wins with one exception: two `=` after the angle mean a `===` follows,
      * as in `foo:list<int>===bar`, so the angle stays bare instead of stealing the first `=` and leaving behind a `==`
      * that is no token at all.
-     *
-     * @param Peekable<string> $chars
-     * @param positive-int $column
      */
-    private static function angle(Peekable $chars, int &$column, Token $bare, Token $pair): Token
+    private static function angle(Source $source, Token $bare, Token $pair): Token
     {
-        $chars->next();
-        $column++;
-        if ($chars->peek() !== '=' || $chars->peek(1) === '=') {
+        $source->take();
+        if ($source->peek() !== '=' || $source->peek(1) === '=') {
             return $bare;
         }
-        $chars->next();
-        $column++;
+        $source->take();
         return $pair;
     }
 
@@ -224,70 +176,52 @@ final class Tokenizer
      * followed by a `>`. For `||` it's a choice: the two bars could also be the empty parameter list of a lambda, so
      * that list is written `| |`, and glued bars are the or they almost always are.
      *
-     * @param Peekable<string> $chars
-     * @param positive-int $column
      * @param non-empty-string $second The character that, if it comes next, makes this $pair instead of $bare.
      */
-    private static function bareOrPair(Peekable $chars, int &$column, string $second, Token $bare, Token $pair): Token
+    private static function bareOrPair(Source $source, string $second, Token $bare, Token $pair): Token
     {
-        $chars->next();
-        $column++;
-        if ($chars->peek() !== $second) {
+        $source->take();
+        if ($source->peek() !== $second) {
             return $bare;
         }
-        $chars->next();
-        $column++;
+        $source->take();
         return $pair;
     }
 
     /**
-     * @param Peekable<string> $chars
-     * @param positive-int $column
      * @return Literal<int | float>
      */
-    private static function number(Peekable $chars, int &$column): Literal
+    private static function number(Source $source): Literal
     {
         $number = '';
         while (true) {
-            $char = $chars->peek();
+            $char = $source->peek();
             if ($char === null || !is_numeric($number . $char)) {
                 break;
             }
             $number .= $char;
-            $chars->next();
-            $column++;
+            $source->take();
         }
         return new Literal(str_contains($number, '.') ? (float)$number : (int)$number);
     }
 
     /**
-     * A string literal is the only token that may contain a real newline, so this is the only scanner that can leave
-     * the line it started on. It moves $line as well as $column: an extent that ended on the starting line would be
-     * wrong for the literal itself, and every token after it would be reported a line too high.
+     * A string literal is the only token that may contain a real newline. Nothing here says so: the source counts
+     * lines as it is read, so a literal that spans several of them ends where it ends, and every token after it is
+     * still reported on the line it is written on.
      *
-     * @param Peekable<string> $chars
-     * @param positive-int $line
-     * @param positive-int $column
      * @return Literal<string>
      */
-    private static function string(Peekable $chars, int &$line, int &$column): Literal
+    private static function string(Source $source): Literal
     {
         $string = '';
         while (true) {
-            $char = $chars->peek();
+            $char = $source->take();
             if ($char === null) {
-                throw SyntaxError::create('Expected closing quote', Span::char($line, $column));
+                throw SyntaxError::create('Expected closing quote', $source->position()->span());
             }
-            $chars->next();
             if ($char === '"') {
-                $column++;
                 break;
-            }
-            if ($char === "\n") {
-                $line++;
-                $column = 1;
-            } else {
-                $column++;
             }
             $string .= $char;
         }
