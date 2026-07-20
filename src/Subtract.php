@@ -7,11 +7,19 @@ namespace Eventjet\Ausdruck;
 use Eventjet\Ausdruck\Parser\Token;
 use Override;
 
+use function max;
+use function min;
+
+use const PHP_INT_MAX;
+use const PHP_INT_MIN;
+
 /**
+ * The difference of two numbers. Total in int only up to the range, in the way {@see Arithmetic} describes.
+ *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class Subtract extends BinaryOperator
+final class Subtract extends Arithmetic
 {
     #[Override]
     public function token(): Token
@@ -20,20 +28,23 @@ final class Subtract extends BinaryOperator
     }
 
     /**
-     * @psalm-suppress InvalidOperand Both operands are the same numeric type by then; Psalm's strict binary operands
-     *     mode can't see that {@see Expr::assertSameNumberType()} has already rejected the int/float mix it guards
-     *     against.
+     * The largest and smallest minuend that still fits, given the subtrahend. Subtracting moves the minuend against
+     * the subtrahend's sign, so this is {@see Add::applyInt()} with the clamps swapped: only a negative subtrahend can
+     * carry the minuend past PHP_INT_MAX, only a positive one past PHP_INT_MIN, and clamping to the side that acts is
+     * again what keeps the bound computable. The clamps are unfalsifiable in the same one direction each, and
+     * infection.json excludes the same two mutants for the reason given there.
      */
     #[Override]
-    public function evaluate(Scope $scope): int|float
+    protected function applyInt(int $left, int $right): int|null
     {
-        return Operand::number($this->left->evaluate($scope))
-            - Operand::number($this->right->evaluate($scope));
+        $highest = PHP_INT_MAX + min($right, 0);
+        $lowest = PHP_INT_MIN + max($right, 0);
+        return $left > $highest || $left < $lowest ? null : $left - $right;
     }
 
     #[Override]
-    public function getType(): Type
+    protected function applyFloat(float $left, float $right): float
     {
-        return $this->left->getType();
+        return $left - $right;
     }
 }

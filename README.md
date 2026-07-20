@@ -79,8 +79,9 @@ Where's the rest? We're implementing more as we need them.
 #### Division and modulo
 
 Like the other arithmetic operators, `/` and `%` take two operands of the same numeric type — but the result is an
-`Option` of that type: `int / int` is an `Option<int>`, and a zero divisor makes it `none` rather than an error. Get
-at the value the same way you would with `head`:
+`Option` of that type: `int / int` is an `Option<int>`. A zero divisor makes it `none` rather than an error, and `/`
+has a second `none`: `PHP_INT_MIN / -1`, the one `int` quotient that doesn't fit in an `int`. `%` doesn't share it —
+`PHP_INT_MIN % -1` is `0`, a remainder like any other. Get at the value the same way you would with `head`:
 
 ```
 (a:int / b:int).unwrap:int()
@@ -94,6 +95,25 @@ comparison without an `unwrap`: `a:int / b:int / c:int` is a type error.
 
 An `int` quotient truncates toward zero: `7 / 2` is `3`, and `-7 / 2` is `-3`. The remainder takes the dividend's
 sign: `-7 % 3` is `-1`. A `float` remainder is PHP's `fmod()`.
+
+#### Int overflow
+
+PHP's `int` arithmetic isn't closed: a sum, difference or product past the `int` range evaluates to a `float` rather
+than wrapping. An `int`-typed expression that answered one would be handing back a value of a type it doesn't have, so
+each operator decides up front whether its result exists and fails evaluation when it doesn't:
+
+```
+a:int + b:int
+```
+
+with `a` at `PHP_INT_MAX` and `b` at `1` is an evaluation error, not `9.2233720368548E+18`. `-`, `*` and unary `-` work
+the same way. Evaluating an `int`-typed expression therefore gives you an `int` or nothing at all — the widened value is
+never computed, so it can't reach a caller or quietly widen the operator above it either.
+
+Overflow is not an `Option` case. `/` and `%` give `none` where the operands are fine but the result doesn't exist — a
+zero divisor, or `PHP_INT_MIN / -1` — which is a case worth handling in an expression. A sum that leaves the range is
+instead a mismatch between the values and the type they were declared with, so it's an error to fix rather than a branch
+to write. `float` arithmetic has neither: it goes to `INF`, as it does in PHP.
 
 #### Precedence
 

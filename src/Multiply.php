@@ -7,11 +7,20 @@ namespace Eventjet\Ausdruck;
 use Eventjet\Ausdruck\Parser\Token;
 use Override;
 
+use function intdiv;
+use function max;
+use function min;
+
+use const PHP_INT_MAX;
+use const PHP_INT_MIN;
+
 /**
+ * The product of two numbers. Total in int only up to the range, in the way {@see Arithmetic} describes.
+ *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class Multiply extends BinaryOperator
+final class Multiply extends Arithmetic
 {
     #[Override]
     public function token(): Token
@@ -20,20 +29,33 @@ final class Multiply extends BinaryOperator
     }
 
     /**
-     * @psalm-suppress InvalidOperand Both operands are the same numeric type by then; Psalm's strict binary operands
-     *     mode can't see that {@see Expr::assertSameNumberType()} has already rejected the int/float mix it guards
-     *     against.
+     * The two multiplicands that land exactly on a bound, and the range they enclose. {@see intdiv()} truncates toward
+     * zero, which is toward the inside of whichever bound the product approaches, so each quotient is exactly the last
+     * multiplicand that still fits — the range neither rejects a representable product nor admits an overflowing one.
+     * A negative multiplier reverses which quotient is the upper and which the lower, so they're ordered by value
+     * rather than by which limit they came from.
+     *
+     * The two multipliers that can't be asked are handled first. Zero would make {@see intdiv()} throw, and -1 is the
+     * divisor PHP_INT_MIN has no quotient for: negating is that same operation, and PHP_INT_MIN is the one int it has
+     * no answer for. It is {@see Divide}'s missing quotient, seen from the other side.
      */
     #[Override]
-    public function evaluate(Scope $scope): int|float
+    protected function applyInt(int $left, int $right): int|null
     {
-        return Operand::number($this->left->evaluate($scope))
-            * Operand::number($this->right->evaluate($scope));
+        if ($right === 0) {
+            return 0;
+        }
+        if ($right === -1) {
+            return $left === PHP_INT_MIN ? null : -$left;
+        }
+        $onMax = intdiv(PHP_INT_MAX, $right);
+        $onMin = intdiv(PHP_INT_MIN, $right);
+        return $left > max($onMax, $onMin) || $left < min($onMax, $onMin) ? null : $left * $right;
     }
 
     #[Override]
-    public function getType(): Type
+    protected function applyFloat(float $left, float $right): float
     {
-        return $this->left->getType();
+        return $left * $right;
     }
 }

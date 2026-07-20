@@ -17,6 +17,18 @@
         "global-ignoreSourceCodeByRegex": [
             "assert\\(.+\\);"
         ],
-        "@default": true
+        "@default": true,
+        "DecrementInteger": {
+            "ignoreSourceCodeByRegex": [
+                "\\$highest = PHP_INT_MAX - max\\(\\$right, 0\\);",
+                "\\$lowest = PHP_INT_MIN \\+ max\\(\\$right, 0\\);"
+            ]
+        },
+        "IncrementInteger": {
+            "ignoreSourceCodeByRegex": [
+                "\\$lowest = PHP_INT_MIN - min\\(\\$right, 0\\);",
+                "\\$highest = PHP_INT_MAX \\+ min\\(\\$right, 0\\);"
+            ]
+        }
     }
 }

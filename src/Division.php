@@ -12,12 +12,11 @@ use Override;
  * throwing when the result doesn't exist — the same shape the `head` builtin gives an empty list. A zero divisor is
  * the case they share; {@see Divide} has one more.
  *
- * Which of the two arithmetics either one is comes from the operands' declared type, never from what they evaluate to.
- * An int operand can arrive as a float when its own arithmetic overflowed, so runtime values can't tell an honest float
- * division from an int one whose operands have both left int — and reading that pair as floats would answer an
- * Option<int> with a float. Both operands are narrowed to the type they claim before the result is asked to exist,
- * which is also why an overflowed dividend is reported rather than excused by a divisor that happens to be zero.
- * See {@see Operand::int()}.
+ * Which of the two arithmetics either one is comes from the operands' declared type, never from what they evaluate to:
+ * the declared type is what {@see self::getType()} has already committed the result to, so deciding it any other way
+ * could answer an Option<int> with a float. Both operands are narrowed to the type they claim before the result is
+ * asked to exist, the same way {@see Arithmetic} — the other half of the arithmetic, whose result is of the operand
+ * type rather than an option of it — narrows its own.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck

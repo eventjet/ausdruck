@@ -19,7 +19,11 @@ use function sprintf;
  * value from a {@see Scope} ({@see Get}, {@see Call}) asserts it against its declared type, so none of these can fail
  * for an expression that was built through {@see Expr}. They exist so the nodes can go from mixed to int, float, bool or
  * object without a cast. Anything thrown here is a bug in this library, not in the expression that was evaluated.
- * {@see self::int()} is the one exception to all of this: int overflow reaches it honestly — see there.
+ *
+ * {@see self::int()} used to be the exception. PHP's int arithmetic isn't closed, so an operand whose own arithmetic
+ * had overflowed arrived here as a float, honestly and for a reason no type error explained. {@see Arithmetic} now
+ * decides whether an int result exists before computing it, so the widened value is never produced and there is no
+ * longer a way for one to reach any of these.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -54,11 +58,7 @@ final class Operand
     }
 
     /**
-     * Unlike its siblings, this narrowing is reachable for a well-typed expression: int is the one operand type PHP's
-     * arithmetic doesn't close over. An int operation that overflows evaluates to a float, so an int-typed operand can
-     * arrive here as one — `(a:int + b:int) / c:int` with a sum past PHP_INT_MAX — and a value that has already left
-     * int has no int quotient or remainder to give. Throwing is the designed answer to that overflow, not a guard that
-     * can't fire.
+     * @infection-ignore-all Unreachable; see the class docblock.
      */
     public static function int(mixed $value): int
     {
