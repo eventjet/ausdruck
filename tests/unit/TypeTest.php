@@ -231,6 +231,32 @@ final class TypeTest extends TestCase
         self::assertEquals([Type::bool()], $alias->argumentTypes());
     }
 
+    /**
+     * A list's element type is compared by asking what kind of type the left side is, and an alias only answers that
+     * once it's been seen through. Asking the alias directly makes it none of the kinds that carry a check, so a list
+     * of one thing would pass as a list of another.
+     */
+    public function testAliasOfAListComparesItsElementType(): void
+    {
+        $ints = Type::alias('Ints', Type::listOf(Type::int()));
+
+        self::assertFalse($ints->isSubtypeOf(Type::listOf(Type::string())));
+        self::assertFalse($ints->isSubtypeOf(Type::alias('Strings', Type::listOf(Type::string()))));
+        self::assertTrue($ints->isSubtypeOf(Type::listOf(Type::int())));
+    }
+
+    /**
+     * The same for a struct: seeing through the alias is what leaves a struct to compare field by field.
+     */
+    public function testAliasOfAStructComparesItsFields(): void
+    {
+        $alias = Type::alias('Person', Type::struct(['name' => Type::string()]));
+
+        self::assertFalse($alias->isSubtypeOf(Type::struct(['name' => Type::int()])));
+        self::assertFalse($alias->isSubtypeOf(Type::struct(['age' => Type::int()])));
+        self::assertTrue($alias->isSubtypeOf(Type::struct(['name' => Type::string()])));
+    }
+
     #[DataProvider('failingAssertCases')]
     public function testFailingAssert(Type $type, mixed $value, string $expectedMessage): void
     {

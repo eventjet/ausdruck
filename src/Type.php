@@ -255,7 +255,7 @@ final class Type implements Stringable
         if ($self->name !== $other->name) {
             return false;
         }
-        if ($this->name === 'list') {
+        if ($self->name === 'list') {
             return $self->args[0]->isSubtypeOf($other->args[0]);
         }
         if ($self->name === 'Func') {
@@ -274,7 +274,7 @@ final class Type implements Stringable
                 }
             }
         }
-        if ($this->name === 'Struct') {
+        if ($self->name === 'Struct') {
             foreach ($other->fields as $name => $fieldType) {
                 if (!array_key_exists($name, $self->fields)) {
                     return false;
