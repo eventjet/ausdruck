@@ -32,22 +32,22 @@ final class TypeParserTest extends TestCase
         ];
         yield 'End of string after function arrow' => [
             'fn(int) ->',
-            'Expected return type, got end of input',
+            'Expected type, got end of input',
         ];
         yield 'Dot after function arrow' => [
             'fn(int) -> .',
-            'Expected return type, got .',
+            'Expected type, got .',
         ];
         yield 'Empty string' => [
             <<<'AUSDRUCK'
-                
+
                 =
                 AUSDRUCK,
-            'Invalid type ""',
+            'Expected type, got end of input',
         ];
         yield 'Whitespace-only string' => [
             '  ',
-            'Invalid type ""',
+            'Expected type, got end of input',
         ];
         yield 'Arrow' => [
             <<<'AUSDRUCK'
@@ -91,6 +91,16 @@ final class TypeParserTest extends TestCase
         yield 'Struct: no comma between fields' => [
             '{name: string age: int}',
             'Expected }, got age',
+        ];
+        // Only the closing bracket ends an argument list, so a token that can't start a type is blamed as the element
+        // it isn't rather than as a missing bracket.
+        yield 'Literal instead of a second type argument' => [
+            'list<int 42>',
+            'Expected type, got 42',
+        ];
+        yield 'Literal instead of a second function parameter' => [
+            'fn(int 42) -> string',
+            'Expected type, got 42',
         ];
         // A type string is a whole type, so anything after the first complete one is an error rather than ignored.
         yield 'Trailing identifier' => [
@@ -212,8 +222,8 @@ final class TypeParserTest extends TestCase
     {
         yield 'Name is not an identifier' => ['42: int', 'Expected type name, got 42'];
         yield 'Missing colon after name' => ['Foo int', 'Expected :, got int'];
-        yield 'End of input after colon' => ['Foo:', 'Expected a type for Foo, got end of input'];
-        yield 'Non-type token after colon' => ['Foo: ->', 'Expected a type for Foo, got ->'];
+        yield 'End of input after colon' => ['Foo:', 'Expected type, got end of input'];
+        yield 'Non-type token after colon' => ['Foo: ->', 'Expected type, got ->'];
     }
 
     #[DataProvider('syntaxErrorCases')]

@@ -272,15 +272,6 @@ final class ExpressionParser
         }
         $this->expect(Token::Colon);
         $typeNode = TypeParser::parse($this->tokens);
-        if ($typeNode === null) {
-            throw SyntaxError::create('Expected type, got end of string', $this->nextSpan());
-        }
-        if ($typeNode instanceof ParsedToken) {
-            throw SyntaxError::create(
-                sprintf('Expected type, got %s', Token::print($typeNode->token)),
-                $typeNode->location(),
-            );
-        }
         $type = $this->declarations->types->resolve($typeNode);
         if ($type instanceof TypeError) {
             throw $type;
@@ -409,15 +400,6 @@ final class ExpressionParser
         }
         $this->expect(Token::Colon);
         $typeNode = TypeParser::parse($this->tokens);
-        if ($typeNode === null) {
-            throw SyntaxError::create('Expected type after colon', $this->nextSpan());
-        }
-        if ($typeNode instanceof ParsedToken) {
-            throw SyntaxError::create(
-                sprintf('Expected type after colon, got %s', Token::print($typeNode->token)),
-                $typeNode->location(),
-            );
-        }
         $returnType = $this->declarations->types->resolve($typeNode);
         if ($returnType instanceof TypeError) {
             throw $returnType;
