@@ -10,9 +10,10 @@ use Eventjet\Ausdruck\Type;
  * Every type the language spells itself, as opposed to the ones a consumer adds as aliases. This is the only list of
  * them, and how many type arguments each one takes is stated once, in {@see self::typeArgumentCount()}. Both of the
  * questions the parser asks about a constructor are answers to that one number: {@see Types::resolve()} checks the
- * count it was given against it, and {@see self::takesTypeArguments()} asks whether it is greater than zero. Deriving
- * them means a constructor can't be given an arity in one place and checked against a different one in another—the
- * exhaustive match forces a new case to be given a count, and there is no second count for it to disagree with.
+ * count it was given against it, and {@see TypeParser::parse()} asks whether it is greater than zero before committing
+ * a `<` to being a type argument list. Deriving them means a constructor can't be given an arity in one place and
+ * checked against a different one in another—the exhaustive match forces a new case to be given a count, and there is
+ * no second count for it to disagree with.
  *
  * The case names are the names as written, which is why some of them are PHP keywords.
  *
@@ -53,15 +54,5 @@ enum TypeConstructor: string
             self::String, self::Int, self::Float, self::Bool, self::Any, self::None => 0,
             self::Fn, self::Struct => null,
         };
-    }
-
-    /**
-     * Whether a `<` directly after this name opens a type argument list. It does for the constructors that take at
-     * least one, and for nothing else, which is what lets `a:int < b:int` read as a comparison: see
-     * {@see TypeParser::parse()}, which has to decide what the `<` is before there is a resolved type to ask.
-     */
-    public function takesTypeArguments(): bool
-    {
-        return ($this->typeArgumentCount() ?? 0) > 0;
     }
 }

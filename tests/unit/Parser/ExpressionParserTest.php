@@ -502,6 +502,10 @@ final class ExpressionParserTest extends TestCase
         yield 'alias of a scalar' => ['foo:Count', ['Count' => Type::int()]];
         yield 'alias of a struct' => ['foo:Person', ['Person' => Type::struct(['name' => Type::string()])]];
         yield 'alias inside a list' => ['foo:list<Bag>', ['Bag' => Type::listOf(Type::string())]];
+        // An alias is none of the constructors that are written with type arguments, so a `<` after one can't be
+        // opening an argument list and has to read as less-than. `foo:int < bar:int` in parseCases() pins the same
+        // decision for a name the parser does know; this is the branch for every name it doesn't.
+        yield 'alias before a less-than' => ['foo:Count < bar:Count', ['Count' => Type::int()]];
     }
 
     #[DataProvider('parseCases')]
