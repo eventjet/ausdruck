@@ -149,21 +149,26 @@ final class ExpressionParser
     /**
      * a:int + b:int - c:int
      * =====================
+     *
+     * The loop is what makes this level left-associative: each operator folds what came before into its left operand.
+     * {@see self::parseComparison()} is otherwise the same shape with an if in place of the loop, which is what makes
+     * the six comparison operators non-associative; {@see \Eventjet\Ausdruck\Precedence::leftSlot()} reads that one
+     * difference back out when an expression is printed.
      */
     private function parseAdditive(): Expression
     {
         $left = $this->parseMultiplicative();
         while (true) {
-            $operator = $this->nextToken();
-            if ($operator !== Token::Plus && $operator !== Token::Minus) {
+            $build = match ($this->nextToken()) {
+                Token::Plus => $left->add(...),
+                Token::Minus => $left->subtract(...),
+                default => null,
+            };
+            if ($build === null) {
                 return $left;
             }
             $this->tokens->next();
-            $right = $this->parseMultiplicative();
-            $left = match ($operator) {
-                Token::Plus => $left->add($right),
-                Token::Minus => $left->subtract($right),
-            };
+            $left = $build($this->parseMultiplicative());
         }
     }
 
@@ -175,17 +180,17 @@ final class ExpressionParser
     {
         $left = $this->parseUnary();
         while (true) {
-            $operator = $this->nextToken();
-            if ($operator !== Token::Asterisk && $operator !== Token::Slash && $operator !== Token::Percent) {
+            $build = match ($this->nextToken()) {
+                Token::Asterisk => $left->multiply(...),
+                Token::Slash => $left->divide(...),
+                Token::Percent => $left->modulo(...),
+                default => null,
+            };
+            if ($build === null) {
                 return $left;
             }
             $this->tokens->next();
-            $right = $this->parseUnary();
-            $left = match ($operator) {
-                Token::Asterisk => $left->multiply($right),
-                Token::Slash => $left->divide($right),
-                Token::Percent => $left->modulo($right),
-            };
+            $left = $build($this->parseUnary());
         }
     }
 
