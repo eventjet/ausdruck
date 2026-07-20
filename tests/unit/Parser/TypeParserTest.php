@@ -30,13 +30,21 @@ final class TypeParserTest extends TestCase
             'fn(int',
             'Expected ), got end of input',
         ];
+        // A type is required everywhere one may appear, so one message serves them all; where a position has a name of
+        // its own, it says that instead of just "type".
+        //
+        // The input ran out one column past the whole `->`, not one past the column it starts in: a token is as wide
+        // as it is written.
         yield 'End of string after function arrow' => [
-            'fn(int) ->',
-            'Expected type, got end of input',
+            <<<'AUSDRUCK'
+                fn(int) ->
+                          =
+                AUSDRUCK,
+            'Expected return type, got end of input',
         ];
         yield 'Dot after function arrow' => [
             'fn(int) -> .',
-            'Expected type, got .',
+            'Expected return type, got .',
         ];
         yield 'Empty string' => [
             <<<'AUSDRUCK'
@@ -65,7 +73,10 @@ final class TypeParserTest extends TestCase
             'Expected field name, got {',
         ];
         yield 'Struct: end of input after field name' => [
-            '{name',
+            <<<'AUSDRUCK'
+                {name
+                     =
+                AUSDRUCK,
             'Expected :, got end of input',
         ];
         yield 'Struct: missing colon between field name and type' => [
@@ -119,6 +130,18 @@ final class TypeParserTest extends TestCase
         yield 'Unclosed type argument list' => [
             'list<int .',
             'Expected >, got .',
+        ];
+        // A `<` after a name that isn't a generic constructor might be a less-than, so the argument list after it is
+        // only tried, and any error inside it merely rules that reading out. A broken list nested in one is nested in
+        // the trying too, which is why the outer `<` is blamed rather than the comma the inner list is missing—the
+        // reading fallen back to is a less-than, and it is that one the tokens after it then have to fit.
+        yield 'Committed type argument list broken inside a speculative one' => [
+            'MyType<list<int int>>',
+            'Unexpected <',
+        ];
+        yield 'Committed type argument list broken on its own' => [
+            'list<list<int int>>',
+            'Expected >, got int',
         ];
         // A type string is a whole type, so anything after the first complete one is an error rather than ignored.
         yield 'Trailing identifier' => [

@@ -15,7 +15,6 @@ use Eventjet\Ausdruck\Type;
 
 use function is_string;
 use function sprintf;
-use function str_split;
 
 /**
  * Expressions are parsed as a cascade of precedence levels, from loosest to tightest binding:
@@ -33,10 +32,7 @@ use function str_split;
  */
 final class ExpressionParser
 {
-    /**
-     * @param Peekable<ParsedToken> $tokens
-     */
-    private function __construct(private Peekable $tokens, private Declarations $declarations)
+    private function __construct(private readonly Tokens $tokens, private readonly Declarations $declarations)
     {
     }
 
@@ -48,14 +44,7 @@ final class ExpressionParser
         if ($types instanceof Types) {
             $types = new Declarations($types);
         }
-        $declarations = $types;
-        $chars = $expression === '' ? [] : str_split($expression);
-        /**
-         * @infection-ignore-all Currently, there's no difference between str_split and its multibyte version. Multibyte
-         *     string literals and identifiers are just put back together. If you encounter a case where it does matter,
-         *     just change it to mb_str_split and add an appropriate test case.
-         */
-        return (new self(new Peekable(Tokenizer::tokenize($chars)), $declarations))->parseComplete();
+        return (new self(Tokens::of($expression), $types))->parseComplete();
     }
 
     public static function parseTyped(string $expression, Type $type, Declarations|Types|null $types = null): Expression
@@ -96,7 +85,7 @@ final class ExpressionParser
     private function parseOr(): Expression
     {
         $left = $this->parseAnd();
-        while ($this->nextToken() === Token::Or) {
+        while ($this->tokens->peekToken() === Token::Or) {
             $this->tokens->next();
             $left = $left->or_($this->parseAnd());
         }
@@ -110,7 +99,7 @@ final class ExpressionParser
     private function parseAnd(): Expression
     {
         $left = $this->parseComparison();
-        while ($this->nextToken() === Token::And) {
+        while ($this->tokens->peekToken() === Token::And) {
             $this->tokens->next();
             $left = $left->and_($this->parseComparison());
         }
@@ -129,7 +118,7 @@ final class ExpressionParser
     private function parseComparison(): Expression
     {
         $left = $this->parseAdditive();
-        $build = match ($this->nextToken()) {
+        $build = match ($this->tokens->peekToken()) {
             Token::TripleEquals => $left->eq(...),
             Token::NotEquals => $left->neq(...),
             Token::CloseAngle => $left->gt(...),
@@ -152,7 +141,7 @@ final class ExpressionParser
     private function parseAdditive(): Expression
     {
         $left = $this->parseUnary();
-        while ($this->nextToken() === Token::Minus) {
+        while ($this->tokens->peekToken() === Token::Minus) {
             $this->tokens->next();
             $left = $left->subtract($this->parseUnary());
         }
@@ -185,7 +174,7 @@ final class ExpressionParser
     private function parsePostfix(): Expression
     {
         $expr = $this->parsePrimary();
-        while ($this->nextToken() === Token::Dot) {
+        while ($this->tokens->peekToken() === Token::Dot) {
             $expr = $this->dot($expr);
         }
         return $expr;
@@ -198,7 +187,7 @@ final class ExpressionParser
     {
         $parsedToken = $this->tokens->peek();
         if ($parsedToken === null) {
-            throw SyntaxError::create('Expected expression, got end of input', $this->nextSpan());
+            throw SyntaxError::create('Expected expression, got end of input', $this->tokens->endOfInput());
         }
         $token = $parsedToken->token;
         if ($token === 'true') {
@@ -245,9 +234,9 @@ final class ExpressionParser
      */
     private function group(): Expression
     {
-        Tokens::expect($this->tokens, Token::OpenParen);
+        $this->tokens->expect(Token::OpenParen);
         $inner = $this->parseExpression();
-        Tokens::expect($this->tokens, Token::CloseParen);
+        $this->tokens->expect(Token::CloseParen);
         return $inner;
     }
 
@@ -260,7 +249,7 @@ final class ExpressionParser
     private function variable(string $name, Span $start): Get
     {
         $declaredType = $this->declarations->variables[$name] ?? null;
-        if ($this->nextToken() !== Token::Colon) {
+        if ($this->tokens->peekToken() !== Token::Colon) {
             if ($declaredType !== null) {
                 return Expr::get($name, new TypeHint($declaredType, false), $start);
             }
@@ -269,7 +258,7 @@ final class ExpressionParser
                 $start,
             );
         }
-        Tokens::expect($this->tokens, Token::Colon);
+        $this->tokens->expect(Token::Colon);
         $typeNode = TypeParser::parse($this->tokens);
         $type = $this->declarations->types->resolve($typeNode);
         if ($type instanceof TypeError) {
@@ -295,22 +284,21 @@ final class ExpressionParser
      */
     private function lambda(): Expression
     {
-        $start = Tokens::expect($this->tokens, Token::Pipe);
-        $params = Tokens::commaSeparated(
-            $this->tokens,
+        $start = $this->tokens->expect(Token::Pipe);
+        $params = $this->tokens->commaSeparated(
             Token::Pipe,
-            fn(): string => Tokens::expectIdentifier($this->tokens, 'parameter name')[0],
+            fn(): string => $this->tokens->expectIdentifier('parameter name')[0],
         );
-        Tokens::expect($this->tokens, Token::Pipe);
+        $this->tokens->expect(Token::Pipe);
         $body = $this->parseExpression();
         return Expr::lambda($body, $params, $start->location()->to($body->location()));
     }
 
     private function dot(Expression $target): Call|FieldAccess
     {
-        Tokens::expect($this->tokens, Token::Dot);
-        [$name, $nameLocation] = Tokens::expectIdentifier($this->tokens, 'function name');
-        $token = $this->nextToken();
+        $this->tokens->expect(Token::Dot);
+        [$name, $nameLocation] = $this->tokens->expectIdentifier('function name');
+        $token = $this->tokens->peekToken();
         return match ($token) {
             Token::Colon, Token::OpenParen => $this->call($name, $nameLocation, $target),
             default => Expr::fieldAccess($target, $name, $target->location()->to($nameLocation)),
@@ -325,9 +313,9 @@ final class ExpressionParser
     {
         $signature = $this->declarations->functions[$name] ?? null;
         $returnType = $this->returnType();
-        Tokens::expect($this->tokens, Token::OpenParen);
-        $args = Tokens::commaSeparated($this->tokens, Token::CloseParen, $this->parseExpression(...));
-        $closeParen = Tokens::expect($this->tokens, Token::CloseParen);
+        $this->tokens->expect(Token::OpenParen);
+        $args = $this->tokens->commaSeparated(Token::CloseParen, $this->parseExpression(...));
+        $closeParen = $this->tokens->expect(Token::CloseParen);
         return Expr::call(
             $target,
             $name,
@@ -349,11 +337,11 @@ final class ExpressionParser
      */
     private function returnType(): TypeAnnotation|null
     {
-        if ($this->nextToken() !== Token::Colon) {
+        if ($this->tokens->peekToken() !== Token::Colon) {
             return null;
         }
-        Tokens::expect($this->tokens, Token::Colon);
-        $typeNode = TypeParser::parse($this->tokens);
+        $this->tokens->expect(Token::Colon);
+        $typeNode = TypeParser::parse($this->tokens, 'return type');
         $returnType = $this->declarations->types->resolve($typeNode);
         if ($returnType instanceof TypeError) {
             throw $returnType;
@@ -362,33 +350,14 @@ final class ExpressionParser
     }
 
     /**
-     * The token the parser is looking at, or null at the end of the input.
-     *
-     * @return Token | string | Literal<string | int | float | bool> | null
-     */
-    private function nextToken(): Token|string|Literal|null
-    {
-        return $this->tokens->peek()?->token;
-    }
-
-    private function nextSpan(): Span
-    {
-        $token = $this->tokens->peek();
-        if ($token !== null) {
-            return Span::char($token->line, $token->column);
-        }
-        return Tokens::endOfInput($this->tokens);
-    }
-
-    /**
      * [1 - 2, foo:int]
      * ================
      */
     private function parseListLiteral(): ListLiteral
     {
-        $start = Tokens::expect($this->tokens, Token::OpenBracket);
-        $items = Tokens::commaSeparated($this->tokens, Token::CloseBracket, $this->parseExpression(...));
-        $close = Tokens::expect($this->tokens, Token::CloseBracket);
+        $start = $this->tokens->expect(Token::OpenBracket);
+        $items = $this->tokens->commaSeparated(Token::CloseBracket, $this->parseExpression(...));
+        $close = $this->tokens->expect(Token::CloseBracket);
         return Expr::listLiteral($items, $start->location()->to($close->location()));
     }
 
@@ -398,13 +367,13 @@ final class ExpressionParser
      */
     private function parseStructLiteral(): StructLiteral
     {
-        $start = Tokens::expect($this->tokens, Token::OpenBrace);
+        $start = $this->tokens->expect(Token::OpenBrace);
         $fields = [];
-        $parsed = Tokens::commaSeparated($this->tokens, Token::CloseBrace, $this->parseStructField(...));
+        $parsed = $this->tokens->commaSeparated(Token::CloseBrace, $this->parseStructField(...));
         foreach ($parsed as [$name, $value]) {
             $fields[$name] = $value;
         }
-        $close = Tokens::expect($this->tokens, Token::CloseBrace);
+        $close = $this->tokens->expect(Token::CloseBrace);
         return Expr::structLiteral($fields, $start->location()->to($close->location()));
     }
 
@@ -416,8 +385,8 @@ final class ExpressionParser
      */
     private function parseStructField(): array
     {
-        [$name] = Tokens::expectIdentifier($this->tokens, 'field name');
-        Tokens::expect($this->tokens, Token::Colon);
+        [$name] = $this->tokens->expectIdentifier('field name');
+        $this->tokens->expect(Token::Colon);
         return [$name, $this->parseExpression()];
     }
 }
