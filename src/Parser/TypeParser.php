@@ -46,7 +46,8 @@ final class TypeParser
         while ($tokens->peek() !== null) {
             [$name] = $tokens->expectIdentifier('type name');
             $tokens->expect(Token::Colon);
-            $declarations[$name] = self::parse($tokens);
+            // Named, because a declaration string holds several and the span alone leaves the reader counting them.
+            $declarations[$name] = self::parse($tokens, sprintf('type for %s', $name));
         }
         return $declarations;
     }

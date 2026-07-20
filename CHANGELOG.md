@@ -16,8 +16,9 @@
   meaning. Type strings kept outside the codebase, in configuration or a database, are the ones worth checking.
 
 - Syntax errors say `end of input` where some of them used to say `end of string`, and a type that is required in a
-  named position says so: `Expected return type, got end of input` rather than `Expected type after colon`. Error
-  messages are not covered by the backward-compatibility promise, but code matching on them will need updating.
+  named position says so: `Expected return type, got end of input` rather than `Expected type after colon`, and
+  `Expected type for Foo, got ->` for a declaration in `TypeParser::parseDeclarations()`. Error messages are not
+  covered by the backward-compatibility promise, but code matching on them will need updating.
 
 - Errors reported at the end of the input now point just past the whole last token rather than just past the column it
   starts in. `{name` is reported at column 6 instead of column 3.

@@ -263,8 +263,13 @@ final class TypeParserTest extends TestCase
     {
         yield 'Name is not an identifier' => ['42: int', 'Expected type name, got 42'];
         yield 'Missing colon after name' => ['Foo int', 'Expected :, got int'];
-        yield 'End of input after colon' => ['Foo:', 'Expected type, got end of input'];
-        yield 'Non-type token after colon' => ['Foo: ->', 'Expected type, got ->'];
+        // A declaration string holds several declarations, so the one that is broken says which it is.
+        yield 'End of input after colon' => ['Foo:', 'Expected type for Foo, got end of input'];
+        yield 'Non-type token after colon' => ['Foo: ->', 'Expected type for Foo, got ->'];
+        yield 'Second declaration is the broken one' => [
+            'Foo: int Bar: ->',
+            'Expected type for Bar, got ->',
+        ];
     }
 
     #[DataProvider('syntaxErrorCases')]
