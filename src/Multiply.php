@@ -20,9 +20,9 @@ final class Multiply extends BinaryOperator
     }
 
     /**
-     * @psalm-suppress InvalidOperand Psalm's strict binary operands mode rejects int|float on either side, because it
-     *     can't see that {@see Expr::multiply()} has already required both operands to be of the *same* numeric type.
-     *     The int/float mix it's guarding against can't reach us.
+     * @psalm-suppress InvalidOperand Both operands are the same numeric type by then; Psalm's strict binary operands
+     *     mode can't see that {@see Expr::assertSameNumberType()} has already rejected the int/float mix it guards
+     *     against.
      */
     #[Override]
     public function evaluate(Scope $scope): int|float
