@@ -97,7 +97,7 @@ final class TypeParser
             // A generic constructor is committed: the `<` can only be its argument list, so whatever goes wrong in
             // there is a genuine error, reported where it happens rather than rewound.
             $tokens->next();
-            $args = self::parseTypeList($tokens, Token::CloseAngle);
+            $args = self::parseTypeList($tokens);
         } else {
             // Any other name might be an operand rather than a type constructor, and the `<` a less-than: `a:int <
             // b:int` is a comparison. Only a list that parses and closes is a type argument list, so try to read one
@@ -127,7 +127,7 @@ final class TypeParser
         $snapshot = $tokens->snapshot();
         try {
             $tokens->next();
-            $args = self::parseTypeList($tokens, Token::CloseAngle);
+            $args = self::parseTypeList($tokens);
             if ($tokens->peek()?->token === Token::CloseAngle) {
                 return $args;
             }
@@ -138,29 +138,37 @@ final class TypeParser
     }
 
     /**
+     * Whether a type starts here. A type is either a name or a struct, so nothing else can begin one.
+     *
+     * @param Peekable<ParsedToken> $tokens
+     */
+    private static function startsType(Peekable $tokens): bool
+    {
+        $next = $tokens->peek()?->token;
+        return is_string($next) || $next === Token::OpenBrace;
+    }
+
+    /**
      * map<int, string>
      *     ===========
      *
+     * The list ends where types stop—at the closing bracket, at the end of the input, or at anything else that can't
+     * begin one. Whatever that turns out to be is left for the caller to {@see self::expect()}, so an unclosed list is
+     * reported as the bracket it is missing rather than as a list element that doesn't parse.
+     *
      * @param Peekable<ParsedToken> $tokens
-     * @param Token $close The bracket the list ends at. It is left on the stream for the caller to consume, and it is
-     *     the only thing that ends the list: anything else in front of a list element is a type that doesn't parse.
-     *     Running out of input ends it too, so that the caller's expect($close) gets to name the bracket that's
-     *     missing instead of this asking for another element.
      * @return list<TypeNode>
      */
-    private static function parseTypeList(Peekable $tokens, Token $close): array
+    private static function parseTypeList(Peekable $tokens): array
     {
         $args = [];
-        while (true) {
-            $next = $tokens->peek();
-            if ($next === null || $next->token === $close) {
-                return $args;
-            }
+        while (self::startsType($tokens)) {
             $args[] = self::parse($tokens);
             if ($tokens->peek()?->token === Token::Comma) {
                 $tokens->next();
             }
         }
+        return $args;
     }
 
     /**
@@ -203,7 +211,7 @@ final class TypeParser
     private static function parseFunction(Peekable $tokens, Span $fnLocation): TypeNode
     {
         self::expect($tokens, Token::OpenParen);
-        $params = self::parseTypeList($tokens, Token::CloseParen);
+        $params = self::parseTypeList($tokens);
         self::expect($tokens, Token::CloseParen);
         self::expect($tokens, Token::Arrow);
         $returnType = self::parse($tokens);

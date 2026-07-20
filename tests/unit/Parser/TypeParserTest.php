@@ -92,15 +92,23 @@ final class TypeParserTest extends TestCase
             '{name: string age: int}',
             'Expected }, got age',
         ];
-        // Only the closing bracket ends an argument list, so a token that can't start a type is blamed as the element
-        // it isn't rather than as a missing bracket.
+        // An argument list ends at the first thing that can't start a type, so whatever that is gets blamed as the
+        // closing bracket it isn't. Forgetting the bracket is the likelier mistake, and this names it.
         yield 'Literal instead of a second type argument' => [
             'list<int 42>',
-            'Expected type, got 42',
+            'Expected >, got 42',
         ];
         yield 'Literal instead of a second function parameter' => [
             'fn(int 42) -> string',
-            'Expected type, got 42',
+            'Expected ), got 42',
+        ];
+        yield 'Unclosed function parameter list' => [
+            'fn(int -> string',
+            'Expected ), got ->',
+        ];
+        yield 'Unclosed type argument list' => [
+            'list<int .',
+            'Expected >, got .',
         ];
         // A type string is a whole type, so anything after the first complete one is an error rather than ignored.
         yield 'Trailing identifier' => [
