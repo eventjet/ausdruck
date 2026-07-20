@@ -13,7 +13,9 @@ use function count;
  * A lookahead cursor over an iterable, with the ability to rewind. Items pulled from the underlying
  * generator are buffered as they are read, so {@see self::snapshot()} can record the current position and
  * {@see self::restore()} can return to it later—which is what lets a parser try one reading of the tokens ahead and
- * fall back to another. Everything already read stays available; nothing is pulled from the generator twice.
+ * fall back to another. Everything already read stays available, nothing is pulled from the generator twice, and
+ * nothing is pulled before a caller asks for it—a generator that throws only does so once the item it fails on is
+ * actually wanted.
  *
  * The cursor only moves where it's told; deciding when a reading has failed, and rewinding if it has, is the caller's
  * business. See {@see TypeParser::tryTypeArguments()} for the one place that does.
@@ -60,11 +62,18 @@ final class Peekable
     {
         $target = $this->cursor + $ahead;
         while (count($this->buffer) <= $target) {
+            // A generator stops on the item it yielded, so reading the next one means advancing past the last one
+            // buffered—except on the first pass, when nothing has been yielded yet. Advancing here, once an item is
+            // actually asked for, rather than right after buffering one, is what keeps the generator from running
+            // ahead of the caller: the tokenizer scans the token that was peeked and not the text after it, so a
+            // mistake further right can't throw before the parser has reported the one it already found.
+            if ($this->buffer !== []) {
+                $this->items->next();
+            }
             if (!$this->items->valid()) {
                 return null;
             }
             $this->buffer[] = $this->items->current();
-            $this->items->next();
         }
         return $this->buffer[$target];
     }

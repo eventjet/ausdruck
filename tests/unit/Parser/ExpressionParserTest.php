@@ -430,6 +430,13 @@ final class ExpressionParserTest extends TestCase
         yield 'trailing string literal' => ['"a" "b"', 'Unexpected "b"'];
         yield 'trailing keyword' => ['true false', 'Unexpected identifier false'];
         yield 'trailing operator' => ['a:int -', 'Expected expression, got end of input'];
+        // The leftmost mistake is the one to fix first, so it's the one to report—whatever garbage follows it. Reading
+        // the token that trailing junk starts with must not scan the characters after that token, or the tokenizer
+        // would throw over text further right before the parser ever gets to blame the junk it already has.
+        yield 'trailing literal before an unterminated string' => ['1 2 "unterminated', 'Unexpected 2'];
+        yield 'trailing literal before a non-token symbol' => ['1 2 €', 'Unexpected 2'];
+        yield 'trailing keyword before a non-token symbol' => ['true false €', 'Unexpected identifier false'];
+        yield 'trailing variable before a non-token symbol' => ['a:int b €', 'Unexpected identifier b'];
         yield 'missing comma between list items' => ['[1 2]', 'Expected ], got 2'];
         yield 'missing comma between function arguments' => ['foo:string.substr(0 3)', 'Expected ), got 3'];
         // A group is a whole expression between the parentheses: empty ones have nothing to group, and an unclosed one
