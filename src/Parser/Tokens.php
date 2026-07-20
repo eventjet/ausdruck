@@ -10,9 +10,13 @@ use function str_split;
 
 /**
  * The stream of tokens a parser reads, and the reading conventions {@see ExpressionParser} and {@see TypeParser} share:
- * what it means to require a token, where the input ran out, and the shape of every list in the language. Both walk the
- * same stream, so both had private copies of these; one copy is what keeps the two from drifting apart as either is
+ * what it means to require something, where the input ran out, and the shape of every list in the language. Both walk
+ * the same stream, so both had private copies of these; one copy is what keeps the two from drifting apart as either is
  * edited.
+ *
+ * Requiring something is stated once by {@see self::expected()} and not just for tokens: a type and an expression are
+ * required in the same words and blamed on the same span as a closing bracket, so the two parsers cannot word or locate
+ * the same complaint differently.
  *
  * The cursor underneath is a {@see Peekable}, which buffers whatever it is given and knows nothing about tokens—the
  * tokenizer reads characters through one of its own. Everything token-shaped lives here instead, so a parser holds a
@@ -93,23 +97,34 @@ final class Tokens
         $this->tokens->restore($snapshot);
     }
 
+    /**
+     * Something was required here and isn't there. One rule with one span policy—blame the token that turned up, or
+     * where the input ran out if none did—so every reading that requires something says so through this rather than
+     * wording and locating its own complaint. What is required needn't be a single token: `type` and `expression` are
+     * asked for the same way `)` is, and are named the same way in the error.
+     *
+     * @param string $what What was required, as the error should name it: a printed token, or a phrase like
+     *     "field name" or "return type".
+     */
+    public function expected(string $what): SyntaxError
+    {
+        $actual = $this->tokens->peek();
+        return SyntaxError::create(
+            $actual === null
+                ? sprintf('Expected %s, got end of input', $what)
+                : sprintf('Expected %s, got %s', $what, Token::print($actual->token)),
+            $actual?->location() ?? $this->endOfInput(),
+        );
+    }
+
     public function expect(Token $expected): ParsedToken
     {
         $actual = $this->tokens->peek();
-        if ($actual === null) {
-            throw SyntaxError::create(
-                sprintf('Expected %s, got end of input', Token::print($expected)),
-                $this->endOfInput(),
-            );
+        if ($actual === null || $actual->token !== $expected) {
+            throw $this->expected(Token::print($expected));
         }
-        if ($actual->token === $expected) {
-            $this->tokens->next();
-            return $actual;
-        }
-        throw SyntaxError::create(
-            sprintf('Expected %s, got %s', Token::print($expected), Token::print($actual->token)),
-            $actual->location(),
-        );
+        $this->tokens->next();
+        return $actual;
     }
 
     /**
@@ -119,17 +134,8 @@ final class Tokens
     public function expectIdentifier(string $expected): array
     {
         $name = $this->tokens->peek();
-        if ($name === null) {
-            throw SyntaxError::create(
-                sprintf('Expected %s, got end of input', $expected),
-                $this->endOfInput(),
-            );
-        }
-        if (!is_string($name->token)) {
-            throw SyntaxError::create(
-                sprintf('Expected %s, got %s', $expected, Token::print($name->token)),
-                $name->location(),
-            );
+        if ($name === null || !is_string($name->token)) {
+            throw $this->expected($expected);
         }
         $this->tokens->next();
         return [$name->token, $name->location()];

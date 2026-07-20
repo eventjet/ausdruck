@@ -9,12 +9,23 @@ use function is_string;
 use function sprintf;
 
 /**
+ * Reads types off a stream of tokens. Like {@see ExpressionParser}, it is an object over that stream rather than a set
+ * of statics passing it along: the stream never varies within a parse, so it is state, not an argument, and the
+ * recursive readings can hand each other a closure without one having to capture it.
+ *
+ * The expression parser holds one of these over the same stream, which is what lets a type appear inside an expression:
+ * both are readers of one stream that take turns.
+ *
  * @psalm-internal Eventjet\Ausdruck\Parser
  */
 final class TypeParser
 {
+    public function __construct(private readonly Tokens $tokens)
+    {
+    }
+
     /**
-     * A whole string is a whole type: unlike {@see self::parse()}, which reads one type off a stream the expression
+     * A whole string is a whole type: unlike {@see self::type()}, which reads one type off a stream the expression
      * parser keeps using afterwards, nothing here comes after the type, so a leftover token is an error rather than the
      * caller's business.
      */
@@ -22,7 +33,7 @@ final class TypeParser
     {
         $tokens = Tokens::of($str);
         try {
-            $node = self::parse($tokens);
+            $node = (new self($tokens))->type();
         } catch (SyntaxError $e) {
             return $e;
         }
@@ -42,12 +53,13 @@ final class TypeParser
     public static function parseDeclarations(string $src): array
     {
         $tokens = Tokens::of($src);
+        $types = new self($tokens);
         $declarations = [];
         while ($tokens->peek() !== null) {
             [$name] = $tokens->expectIdentifier('type name');
             $tokens->expect(Token::Colon);
             // Named, because a declaration string holds several and the span alone leaves the reader counting them.
-            $declarations[$name] = self::parse($tokens, sprintf('type for %s', $name));
+            $declarations[$name] = $types->type(sprintf('type for %s', $name));
         }
         return $declarations;
     }
@@ -62,50 +74,45 @@ final class TypeParser
      *     {@see Tokens::expectIdentifier()} extends to names. A call site with nothing more specific to say than
      *     "type" says nothing.
      */
-    public static function parse(Tokens $tokens, string $expected = 'type'): TypeNode
+    public function type(string $expected = 'type'): TypeNode
     {
-        $parsedToken = $tokens->peek();
+        $parsedToken = $this->tokens->peek();
         if ($parsedToken === null) {
-            throw SyntaxError::create(
-                sprintf('Expected %s, got end of input', $expected),
-                $tokens->endOfInput(),
-            );
+            throw $this->tokens->expected($expected);
         }
         if ($parsedToken->token === Token::OpenBrace) {
-            return self::parseStruct($tokens, $parsedToken->location());
+            return $this->parseStruct($parsedToken->location());
         }
         $name = $parsedToken->token;
         if (!is_string($name)) {
-            throw SyntaxError::create(
-                sprintf('Expected %s, got %s', $expected, Token::print($name)),
-                $parsedToken->location(),
-            );
+            throw $this->tokens->expected($expected);
         }
-        $tokens->next();
+        $location = $parsedToken->location();
+        $this->tokens->next();
         if ($name === 'fn') {
-            return self::parseFunction($tokens, $parsedToken->location());
+            return $this->parseFunction($location);
         }
-        if ($tokens->peekToken() !== Token::OpenAngle) {
-            return new TypeNode($name, [], $parsedToken->location());
+        if ($this->tokens->peekToken() !== Token::OpenAngle) {
+            return new TypeNode($name, [], $location);
         }
         if (TypeConstructor::tryFrom($name)?->takesTypeArguments() ?? false) {
             // A generic constructor is committed: the `<` can only be its argument list, so whatever goes wrong in
             // there is a genuine error, reported where it happens rather than rewound—unless a speculative list
             // further out is still deciding and swallows it. See self::tryTypeArguments().
-            $tokens->next();
-            $args = self::parseTypeList($tokens, Token::CloseAngle);
+            $this->tokens->next();
+            $args = $this->parseTypeList(Token::CloseAngle);
         } else {
             // Any other name might be an operand rather than a type constructor, and the `<` a less-than: `a:int <
             // b:int` is a comparison. Only a list that parses and closes is a type argument list, so try to read one
             // and hand the `<` back if that isn't what's there. A closed list after a name that takes none
             // (`int<string>`) is read as a type on purpose, so the resolver can reject it by name.
-            $args = self::tryTypeArguments($tokens);
+            $args = $this->tryTypeArguments();
             if ($args === null) {
-                return new TypeNode($name, [], $parsedToken->location());
+                return new TypeNode($name, [], $location);
             }
         }
-        $closeAngle = $tokens->expect(Token::CloseAngle);
-        return new TypeNode($name, $args, $parsedToken->location()->to($closeAngle->location()));
+        $closeAngle = $this->tokens->expect(Token::CloseAngle);
+        return new TypeNode($name, $args, $location->to($closeAngle->location()));
     }
 
     /**
@@ -124,18 +131,18 @@ final class TypeParser
      *
      * @return list<TypeNode> | null
      */
-    private static function tryTypeArguments(Tokens $tokens): array|null
+    private function tryTypeArguments(): array|null
     {
-        $snapshot = $tokens->snapshot();
+        $snapshot = $this->tokens->snapshot();
         try {
-            $tokens->next();
-            $args = self::parseTypeList($tokens, Token::CloseAngle);
-            if ($tokens->peekToken() === Token::CloseAngle) {
+            $this->tokens->next();
+            $args = $this->parseTypeList(Token::CloseAngle);
+            if ($this->tokens->peekToken() === Token::CloseAngle) {
                 return $args;
             }
         } catch (SyntaxError) {
         }
-        $tokens->restore($snapshot);
+        $this->tokens->restore($snapshot);
         return null;
     }
 
@@ -148,29 +155,29 @@ final class TypeParser
      * @param Token $close The bracket that ends the list, which the caller takes.
      * @return list<TypeNode>
      */
-    private static function parseTypeList(Tokens $tokens, Token $close): array
+    private function parseTypeList(Token $close): array
     {
-        return $tokens->commaSeparated($close, static fn(): TypeNode => self::parse($tokens));
+        return $this->tokens->commaSeparated($close, fn(): TypeNode => $this->type());
     }
 
-    private static function parseFunction(Tokens $tokens, Span $fnLocation): TypeNode
+    private function parseFunction(Span $fnLocation): TypeNode
     {
-        $tokens->expect(Token::OpenParen);
-        $params = self::parseTypeList($tokens, Token::CloseParen);
-        $tokens->expect(Token::CloseParen);
-        $tokens->expect(Token::Arrow);
-        $returnType = self::parse($tokens, 'return type');
+        $this->tokens->expect(Token::OpenParen);
+        $params = $this->parseTypeList(Token::CloseParen);
+        $this->tokens->expect(Token::CloseParen);
+        $this->tokens->expect(Token::Arrow);
+        $returnType = $this->type('return type');
         return new TypeNode('fn', array_merge($params, [$returnType]), $fnLocation->to($returnType->location));
     }
 
     /**
-     * @param Span $start The location of the `{`, which {@see self::parse()} has already peeked.
+     * @param Span $start The location of the `{`, which {@see self::type()} has already peeked.
      */
-    private static function parseStruct(Tokens $tokens, Span $start): TypeNode
+    private function parseStruct(Span $start): TypeNode
     {
-        $tokens->next();
-        $fields = $tokens->commaSeparated(Token::CloseBrace, static fn(): TypeNode => self::parseField($tokens));
-        $end = $tokens->expect(Token::CloseBrace)->location();
+        $this->tokens->next();
+        $fields = $this->tokens->commaSeparated(Token::CloseBrace, fn(): TypeNode => $this->parseField());
+        $end = $this->tokens->expect(Token::CloseBrace)->location();
         return TypeNode::struct($fields, $start->to($end));
     }
 
@@ -178,10 +185,10 @@ final class TypeParser
      * {name: string, age: int}
      *  ============
      */
-    private static function parseField(Tokens $tokens): TypeNode
+    private function parseField(): TypeNode
     {
-        [$name, $nameLocation] = $tokens->expectIdentifier('field name');
-        $tokens->expect(Token::Colon);
-        return TypeNode::keyValue(new TypeNode($name, [], $nameLocation), self::parse($tokens));
+        [$name, $nameLocation] = $this->tokens->expectIdentifier('field name');
+        $this->tokens->expect(Token::Colon);
+        return TypeNode::keyValue(new TypeNode($name, [], $nameLocation), $this->type());
     }
 }

@@ -32,8 +32,15 @@ use function sprintf;
  */
 final class ExpressionParser
 {
+    /**
+     * The reader of the types written inside an expression, over the same stream this one reads: a `:int` is read by
+     * handing the stream over and carrying on where it left off.
+     */
+    private readonly TypeParser $typeParser;
+
     private function __construct(private readonly Tokens $tokens, private readonly Declarations $declarations)
     {
+        $this->typeParser = new TypeParser($tokens);
     }
 
     public static function parse(string $expression, Declarations|Types|null $types = null): Expression
@@ -187,7 +194,7 @@ final class ExpressionParser
     {
         $parsedToken = $this->tokens->peek();
         if ($parsedToken === null) {
-            throw SyntaxError::create('Expected expression, got end of input', $this->tokens->endOfInput());
+            throw $this->tokens->expected('expression');
         }
         $token = $parsedToken->token;
         if ($token === 'true') {
@@ -218,10 +225,7 @@ final class ExpressionParser
         if ($token === Token::OpenParen) {
             return $this->group();
         }
-        throw SyntaxError::create(
-            sprintf('Expected expression, got %s', Token::print($token)),
-            $parsedToken->location(),
-        );
+        throw $this->tokens->expected('expression');
     }
 
     /**
@@ -259,7 +263,7 @@ final class ExpressionParser
             );
         }
         $this->tokens->expect(Token::Colon);
-        $typeNode = TypeParser::parse($this->tokens);
+        $typeNode = $this->typeParser->type();
         $type = $this->declarations->types->resolve($typeNode);
         if ($type instanceof TypeError) {
             throw $type;
@@ -341,7 +345,7 @@ final class ExpressionParser
             return null;
         }
         $this->tokens->expect(Token::Colon);
-        $typeNode = TypeParser::parse($this->tokens, 'return type');
+        $typeNode = $this->typeParser->type('return type');
         $returnType = $this->declarations->types->resolve($typeNode);
         if ($returnType instanceof TypeError) {
             throw $returnType;

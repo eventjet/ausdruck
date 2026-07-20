@@ -26,9 +26,10 @@ final class Tokenizer
     private const UNDERSCORE = 95;
 
     /**
-     * Every branch reads the same way: note where the token starts, scan it, then ask the source how far it got. No
-     * scanner keeps a line or column of its own, so none of them can disagree about what reading a character does—see
-     * {@see Source}.
+     * A token is whatever a scanner reads, spanning from where the scan started to the last character it took. That is
+     * said once, here, so it cannot be said differently by the next token form added: a scanner returns what it read
+     * and never sees the span it will be given. No scanner keeps a line or column of its own either, so none of them
+     * can disagree about what reading a character does—see {@see Source}.
      *
      * @param iterable<mixed, string> $chars
      * @return iterable<ParsedToken>
@@ -36,71 +37,73 @@ final class Tokenizer
     public static function tokenize(iterable $chars): iterable
     {
         $source = new Source($chars);
-        while (true) {
-            $char = $source->peek();
-            if ($char === null) {
-                break;
-            }
+        while (($char = $source->peek()) !== null) {
             if (ctype_space($char)) {
                 $source->take();
                 continue;
             }
             $start = $source->position();
-            $singleCharToken = match ($char) {
-                '.' => Token::Dot,
-                '(' => Token::OpenParen,
-                ')' => Token::CloseParen,
-                ':' => Token::Colon,
-                ',' => Token::Comma,
-                '[' => Token::OpenBracket,
-                ']' => Token::CloseBracket,
-                '{' => Token::OpenBrace,
-                '}' => Token::CloseBrace,
-                default => null,
-            };
-            if ($singleCharToken !== null) {
-                $source->take();
-                yield new ParsedToken($singleCharToken, $source->spanFrom($start));
-                continue;
-            }
-            if ($char === '"') {
-                $source->take();
-                $string = self::string($source);
-                yield new ParsedToken($string, $source->spanFrom($start));
-                continue;
-            }
-            $multiCharToken = match ($char) {
-                '=' => self::exact($source, '===', Token::TripleEquals),
-                '!' => self::exact($source, '!==', Token::NotEquals),
-                '&' => self::exact($source, '&&', Token::And),
-                '<' => self::angle($source, Token::OpenAngle, Token::LessThanEquals),
-                '>' => self::angle($source, Token::CloseAngle, Token::GreaterThanEquals),
-                /**
-                 * The sign is never folded into a number literal: a `-` always yields Token::Minus, and
-                 * {@see \Eventjet\Ausdruck\Expr::negative()} turns a negated number literal back into a negative one.
-                 * If the sign were folded in here, whitespace would silently decide the meaning of `a -2`:
-                 * subtraction, or `a` followed by the literal -2.
-                 */
-                '-' => self::bareOrPair($source, '>', Token::Minus, Token::Arrow),
-                '|' => self::bareOrPair($source, '|', Token::Pipe, Token::Or),
-                default => null,
-            };
-            if ($multiCharToken !== null) {
-                yield new ParsedToken($multiCharToken, $source->spanFrom($start));
-                continue;
-            }
-            if (is_numeric($char)) {
-                $number = self::number($source);
-                yield new ParsedToken($number, $source->spanFrom($start));
-                continue;
-            }
-            if (self::isIdentifierChar($char, first: true)) {
-                $identifier = self::identifier($source);
-                yield new ParsedToken($identifier, $source->spanFrom($start));
-                continue;
-            }
-            throw SyntaxError::create(sprintf('Unexpected character %s', $char), $start->span());
+            yield new ParsedToken(self::scan($source, $char), $source->spanFrom($start));
         }
+    }
+
+    /**
+     * Which token starts with $char, and reading it. Every branch leaves the source just past the token it read and
+     * says nothing about where that was; {@see self::tokenize()} measures. The character is peeked, not taken, so a
+     * branch is free to take it wherever suits the form it reads—in the dispatch for the one-character tokens, inside
+     * the scanner for the operators, in the scanning loop for numbers and identifiers.
+     *
+     * @return Token | string | Literal<string | int | float>
+     */
+    private static function scan(Source $source, string $char): Token|string|Literal
+    {
+        $singleCharToken = match ($char) {
+            '.' => Token::Dot,
+            '(' => Token::OpenParen,
+            ')' => Token::CloseParen,
+            ':' => Token::Colon,
+            ',' => Token::Comma,
+            '[' => Token::OpenBracket,
+            ']' => Token::CloseBracket,
+            '{' => Token::OpenBrace,
+            '}' => Token::CloseBrace,
+            default => null,
+        };
+        if ($singleCharToken !== null) {
+            $source->take();
+            return $singleCharToken;
+        }
+        if ($char === '"') {
+            $source->take();
+            return self::string($source);
+        }
+        $multiCharToken = match ($char) {
+            '=' => self::exact($source, '===', Token::TripleEquals),
+            '!' => self::exact($source, '!==', Token::NotEquals),
+            '&' => self::exact($source, '&&', Token::And),
+            '<' => self::angle($source, Token::OpenAngle, Token::LessThanEquals),
+            '>' => self::angle($source, Token::CloseAngle, Token::GreaterThanEquals),
+            /**
+             * The sign is never folded into a number literal: a `-` always yields Token::Minus, and
+             * {@see \Eventjet\Ausdruck\Expr::negative()} turns a negated number literal back into a negative one.
+             * If the sign were folded in here, whitespace would silently decide the meaning of `a -2`:
+             * subtraction, or `a` followed by the literal -2.
+             */
+            '-' => self::bareOrPair($source, '>', Token::Minus, Token::Arrow),
+            '|' => self::bareOrPair($source, '|', Token::Pipe, Token::Or),
+            default => null,
+        };
+        if ($multiCharToken !== null) {
+            return $multiCharToken;
+        }
+        if (is_numeric($char)) {
+            return self::number($source);
+        }
+        if (self::isIdentifierChar($char, first: true)) {
+            return self::identifier($source);
+        }
+        // Nothing has been taken, so the character that has no reading is still the one under the cursor.
+        throw SyntaxError::create(sprintf('Unexpected character %s', $char), $source->position()->span());
     }
 
     private static function identifier(Source $source): string
