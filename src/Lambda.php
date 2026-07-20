@@ -27,6 +27,11 @@ final class Lambda extends Expression
         $this->location = $location;
     }
 
+    /**
+     * A lambda with no parameters prints as `|| body`, and the lexer reads `||` back as the or operator rather than an
+     * empty parameter list, so that one shape doesn't round-trip. The parser can't produce such a lambda for the same
+     * reason it can't read one; only {@see Expr::lambda()} can, by being passed no parameter names.
+     */
     public function __toString(): string
     {
         return sprintf('|%s| %s', implode(', ', $this->parameters), $this->body);

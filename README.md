@@ -150,8 +150,8 @@ a:bool && (b:bool || c:bool)
 ```
 
 Parentheses only group; they add no node of their own. Redundant ones — a group the precedence would have produced
-anyway, like `(a:int - b:int) - c:int` — parse fine and simply disappear, so printing an expression back out adds a
-pair of parentheses exactly where one is needed to parse it back into the same expression, and nowhere else.
+anyway, like `(a:int - b:int) - c:int` — parse fine and simply disappear, so printing an expression back out puts a
+pair of parentheses exactly where the precedence would otherwise regroup the tree, and nowhere else.
 
 Anywhere an expression is expected, it can be a whole one, not only at the top level. List items, struct field values,
 function arguments, and lambda bodies are all full expressions, so operators, calls, and field access are available in

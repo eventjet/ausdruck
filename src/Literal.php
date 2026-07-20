@@ -34,6 +34,13 @@ final class Literal extends AbstractLiteral
         $this->location = $location;
     }
 
+    /**
+     * The source spelling of a value, where it has one. `none` doesn't: {@see Type::fromValue()} reads PHP's null as
+     * the None type, and it prints here as `null` because that is what it is in PHP, but the language has no null
+     * literal to read it back with. A none-valued expression therefore prints to something the parser rejects — the
+     * one value this produces that doesn't round-trip, and the reason the test cases that evaluate to none assert
+     * through `isSome` instead of naming the value.
+     */
     private static function dumpValue(mixed $value): string
     {
         if (is_string($value)) {
