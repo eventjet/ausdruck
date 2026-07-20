@@ -138,6 +138,23 @@ final class ExpressionParserTest extends TestCase
                     Expr::get('d', $b),
                 ),
             ],
+            // A comparison prints both of its operands at the additive level, and the cases above only ever put a
+            // looser expression on the left. These put one on the right, so dropping the parentheses there is caught:
+            // without them `a:bool === b:bool || c:bool` re-parses as `(a === b) || c`, a different tree.
+            [
+                'a:bool === (b:bool || c:bool)',
+                Expr::eq(Expr::get('a', $b), Expr::or_(Expr::get('b', $b), Expr::get('c', $b))),
+            ],
+            [
+                'a:bool !== (b:bool && c:bool)',
+                Expr::neq(Expr::get('a', $b), Expr::and_(Expr::get('b', $b), Expr::get('c', $b))),
+            ],
+            // Comparison is non-associative, so a comparison nested in a comparison's operand slot needs the
+            // parentheses whichever side it sits on.
+            [
+                'a:bool === (b:int > c:int)',
+                Expr::eq(Expr::get('a', $b), Expr::gt(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
             // Unary binds tighter than additive, so this subtracts a negation rather than negating a subtraction.
             [
                 'a:int - -b:int',
