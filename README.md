@@ -146,7 +146,7 @@ a:bool && (b:bool || c:bool)
 (a:int - b:int) - c:int
 (a:int + b:int) * c:int
 (a:int > b:int) === c:bool
-(a:int - b:int).abs:int()
+(a:int / b:int).unwrap:int()
 ```
 
 Parentheses only group; they add no node of their own. Redundant ones — a group the precedence would have produced
