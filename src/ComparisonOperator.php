@@ -6,9 +6,11 @@ namespace Eventjet\Ausdruck;
 
 /**
  * The six comparison operators, each paired with the rule that decides it: `===` and `!==` compare any two values of
- * the same type by deep structural equality ({@see ValueEquality}), `>`, `<`, `>=` and `<=` compare two numbers. Which
- * operands an operator will accept is {@see Expr}'s business, the one place nodes are built and their types checked;
- * this only says how a pair of operands that already type-check is decided.
+ * the same type by deep structural equality ({@see ValueEquality}), `>`, `<`, `>=` and `<=` compare two numbers. This
+ * only says how a pair of operands that already type-checks is decided; which operands an operator will accept is
+ * {@see Expr::checkComparison()}'s business. Keeping that there rather than here is what holds the dependencies one
+ * way: this enum needs to know about runtime values and nothing else, while deciding what an operator accepts means
+ * knowing about {@see Expression}, {@see Type} and the errors raised for a mismatch.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck

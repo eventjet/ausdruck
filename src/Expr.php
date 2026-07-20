@@ -40,14 +40,13 @@ final class Expr
 
     public static function eq(Expression $left, Expression $right): Eq
     {
-        self::assertSameType($left, $right, ComparisonOperator::Equals->value);
+        self::checkComparison(ComparisonOperator::Equals, $left, $right);
         return new Eq($left, $right);
     }
 
     public static function neq(Expression $left, Expression $right): Comparison
     {
-        self::assertSameType($left, $right, ComparisonOperator::NotEquals->value);
-        return new Comparison(ComparisonOperator::NotEquals, $left, $right);
+        return self::comparison(ComparisonOperator::NotEquals, $left, $right);
     }
 
     public static function get(string $name, TypeHint|Type $type, Span|null $location = null): Get
@@ -142,26 +141,23 @@ final class Expr
 
     public static function gt(Expression $left, Expression $right): Gt
     {
-        self::assertComparable($left, $right);
+        self::checkComparison(ComparisonOperator::GreaterThan, $left, $right);
         return new Gt($left, $right);
     }
 
     public static function lt(Expression $left, Expression $right): Comparison
     {
-        self::assertComparable($left, $right);
-        return new Comparison(ComparisonOperator::LessThan, $left, $right);
+        return self::comparison(ComparisonOperator::LessThan, $left, $right);
     }
 
     public static function gte(Expression $left, Expression $right): Comparison
     {
-        self::assertComparable($left, $right);
-        return new Comparison(ComparisonOperator::GreaterThanOrEqual, $left, $right);
+        return self::comparison(ComparisonOperator::GreaterThanOrEqual, $left, $right);
     }
 
     public static function lte(Expression $left, Expression $right): Comparison
     {
-        self::assertComparable($left, $right);
-        return new Comparison(ComparisonOperator::LessThanOrEqual, $left, $right);
+        return self::comparison(ComparisonOperator::LessThanOrEqual, $left, $right);
     }
 
     /**
@@ -210,6 +206,30 @@ final class Expr
     {
         /** @infection-ignore-all These dummy spans are just there to fill parameter lists */
         return Span::char(1, 1);
+    }
+
+    private static function comparison(ComparisonOperator $operator, Expression $left, Expression $right): Comparison
+    {
+        self::checkComparison($operator, $left, $right);
+        return new Comparison($operator, $left, $right);
+    }
+
+    /**
+     * Which rule an operator's operands have to satisfy, for all six in one place. The two rules answer different
+     * questions: `===` and `!==` compare for equality, so their operands only have to be of the same type, while the
+     * four ordering operators need operands that have an order at all. Stating the split once means a seventh operator
+     * has to be classified rather than copied from whichever neighbor happened to look closest.
+     */
+    private static function checkComparison(ComparisonOperator $operator, Expression $left, Expression $right): void
+    {
+        match ($operator) {
+            ComparisonOperator::Equals,
+            ComparisonOperator::NotEquals => self::assertSameType($left, $right, $operator->value),
+            ComparisonOperator::GreaterThan,
+            ComparisonOperator::LessThan,
+            ComparisonOperator::GreaterThanOrEqual,
+            ComparisonOperator::LessThanOrEqual => self::assertComparable($left, $right),
+        };
     }
 
     /**
