@@ -206,6 +206,31 @@ final class TypeTest extends TestCase
         self::assertTrue($bar->equals($foo));
     }
 
+    /**
+     * An alias is a name for one complete type, so it prints as that name and nothing else. Printing the arguments of
+     * the type it stands for would spell a type the parser rejects: `Bag<string>` reads as arguments applied to Bag,
+     * and an alias takes none.
+     */
+    public function testAliasOfAParameterizedTypePrintsAsItsNameAlone(): void
+    {
+        $alias = Type::alias('Bag', Type::listOf(Type::string()));
+
+        self::assertSame('Bag', (string)$alias);
+    }
+
+    /**
+     * Aliasing hides the layout a function type keeps its return and parameter types in, so the accessors have to look
+     * through the alias the same way subtyping and field lookup do.
+     */
+    public function testAliasOfAFunctionTypeKeepsItsSignatureReadable(): void
+    {
+        $alias = Type::alias('Callback', Type::func(Type::string(), [Type::int(), Type::bool()]));
+
+        self::assertTrue($alias->returnType()->equals(Type::string()));
+        self::assertTrue($alias->receiverType()?->equals(Type::int()) ?? false);
+        self::assertEquals([Type::bool()], $alias->argumentTypes());
+    }
+
     #[DataProvider('failingAssertCases')]
     public function testFailingAssert(Type $type, mixed $value, string $expectedMessage): void
     {
