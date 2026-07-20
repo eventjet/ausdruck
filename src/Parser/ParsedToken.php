@@ -4,27 +4,23 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
-use function assert;
-use function strlen;
-
 final class ParsedToken
 {
     /**
      * @param Token | string | Literal<string | int | float | bool> $token
-     * @param positive-int $line
-     * @param positive-int $column
+     * @param Span $location Where the token is written, as wide as it is written. Handed in by {@see Tokenizer},
+     *     which is scanning the source and is the only thing that knows: a token does not remember its spelling, so
+     *     the extent cannot be worked back out of it. `007` and `1.50` are the same tokens as `7` and `1.5`, and
+     *     measuring how they print would put the end of the first one two columns short of where it is written.
      */
     public function __construct(
         public readonly Token|string|Literal $token,
-        public readonly int $line,
-        public readonly int $column,
+        private readonly Span $location,
     ) {
     }
 
     public function location(): Span
     {
-        $str = $this->token instanceof Token ? $this->token->value : (string)$this->token;
-        assert($str !== '');
-        return new Span($this->line, $this->column, $this->line, $this->column + strlen($str) - 1);
+        return $this->location;
     }
 }

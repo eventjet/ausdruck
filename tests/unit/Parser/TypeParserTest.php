@@ -143,6 +143,23 @@ final class TypeParserTest extends TestCase
             'list<list<int int>>',
             'Expected >, got int',
         ];
+        // A token is underlined as wide as it is written, not as wide as it prints back: `1.50` occupies four
+        // columns even though the literal re-prints as `1.5`. The extent is recorded by the tokenizer while it reads
+        // the source, because the token itself no longer remembers how it was spelled.
+        yield 'Number literal wider than it prints' => [
+            <<<'AUSDRUCK'
+                list<1.50>
+                     ====
+                AUSDRUCK,
+            'Expected type, got 1.5',
+        ];
+        yield 'Number literal with leading zeros' => [
+            <<<'AUSDRUCK'
+                list<007>
+                     ===
+                AUSDRUCK,
+            'Expected type, got 7',
+        ];
         // A type string is a whole type, so anything after the first complete one is an error rather than ignored.
         yield 'Trailing identifier' => [
             'int foo',

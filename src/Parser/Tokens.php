@@ -177,7 +177,9 @@ final class Tokens
     /**
      * Where the input ran out: just after the last token read, or the very start of it if there never was one. Just
      * after the token, that is, not just after the column it starts in—an input ending in `->` ran out two columns on,
-     * not one—which is the extent {@see ParsedToken::location()} already works out.
+     * not one—which is the extent {@see ParsedToken::location()} carries. Carries rather than computes: the width of
+     * a token cannot be recovered from the token, only from the source, so an input ending in `1.50` ran out four
+     * columns on even though the literal prints back three wide.
      */
     public function endOfInput(): Span
     {

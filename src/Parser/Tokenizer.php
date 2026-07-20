@@ -56,7 +56,7 @@ final class Tokenizer
             };
             if ($singleCharToken !== null) {
                 $chars->next();
-                yield new ParsedToken($singleCharToken, $line, $column);
+                yield new ParsedToken($singleCharToken, Span::char($line, $column));
                 $column++;
                 continue;
             }
@@ -75,7 +75,11 @@ final class Tokenizer
                 $startCol = $column;
                 $chars->next();
                 $column++;
-                yield new ParsedToken(self::string($chars, $line, $column), $startLine, $startCol);
+                // Scanned before the span is built, not inside the ParsedToken() call: it is what moves $line and
+                // $column to the end of the token, and reading them as arguments alongside it would make the extent
+                // depend on PHP evaluating the arguments left to right.
+                $string = self::string($chars, $line, $column);
+                yield new ParsedToken($string, self::spanTo($startLine, $startCol, $line, $column));
                 continue;
             }
             $startCol = $column;
@@ -96,19 +100,39 @@ final class Tokenizer
                 default => null,
             };
             if ($multiCharToken !== null) {
-                yield new ParsedToken($multiCharToken, $line, $startCol);
+                yield new ParsedToken($multiCharToken, self::spanTo($line, $startCol, $line, $column));
                 continue;
             }
             if (is_numeric($char)) {
-                yield new ParsedToken(self::number($chars, $column), $line, $startCol);
+                $number = self::number($chars, $column);
+                yield new ParsedToken($number, self::spanTo($line, $startCol, $line, $column));
                 continue;
             }
             if (self::isIdentifierChar($char, first: true)) {
-                yield new ParsedToken(self::identifier($chars, $line, $column), $line, $startCol);
+                $identifier = self::identifier($chars, $line, $column);
+                yield new ParsedToken($identifier, self::spanTo($line, $startCol, $line, $column));
                 continue;
             }
             throw SyntaxError::create(sprintf('Unexpected character %s', $char), Span::char($line, $column));
         }
+    }
+
+    /**
+     * The extent of a token that has just been scanned. Every scanner stops on the character after the token it read,
+     * so that is where the extent ends: one column back.
+     *
+     * @param positive-int $startLine
+     * @param positive-int $startColumn
+     * @param positive-int $line Where the scanner stopped.
+     * @param positive-int $column Where the scanner stopped: one past the token's last character.
+     */
+    private static function spanTo(int $startLine, int $startColumn, int $line, int $column): Span
+    {
+        $endColumn = $column - 1;
+        // A scanner is only entered on a character that belongs to the token, and consumes it, so it always leaves
+        // $column at least one past the start of a line.
+        assert($endColumn >= 1);
+        return new Span($startLine, $startColumn, $line, $endColumn);
     }
 
     /**
@@ -237,12 +261,16 @@ final class Tokenizer
     }
 
     /**
+     * A string literal is the only token that may contain a real newline, so this is the only scanner that can leave
+     * the line it started on. It moves $line as well as $column: an extent that ended on the starting line would be
+     * wrong for the literal itself, and every token after it would be reported a line too high.
+     *
      * @param Peekable<string> $chars
      * @param positive-int $line
      * @param positive-int $column
      * @return Literal<string>
      */
-    private static function string(Peekable $chars, int $line, int &$column): Literal
+    private static function string(Peekable $chars, int &$line, int &$column): Literal
     {
         $string = '';
         while (true) {
@@ -250,14 +278,18 @@ final class Tokenizer
             if ($char === null) {
                 throw SyntaxError::create('Expected closing quote', Span::char($line, $column));
             }
+            $chars->next();
             if ($char === '"') {
-                $chars->next();
                 $column++;
                 break;
             }
+            if ($char === "\n") {
+                $line++;
+                $column = 1;
+            } else {
+                $column++;
+            }
             $string .= $char;
-            $chars->next();
-            $column++;
         }
         return new Literal($string);
     }
