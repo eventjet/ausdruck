@@ -7,7 +7,6 @@ namespace Eventjet\Ausdruck;
 use Override;
 
 use function intdiv;
-use function is_int;
 
 use const PHP_INT_MIN;
 
@@ -16,6 +15,13 @@ use const PHP_INT_MIN;
  * type evaluate to none rather than throwing — the same shape the `head` builtin gives an empty list. That's every
  * zero divisor, plus PHP_INT_MIN / -1, the one int division whose result overflows int and the one input
  * {@see intdiv()} throws for. An int quotient is {@see intdiv()}, truncated toward zero.
+ *
+ * Which of the two divisions this is comes from the operands' declared type, never from what they evaluate to. An int
+ * operand can arrive as a float when its own arithmetic overflowed, so runtime values can't tell an honest float
+ * division from an int one whose operands have both left int — and reading that pair as floats would answer an
+ * Option<int> with a float. Both operands are narrowed to the type they claim before the quotient is asked to exist,
+ * which is also why an overflowed dividend is reported rather than excused by a divisor that happens to be zero.
+ * See {@see Operand::int()}.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -31,18 +37,16 @@ final class Divide extends BinaryOperator
     #[Override]
     public function evaluate(Scope $scope): int|float|null
     {
-        /** @psalm-suppress MixedAssignment It's narrowed in the branches below, once the divisor has decided which number type both operands share. */
-        $dividend = $this->left->evaluate($scope);
-        $divisor = Operand::number($this->right->evaluate($scope));
-        if ($divisor === 0 || $divisor === 0.0) {
-            return null;
+        if ($this->left->matchesType(Type::float())) {
+            $dividend = Operand::float($this->left->evaluate($scope));
+            $divisor = Operand::float($this->right->evaluate($scope));
+            return $divisor === 0.0 ? null : $dividend / $divisor;
         }
-        if (!is_int($divisor)) {
-            return Operand::float($dividend) / $divisor;
-        }
-        $dividend = Operand::int($dividend);
-        // The one nonzero divisor without an int quotient: -PHP_INT_MIN is one past PHP_INT_MAX, and intdiv() throws.
-        return $dividend === PHP_INT_MIN && $divisor === -1
+        $dividend = Operand::int($this->left->evaluate($scope));
+        $divisor = Operand::int($this->right->evaluate($scope));
+        // Besides a zero divisor, the one operand pair without an int quotient: -PHP_INT_MIN is one past PHP_INT_MAX,
+        // and intdiv() throws for it.
+        return $divisor === 0 || ($dividend === PHP_INT_MIN && $divisor === -1)
             ? null
             : intdiv($dividend, $divisor);
     }

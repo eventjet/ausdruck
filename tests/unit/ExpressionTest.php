@@ -452,10 +452,49 @@ final class ExpressionTest extends TestCase
             'Expected int, got None',
         ];
         // PHP's int arithmetic isn't closed: a sum past PHP_INT_MAX evaluates to a float, and a value that has left
-        // int has no int quotient to give. See Operand::int().
+        // int has no int quotient or remainder to give. See Operand::int(). An operand that overflowed is rejected
+        // wherever it appears, so that the same mistake can't report itself differently depending on which side of the
+        // operator it lands on, or hide behind a divisor that happens to be zero.
         yield 'Dividing an int sum that overflowed' => [
             ['(a:int + b:int) / c:int'],
             new Scope(['a' => PHP_INT_MAX, 'b' => 1, 'c' => 2]),
+            'Expected an int operand, got float',
+        ];
+        yield 'Dividing by an int sum that overflowed' => [
+            ['a:int / (b:int + c:int)'],
+            new Scope(['a' => 1, 'b' => PHP_INT_MAX, 'c' => 1]),
+            'Expected an int operand, got float',
+        ];
+        yield 'Dividing an int sum that overflowed by another' => [
+            ['(a:int + b:int) / (c:int + d:int)'],
+            new Scope(['a' => PHP_INT_MAX, 'b' => 1, 'c' => PHP_INT_MAX, 'd' => 1]),
+            'Expected an int operand, got float',
+        ];
+        // The operands are checked against the type they claim before the quotient is asked to exist: a dividend that
+        // has left int is a defect to report, not a division that merely has no answer.
+        yield 'Dividing an int sum that overflowed by zero' => [
+            ['(a:int + b:int) / c:int'],
+            new Scope(['a' => PHP_INT_MAX, 'b' => 1, 'c' => 0]),
+            'Expected an int operand, got float',
+        ];
+        yield 'Taking the remainder of an int sum that overflowed' => [
+            ['(a:int + b:int) % c:int'],
+            new Scope(['a' => PHP_INT_MAX, 'b' => 1, 'c' => 2]),
+            'Expected an int operand, got float',
+        ];
+        yield 'Taking a remainder modulo an int sum that overflowed' => [
+            ['a:int % (b:int + c:int)'],
+            new Scope(['a' => 1, 'b' => PHP_INT_MAX, 'c' => 1]),
+            'Expected an int operand, got float',
+        ];
+        yield 'Taking the remainder of an int sum that overflowed modulo another' => [
+            ['(a:int + b:int) % (c:int + d:int)'],
+            new Scope(['a' => PHP_INT_MAX, 'b' => 1, 'c' => PHP_INT_MAX, 'd' => 1]),
+            'Expected an int operand, got float',
+        ];
+        yield 'Taking the remainder of an int sum that overflowed modulo zero' => [
+            ['(a:int + b:int) % c:int'],
+            new Scope(['a' => PHP_INT_MAX, 'b' => 1, 'c' => 0]),
             'Expected an int operand, got float',
         ];
     }

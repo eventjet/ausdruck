@@ -7,13 +7,15 @@ namespace Eventjet\Ausdruck;
 use Override;
 
 use function fmod;
-use function is_int;
 
 /**
  * Like {@see Divide}, modulo is total: the remainder is an option of the operand type, and a zero divisor makes it
  * none rather than throwing. A zero divisor is also the only operand pair without a remainder — the division whose
  * quotient overflows int still has one, since PHP_INT_MIN % -1 is 0. The remainder takes the dividend's sign. A float
  * remainder is {@see fmod()}, whose NAN-on-zero quirk stays inside: the divisor is checked before it's called.
+ *
+ * Which of the two remainders this is comes from the operands' declared type, and both are narrowed to the type they
+ * claim before the remainder is asked to exist, for the reasons spelled out in {@see Divide}.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -29,15 +31,14 @@ final class Modulo extends BinaryOperator
     #[Override]
     public function evaluate(Scope $scope): int|float|null
     {
-        /** @psalm-suppress MixedAssignment It's narrowed in the branches below, once the divisor has decided which number type both operands share. */
-        $dividend = $this->left->evaluate($scope);
-        $divisor = Operand::number($this->right->evaluate($scope));
-        if ($divisor === 0 || $divisor === 0.0) {
-            return null;
+        if ($this->left->matchesType(Type::float())) {
+            $dividend = Operand::float($this->left->evaluate($scope));
+            $divisor = Operand::float($this->right->evaluate($scope));
+            return $divisor === 0.0 ? null : fmod($dividend, $divisor);
         }
-        return is_int($divisor)
-            ? Operand::int($dividend) % $divisor
-            : fmod(Operand::float($dividend), $divisor);
+        $dividend = Operand::int($this->left->evaluate($scope));
+        $divisor = Operand::int($this->right->evaluate($scope));
+        return $divisor === 0 ? null : $dividend % $divisor;
     }
 
     #[Override]
