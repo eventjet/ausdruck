@@ -24,19 +24,61 @@ final class Types
     {
     }
 
-    private static function noArgs(Type $type, TypeNode $node): Type|TypeError
+    /**
+     * The one place a type argument count is checked. {@see TypeConstructor::typeArgumentCount()} says what each
+     * constructor takes, and an alias takes none, so every wrong count is worded here rather than restated per
+     * constructor. A surplus blames the arguments past the count that was wanted—the ones before it are what was asked
+     * for—while too few blames all of them, because none of them is individually the mistake.
+     *
+     * @param int<0, max> $expected
+     */
+    private static function checkArity(TypeNode $node, int $expected): TypeError|null
     {
-        if ($node->args === []) {
-            return $type;
+        $args = $node->args;
+        $given = count($args);
+        if ($given === $expected) {
+            return null;
         }
-        $location = $node->args[0]->location->to($node->args[count($node->args) - 1]->location);
-        return TypeError::create(sprintf('Invalid type "%s": %s does not accept arguments', $node, $type), $location);
+        if ($args === []) {
+            assert($expected > 0);
+            return TypeError::create(
+                sprintf('The %s type requires %s, none given', $node->name, self::spellArguments($expected)),
+                $node->location,
+            );
+        }
+        $last = $args[array_key_last($args)];
+        if ($expected === 0) {
+            return TypeError::create(
+                sprintf('Invalid type "%s": %s does not accept arguments', $node, $node->name),
+                $args[0]->location->to($last->location),
+            );
+        }
+        return TypeError::create(
+            sprintf(
+                'Invalid type "%s": %s expects exactly %s, got %d',
+                $node,
+                $node->name,
+                self::spellArguments($expected),
+                $given,
+            ),
+            ($args[$expected] ?? $args[0])->location->to($last->location),
+        );
     }
 
-    private static function dummySpan(): Span
+    /**
+     * How many arguments a message asks for. Arities are small and fixed—no constructor takes more than two—so the
+     * counts are spelled out rather than printed as digits, which is how these messages have always read, and the
+     * number and its plural are chosen together rather than agreed on by two separate expressions.
+     *
+     * @param positive-int $count
+     */
+    private static function spellArguments(int $count): string
     {
-        /** @infection-ignore-all These dummy spans are just there to fill parameter lists */
-        return Span::char(1, 1);
+        return match ($count) {
+            1 => 'one argument',
+            2 => 'two arguments',
+            default => sprintf('%d arguments', $count),
+        };
     }
 
     /**
@@ -52,87 +94,38 @@ final class Types
                 $node->location,
             );
         }
+        $arity = $constructor->typeArgumentCount();
+        $arityError = $arity === null ? null : self::checkArity($node, $arity);
+        if ($arityError !== null) {
+            return $arityError;
+        }
         return match ($constructor) {
             TypeConstructor::Fn => $this->resolveFunction($node),
-            TypeConstructor::String => self::noArgs(Type::string(), $node),
-            TypeConstructor::Int => self::noArgs(Type::int(), $node),
-            TypeConstructor::Float => self::noArgs(Type::float(), $node),
-            TypeConstructor::Bool => self::noArgs(Type::bool(), $node),
-            TypeConstructor::Any => self::noArgs(Type::any(), $node),
+            TypeConstructor::String => Type::string(),
+            TypeConstructor::Int => Type::int(),
+            TypeConstructor::Float => Type::float(),
+            TypeConstructor::Bool => Type::bool(),
+            TypeConstructor::Any => Type::any(),
             TypeConstructor::Map => $this->resolveMap($node),
             TypeConstructor::List => $this->resolveList($node),
-            TypeConstructor::Option => $this->resolveOption($this->exactlyOneTypeArg($node)),
-            TypeConstructor::Some => $this->exactlyOneTypeArg($node),
-            TypeConstructor::None => self::noArgs(Type::none(), $node),
+            TypeConstructor::Option => $this->resolveOption($node),
+            TypeConstructor::Some => $this->resolveSome($node),
+            TypeConstructor::None => Type::none(),
             TypeConstructor::Struct => $this->resolveStruct($node),
         };
     }
 
-    private function exactlyOneTypeArg(TypeNode $node): Type|TypeError
-    {
-        if ($node->args === []) {
-            return TypeError::create(
-                sprintf('The %s type requires one argument, none given', $node->name),
-                $node->location,
-            );
-        }
-        if (count($node->args) > 1) {
-            return TypeError::create(
-                sprintf(
-                    'Invalid type "%s": %s expects exactly one argument, got %d',
-                    $node,
-                    $node->name,
-                    count($node->args),
-                ),
-                $node->args[1]->location->to($node->args[array_key_last($node->args)]->location),
-            );
-        }
-        return $this->resolve($node->args[0]);
-    }
-
     private function resolveList(TypeNode $node): Type|TypeError
     {
-        $args = $node->args;
-        if ($args === []) {
-            return TypeError::create('The list type requires one argument, none given', $node->location);
-        }
-        $nArgs = count($args);
-        if ($nArgs > 1) {
-            $location = $args[0]->location->to($args[count($args) - 1]->location);
-            return TypeError::create(
-                sprintf(
-                    'Invalid type "%s": list expects exactly one argument, got %d',
-                    new TypeNode('list', $args, self::dummySpan()),
-                    $nArgs,
-                ),
-                $location,
-            );
-        }
-        $valueType = $this->resolve($args[0]);
-        if ($valueType instanceof TypeError) {
-            return $valueType;
-        }
-        return Type::listOf($valueType);
+        assert(count($node->args) === 1);
+        $valueType = $this->resolve($node->args[0]);
+        return $valueType instanceof TypeError ? $valueType : Type::listOf($valueType);
     }
 
     private function resolveMap(TypeNode $node): Type|TypeError
     {
+        assert(count($node->args) === 2);
         $args = $node->args;
-        if ($args === []) {
-            return TypeError::create('The map type requires two arguments, none given', $node->location);
-        }
-        $nArgs = count($args);
-        if ($nArgs !== 2) {
-            $location = $args[0]->location->to($args[count($args) - 1]->location);
-            return TypeError::create(
-                sprintf(
-                    'Invalid type "%s": map expects exactly two arguments, got %d',
-                    new TypeNode('map', $args, self::dummySpan()),
-                    $nArgs,
-                ),
-                $location,
-            );
-        }
         $keyType = $this->resolve($args[0]);
         if ($keyType instanceof TypeError) {
             return $keyType;
@@ -141,17 +134,14 @@ final class Types
             return TypeError::create(
                 sprintf(
                     'Invalid type "%s": map expects the key type to be int or string, got %s',
-                    new TypeNode('map', $args, self::dummySpan()),
+                    $node,
                     $keyType,
                 ),
                 $args[0]->location,
             );
         }
         $valueType = $this->resolve($args[1]);
-        if ($valueType instanceof TypeError) {
-            return $valueType;
-        }
-        return Type::mapOf($keyType, $valueType);
+        return $valueType instanceof TypeError ? $valueType : Type::mapOf($keyType, $valueType);
     }
 
     /**
@@ -165,12 +155,23 @@ final class Types
         if ($type === null) {
             return null;
         }
-        return self::noArgs(Type::alias($node->name, $type), $node);
+        return self::checkArity($node, 0) ?? Type::alias($node->name, $type);
     }
 
-    private function resolveOption(Type|TypeError $arg): Type|TypeError
+    /**
+     * An Option is a Some that may be absent, so it is the type of its argument and nothing more—which is what
+     * {@see self::resolveSome()} already resolves.
+     */
+    private function resolveOption(TypeNode $node): Type|TypeError
     {
-        return $arg instanceof TypeError ? $arg : Type::option($arg);
+        $some = $this->resolveSome($node);
+        return $some instanceof TypeError ? $some : Type::option($some);
+    }
+
+    private function resolveSome(TypeNode $node): Type|TypeError
+    {
+        assert(count($node->args) === 1);
+        return $this->resolve($node->args[0]);
     }
 
     private function resolveFunction(TypeNode $node): Type|TypeError
