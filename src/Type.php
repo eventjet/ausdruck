@@ -70,9 +70,15 @@ final class Type implements Stringable
         return new self('map', [$keys, $values]);
     }
 
+    /**
+     * An alias is a name for one complete type, and takes no arguments of its own: the arguments of the type it stands
+     * for belong to that type, not to the name. Copying them here would make the alias print as `Bag<string>`, which
+     * reads back as arguments applied to Bag and is rejected. Everything that needs to see through the name calls
+     * {@see self::canonical()}.
+     */
     public static function alias(string $name, self $type): self
     {
-        return new self($name, $type->args, $type);
+        return new self($name, aliasFor: $type);
     }
 
     public static function any(): self
@@ -249,7 +255,7 @@ final class Type implements Stringable
         if ($self->name !== $other->name) {
             return false;
         }
-        if ($this->name === 'list') {
+        if ($self->name === 'list') {
             return $self->args[0]->isSubtypeOf($other->args[0]);
         }
         if ($self->name === 'Func') {
@@ -268,7 +274,7 @@ final class Type implements Stringable
                 }
             }
         }
-        if ($this->name === 'Struct') {
+        if ($self->name === 'Struct') {
             foreach ($other->fields as $name => $fieldType) {
                 if (!array_key_exists($name, $self->fields)) {
                     return false;
@@ -288,7 +294,7 @@ final class Type implements Stringable
      */
     public function returnType(): self
     {
-        return $this->args[0];
+        return $this->canonical()->args[0];
     }
 
     /**
@@ -334,7 +340,7 @@ final class Type implements Stringable
      */
     private function parameterTypes(): array
     {
-        return array_slice($this->args, 1);
+        return array_slice($this->canonical()->args, 1);
     }
 
     private function canonical(): self
