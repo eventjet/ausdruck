@@ -4,34 +4,18 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use Eventjet\Ausdruck\Parser\Token;
-use Override;
-
 /**
+ * The `>` comparison: a {@see Comparison} holding {@see ComparisonOperator::GreaterThan}. It survives for the same
+ * reason {@see Eq} does—{@see Expression::gt()} has declared this return type since before Comparison existed—and
+ * folds into Comparison with it in the next breaking release.
+ *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class Gt extends BinaryOperator
+final class Gt extends Comparison
 {
-    /**
-     * {@see Token::CloseAngle} names `>` after its other job, closing a type parameter list like `list<int>`; the
-     * lexer emits the one token for both, so this is the same `>` the parser reads here.
-     */
-    #[Override]
-    public function token(): Token
+    public function __construct(Expression $left, Expression $right)
     {
-        return Token::CloseAngle;
-    }
-
-    #[Override]
-    public function evaluate(Scope $scope): bool
-    {
-        return Operand::number($this->left->evaluate($scope)) > Operand::number($this->right->evaluate($scope));
-    }
-
-    #[Override]
-    public function getType(): Type
-    {
-        return Type::bool();
+        parent::__construct(ComparisonOperator::GreaterThan, $left, $right);
     }
 }

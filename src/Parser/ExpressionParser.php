@@ -73,7 +73,7 @@ final class ExpressionParser
 
     /**
      * The entire input has to be a single expression. Stopping at the first complete one and dropping the rest would
-     * make `42 < 23` — a comparison the language doesn't have — a roundabout way of writing `42`.
+     * make `42 "foo"` — two expressions with nothing joining them — a roundabout way of writing `42`.
      */
     private function parseComplete(): Expression
     {
@@ -122,22 +122,28 @@ final class ExpressionParser
      * foo:int - 1 > bar:int && baz:bool
      * ====================
      *
-     * === and > are non-associative: a === b === c is a syntax error rather than (a === b) === c, which could only ever
-     * be a type error anyway.
+     * The comparison operators (===, !==, >, <, >=, <=) are non-associative: a === b === c is a syntax error rather
+     * than (a === b) === c, which could only ever be a type error anyway. `<` and `>` double as the angle brackets of a
+     * generic type; a bare `<` reaches here as less-than only once {@see TypeParser} has declined to read it as the
+     * start of a type argument list.
      */
     private function parseComparison(): Expression
     {
         $left = $this->parseAdditive();
-        $operator = $this->nextToken();
-        if ($operator === Token::TripleEquals) {
-            $this->tokens->next();
-            return $left->eq($this->parseAdditive());
+        $build = match ($this->nextToken()) {
+            Token::TripleEquals => $left->eq(...),
+            Token::NotEquals => $left->neq(...),
+            Token::CloseAngle => $left->gt(...),
+            Token::OpenAngle => $left->lt(...),
+            Token::GreaterThanEquals => $left->gte(...),
+            Token::LessThanEquals => $left->lte(...),
+            default => null,
+        };
+        if ($build === null) {
+            return $left;
         }
-        if ($operator === Token::CloseAngle) {
-            $this->tokens->next();
-            return $left->gt($this->parseAdditive());
-        }
-        return $left;
+        $this->tokens->next();
+        return $build($this->parseAdditive());
     }
 
     /**

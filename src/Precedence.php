@@ -127,7 +127,8 @@ enum Precedence: int
         return match ($token) {
             Token::Or => self::Or,
             Token::And => self::And,
-            Token::TripleEquals, Token::CloseAngle => self::Comparison,
+            Token::TripleEquals, Token::NotEquals, Token::CloseAngle, Token::OpenAngle,
+            Token::GreaterThanEquals, Token::LessThanEquals => self::Comparison,
             Token::Plus, Token::Minus => self::Additive,
             Token::Asterisk, Token::Slash, Token::Percent => self::Multiplicative,
             default => throw new LogicException(sprintf('%s is not a binary operator', $token->value)),
@@ -152,9 +153,10 @@ enum Precedence: int
     /**
      * The slot the parser reads a binary operator's left operand at. A while-loop level folds operands into its left
      * side at its own level — that's what makes those levels left-associative — so the left slot is the level itself.
-     * The comparison level has an if-shape instead: it reads both sides one level tighter, which is what makes `===`
-     * and `>` non-associative, and why its left slot is the tighter one. Associativity is a fact about the level, not
-     * about the operator: operators sharing a level are parsed by the same loop or if, so they can't differ in it.
+     * The comparison level has an if-shape instead: it reads both sides one level tighter, which is what makes the six
+     * comparison operators non-associative, and why its left slot is the tighter one. Associativity is a fact about
+     * the level, not about the operator: operators sharing a level are parsed by the same loop or if, so they can't
+     * differ in it.
      */
     private function leftSlot(): self
     {

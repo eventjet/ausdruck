@@ -12,6 +12,7 @@ enum Token: string
 {
     case Dot = '.';
     case TripleEquals = '===';
+    case NotEquals = '!==';
     case Quote = '"';
     case OpenParen = '(';
     case CloseParen = ')';
@@ -19,6 +20,8 @@ enum Token: string
     case CloseBracket = ']';
     case OpenAngle = '<';
     case CloseAngle = '>';
+    case LessThanEquals = '<=';
+    case GreaterThanEquals = '>=';
     case OpenBrace = '{';
     case CloseBrace = '}';
     case Or = '||';

@@ -1,0 +1,8 @@
+foo:int < bar:int
+-- Input --
+{
+  foo: 3,
+  bar: 5,
+}
+-- Output --
+true

@@ -6,8 +6,10 @@ namespace Eventjet\Ausdruck\Test\Unit\Parser;
 
 use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
+use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\Span;
+use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -48,6 +50,13 @@ final class ExpressionParserTest extends TestCase
             ['foo:string', Expr::get('foo', $s)],
             ['"my-literal"', Expr::literal('my-literal')],
             ['foo:string === bar:string', Expr::get('foo', Type::string())->eq(Expr::get('bar', Type::string()))],
+            ['foo:string !== bar:string', Expr::get('foo', $s)->neq(Expr::get('bar', $s))],
+            ['foo:int > bar:int', Expr::get('foo', $i)->gt(Expr::get('bar', $i))],
+            // `<` doubles as a generic's opening bracket, so this pins that the parser reads it as less-than here, not as
+            // the start of a broken `int<...>` type.
+            ['foo:int < bar:int', Expr::get('foo', $i)->lt(Expr::get('bar', $i))],
+            ['foo:int >= bar:int', Expr::get('foo', $i)->gte(Expr::get('bar', $i))],
+            ['foo:int <= bar:int', Expr::get('foo', $i)->lte(Expr::get('bar', $i))],
             ['foo:bool || bar:bool', Expr::get('foo', Type::bool())->or_(Expr::get('bar', Type::bool()))],
             [
                 'haystack:list<string>.some:bool(|item| item:string === needle:string)',
@@ -155,6 +164,23 @@ final class ExpressionParserTest extends TestCase
                     ),
                     Expr::get('d', $b),
                 ),
+            ],
+            // A comparison prints both of its operands at the additive level, and the cases above only ever put a
+            // looser expression on the left. These put one on the right, so dropping the parentheses there is caught:
+            // without them `a:bool === b:bool || c:bool` re-parses as `(a === b) || c`, a different tree.
+            [
+                'a:bool === (b:bool || c:bool)',
+                Expr::eq(Expr::get('a', $b), Expr::or_(Expr::get('b', $b), Expr::get('c', $b))),
+            ],
+            [
+                'a:bool !== (b:bool && c:bool)',
+                Expr::neq(Expr::get('a', $b), Expr::and_(Expr::get('b', $b), Expr::get('c', $b))),
+            ],
+            // Comparison is non-associative, so a comparison nested in a comparison's operand slot needs the
+            // parentheses whichever side it sits on.
+            [
+                'a:bool === (b:int > c:int)',
+                Expr::eq(Expr::get('a', $b), Expr::gt(Expr::get('b', $i), Expr::get('c', $i))),
             ],
             // Multiplicative binds tighter than additive.
             [
@@ -446,10 +472,36 @@ final class ExpressionParserTest extends TestCase
                     Expr::get('c', Type::int()),
                 ),
             ],
+            // A generic's closing angle glued to `===` or `!==`: the `>` must stay a bare close-angle instead of
+            // munching a `>=` that would orphan a `==`, which is no token at all.
+            [
+                'foo:list<int>===bar:list<int>',
+                Expr::eq(Expr::get('foo', Type::listOf(Type::int())), Expr::get('bar', Type::listOf(Type::int()))),
+            ],
+            [
+                'foo:list<int>!==bar:list<int>',
+                Expr::get('foo', Type::listOf(Type::int()))->neq(Expr::get('bar', Type::listOf(Type::int()))),
+            ],
+            // ...but one `=` after the angle is still `>=`/`<=`.
+            ['a:int>=1', Expr::get('a', Type::int())->gte(Expr::literal(1))],
+            ['a:int<=1', Expr::get('a', Type::int())->lte(Expr::literal(1))],
         ];
         foreach ($cases as $case) {
             yield $case[0] => $case;
         }
+    }
+
+    /**
+     * @return iterable<string, array{string, array<string, Type>}>
+     */
+    public static function aliasRoundTripCases(): iterable
+    {
+        yield 'alias of a list' => ['foo:Bag', ['Bag' => Type::listOf(Type::string())]];
+        yield 'alias of a map' => ['foo:Lookup', ['Lookup' => Type::mapOf(Type::string(), Type::int())]];
+        yield 'alias of an option' => ['foo:Maybe', ['Maybe' => Type::option(Type::int())]];
+        yield 'alias of a scalar' => ['foo:Count', ['Count' => Type::int()]];
+        yield 'alias of a struct' => ['foo:Person', ['Person' => Type::struct(['name' => Type::string()])]];
+        yield 'alias inside a list' => ['foo:list<Bag>', ['Bag' => Type::listOf(Type::string())]];
     }
 
     #[DataProvider('parseCases')]
@@ -469,6 +521,25 @@ final class ExpressionParserTest extends TestCase
     public function testToString(string $expected, Expression $expr): void
     {
         self::assertSame($expected, (string)$expr);
+    }
+
+    /**
+     * Printing an expression has to spell a type the parser reads back. An alias of a parameterized type is the case
+     * that gets this wrong most easily: the type it stands for has arguments, the alias itself takes none, and printing
+     * the former under the latter's name produces `Bag<string>`, which no longer parses.
+     *
+     * @param array<string, Type> $aliases
+     */
+    #[DataProvider('aliasRoundTripCases')]
+    public function testAliasedTypesRoundTrip(string $expression, array $aliases): void
+    {
+        $declarations = new Declarations(types: new Types($aliases));
+        $expr = ExpressionParser::parse($expression, $declarations);
+
+        $reparsed = ExpressionParser::parse((string)$expr, $declarations);
+
+        self::assertSame($expression, (string)$expr);
+        self::assertTrue($expr->equals($reparsed), sprintf('%s does not equal %s', $expr, $reparsed));
     }
 
     public function testParseTypedReturnsTheParsedExpressionIfItMatchesTheGivenType(): void

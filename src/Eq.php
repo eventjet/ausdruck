@@ -4,62 +4,20 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use Eventjet\Ausdruck\Parser\Token;
-use Override;
-
-use function array_key_exists;
-use function count;
-use function get_object_vars;
-use function is_object;
-
 /**
+ * The `===` comparison: a {@see Comparison} holding {@see ComparisonOperator::Equals}, and nothing else. The class
+ * survives because {@see Expression::eq()} has declared it as its return type since before Comparison existed, and
+ * Expression is public API: consumers may type against what eq() returns, so widening the declaration to Comparison
+ * is a breaking change—the backward-compatibility check in CI flags exactly that. Folds into Comparison in the next
+ * breaking release, together with {@see Gt}.
+ *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class Eq extends BinaryOperator
+final class Eq extends Comparison
 {
-    private static function compareStructs(object $left, object $right): bool
+    public function __construct(Expression $left, Expression $right)
     {
-        $leftVars = get_object_vars($left);
-        $rightVars = get_object_vars($right);
-        if (count($leftVars) !== count($rightVars)) {
-            return false;
-        }
-        /** @var mixed $value */
-        foreach ($leftVars as $key => $value) {
-            if (!array_key_exists($key, $rightVars)) {
-                return false;
-            }
-            if (!self::compareValues($value, $rightVars[$key])) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static function compareValues(mixed $left, mixed $right): bool
-    {
-        if (is_object($left) && is_object($right)) {
-            return self::compareStructs($left, $right);
-        }
-        return $left === $right;
-    }
-
-    #[Override]
-    public function token(): Token
-    {
-        return Token::TripleEquals;
-    }
-
-    #[Override]
-    public function evaluate(Scope $scope): bool
-    {
-        return self::compareValues($this->left->evaluate($scope), $this->right->evaluate($scope));
-    }
-
-    #[Override]
-    public function getType(): Type
-    {
-        return Type::bool();
+        parent::__construct(ComparisonOperator::Equals, $left, $right);
     }
 }

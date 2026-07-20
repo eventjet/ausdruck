@@ -62,17 +62,23 @@ See [Types](#types)
 
 Both operands must be of the same type.
 
-| Operator | Description    | Example                  | Note                                             |
-|----------|----------------|--------------------------|--------------------------------------------------|
-| `===`    | Equality       | `foo:string === "bar"`   |                                                  |
-| `-`      | Subtraction    | `foo:int - bar:int`      | Operands must be of type `int` or `float`        |
-| `+`      | Addition       | `foo:int + bar:int`      | Operands must be of type `int` or `float`        |
-| `*`      | Multiplication | `foo:int * bar:int`      | Operands must be of type `int` or `float`        |
-| `/`      | Division       | `foo:int / bar:int`      | See [Division and modulo](#division-and-modulo)  |
-| `%`      | Modulo         | `foo:int % bar:int`      | See [Division and modulo](#division-and-modulo)  |
-| `>`      | Greater than   | `foo:int > bar:int`      | Operands must be of type `int` or `float`        |
-| `\|\|`   | Logical OR     | `foo:bool \|\| bar:bool` | Operands must be of type `bool`                  |
-| &&       | Logical AND    | `foo:bool && bar:bool`   | Operands must be of type `bool`                  |
+| Operator | Description           | Example                  | Note                                            |
+|----------|-----------------------|--------------------------|-------------------------------------------------|
+| `===`    | Equality              | `foo:string === "bar"`   |                                                 |
+| `!==`    | Inequality            | `foo:string !== "bar"`   |                                                 |
+| `-`      | Subtraction           | `foo:int - bar:int`      | Operands must be of type `int` or `float`       |
+| `+`      | Addition              | `foo:int + bar:int`      | Operands must be of type `int` or `float`       |
+| `*`      | Multiplication        | `foo:int * bar:int`      | Operands must be of type `int` or `float`       |
+| `/`      | Division              | `foo:int / bar:int`      | See [Division and modulo](#division-and-modulo) |
+| `%`      | Modulo                | `foo:int % bar:int`      | See [Division and modulo](#division-and-modulo) |
+| `>`      | Greater than          | `foo:int > bar:int`      | Operands must be of type `int` or `float`       |
+| `>=`     | Greater than or equal | `foo:int >= bar:int`     | Operands must be of type `int` or `float`       |
+| `<`      | Less than             | `foo:int < bar:int`      | Operands must be of type `int` or `float`       |
+| `<=`     | Less than or equal    | `foo:int <= bar:int`     | Operands must be of type `int` or `float`       |
+| `\|\|`   | Logical OR            | `foo:bool \|\| bar:bool` | Operands must be of type `bool`                 |
+| &&       | Logical AND           | `foo:bool && bar:bool`   | Operands must be of type `bool`                 |
+
+Equality is spelled `===`, so inequality is `!==`; there is no `==` or `!=`.
 
 Where's the rest? We're implementing more as we need them.
 
@@ -119,23 +125,23 @@ to write. `float` arithmetic has neither: it goes to `INF`, as it does in PHP.
 
 Operators bind from tightest to loosest in this order:
 
-| Operator               | Associativity   |
-|------------------------|-----------------|
-| `.` (field, method)    | Left            |
-| `-` (negation)         | Right           |
-| `*`, `/`, `%`          | Left            |
-| `-` (subtraction), `+` | Left            |
-| `===`, `>`             | Non-associative |
-| `&&`                   | Left            |
-| `\|\|`                 | Left            |
+| Operator                           | Associativity   |
+|------------------------------------|-----------------|
+| `.` (field, method)                | Left            |
+| `-` (negation)                     | Right           |
+| `*`, `/`, `%`                      | Left            |
+| `-` (subtraction), `+`             | Left            |
+| `===`, `!==`, `>`, `>=`, `<`, `<=` | Non-associative |
+| `&&`                               | Left            |
+| `\|\|`                             | Left            |
 
 As in most languages, `&&` binds tighter than `||`, so `a:bool && b:bool || c:bool` means
 `(a:bool && b:bool) || c:bool`; `*`, `/` and `%` bind tighter than `+` and binary `-`, so `a:int + b:int * c:int`
 means `a:int + (b:int * c:int)`. Operators that share a level are left-associative across it:
 `a:int - b:int + c:int` means `(a:int - b:int) + c:int`.
 
-`===` and `>` are non-associative: `a:int > b:int > c:int` is a syntax error rather than a comparison against the
-`bool` that the first comparison produces. Chain with `&&` instead.
+The comparison operators are non-associative: `a:int > b:int > c:int` is a syntax error rather than a comparison
+against the `bool` that the first comparison produces. Chain with `&&` instead.
 
 #### Grouping
 

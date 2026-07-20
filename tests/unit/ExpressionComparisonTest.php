@@ -7,13 +7,12 @@ namespace Eventjet\Ausdruck\Test\Unit;
 use Eventjet\Ausdruck\Add;
 use Eventjet\Ausdruck\And_;
 use Eventjet\Ausdruck\Call;
+use Eventjet\Ausdruck\ComparisonOperator;
 use Eventjet\Ausdruck\Divide;
-use Eventjet\Ausdruck\Eq;
 use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\FieldAccess;
 use Eventjet\Ausdruck\Get;
-use Eventjet\Ausdruck\Gt;
 use Eventjet\Ausdruck\Lambda;
 use Eventjet\Ausdruck\ListLiteral;
 use Eventjet\Ausdruck\Literal;
@@ -76,6 +75,22 @@ final class ExpressionComparisonTest extends TestCase
             Expr::gt(Expr::literal(1), Expr::literal(2)),
         ];
         yield [
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield [
+            Expr::gte(Expr::literal(1), Expr::literal(2)),
+            Expr::gte(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield [
+            Expr::lte(Expr::literal(1), Expr::literal(2)),
+            Expr::lte(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield [
+            Expr::neq(Expr::literal('a'), Expr::literal('b')),
+            Expr::neq(Expr::literal('a'), Expr::literal('b')),
+        ];
+        yield [
             Expr::negative(Expr::get('a', Type::int())),
             Expr::negative(Expr::get('a', Type::int())),
         ];
@@ -111,15 +126,15 @@ final class ExpressionComparisonTest extends TestCase
      */
     public static function notEqualsCases(): iterable
     {
-        yield Eq::class . ': left is different' => [
+        yield ComparisonOperator::Equals->name . ': left is different' => [
             Expr::eq(Expr::literal('a'), Expr::literal('a')),
             Expr::eq(Expr::literal('b'), Expr::literal('a')),
         ];
-        yield Eq::class . ': right is different' => [
+        yield ComparisonOperator::Equals->name . ': right is different' => [
             Expr::eq(Expr::literal('a'), Expr::literal('a')),
             Expr::eq(Expr::literal('a'), Expr::literal('b')),
         ];
-        yield Eq::class . ': different type' => [
+        yield ComparisonOperator::Equals->name . ': different type' => [
             Expr::eq(Expr::literal('a'), Expr::literal('a')),
             Expr::or_(Expr::literal(true), Expr::literal(false)),
         ];
@@ -284,20 +299,68 @@ final class ExpressionComparisonTest extends TestCase
             Expr::literal(1)->call('foo', Type::int(), []),
             Expr::literal(1),
         ];
-        yield Gt::class . ': left is different' => [
+        yield ComparisonOperator::GreaterThan->name . ': left is different' => [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
             Expr::gt(Expr::literal(2), Expr::literal(2)),
         ];
-        yield Gt::class . ': right is different' => [
+        yield ComparisonOperator::GreaterThan->name . ': right is different' => [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
             Expr::gt(Expr::literal(1), Expr::literal(1)),
         ];
-        yield Gt::class . ': both are different' => [
+        yield ComparisonOperator::GreaterThan->name . ': both are different' => [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
             Expr::gt(Expr::literal(2), Expr::literal(1)),
         ];
-        yield Gt::class . ': different type' => [
+        yield ComparisonOperator::GreaterThan->name . ': different type' => [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
+            Expr::eq(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield ComparisonOperator::LessThan->name . ': left is different' => [
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+            Expr::lt(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield ComparisonOperator::LessThan->name . ': right is different' => [
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+            Expr::lt(Expr::literal(1), Expr::literal(1)),
+        ];
+        yield ComparisonOperator::LessThan->name . ': different type' => [
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+            Expr::gt(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield ComparisonOperator::GreaterThanOrEqual->name . ': left is different' => [
+            Expr::gte(Expr::literal(1), Expr::literal(2)),
+            Expr::gte(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield ComparisonOperator::GreaterThanOrEqual->name . ': right is different' => [
+            Expr::gte(Expr::literal(1), Expr::literal(2)),
+            Expr::gte(Expr::literal(1), Expr::literal(1)),
+        ];
+        yield ComparisonOperator::GreaterThanOrEqual->name . ': different type' => [
+            Expr::gte(Expr::literal(1), Expr::literal(2)),
+            Expr::gt(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield ComparisonOperator::LessThanOrEqual->name . ': left is different' => [
+            Expr::lte(Expr::literal(1), Expr::literal(2)),
+            Expr::lte(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield ComparisonOperator::LessThanOrEqual->name . ': right is different' => [
+            Expr::lte(Expr::literal(1), Expr::literal(2)),
+            Expr::lte(Expr::literal(1), Expr::literal(1)),
+        ];
+        yield ComparisonOperator::LessThanOrEqual->name . ': different type' => [
+            Expr::lte(Expr::literal(1), Expr::literal(2)),
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield ComparisonOperator::NotEquals->name . ': left is different' => [
+            Expr::neq(Expr::literal(1), Expr::literal(2)),
+            Expr::neq(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield ComparisonOperator::NotEquals->name . ': right is different' => [
+            Expr::neq(Expr::literal(1), Expr::literal(2)),
+            Expr::neq(Expr::literal(1), Expr::literal(1)),
+        ];
+        yield ComparisonOperator::NotEquals->name . ': different type' => [
+            Expr::neq(Expr::literal(1), Expr::literal(2)),
             Expr::eq(Expr::literal(1), Expr::literal(2)),
         ];
         yield Negative::class . ': different type' => [

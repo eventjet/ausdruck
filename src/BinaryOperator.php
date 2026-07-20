@@ -37,8 +37,13 @@ abstract class BinaryOperator extends Expression
         return $this->token()->value;
     }
 
+    /**
+     * Two operator nodes are the same expression when they are the same operator over equal operands. The class is
+     * what says which operator, for every operator but the comparisons: {@see Comparison} holds four of its six in one
+     * class and so overrides this to compare that too. It is the one piece of the ritual a subclass may restate.
+     */
     #[Override]
-    final public function equals(Expression $other): bool
+    public function equals(Expression $other): bool
     {
         return $other instanceof static
             && $this->left->equals($other->left)
