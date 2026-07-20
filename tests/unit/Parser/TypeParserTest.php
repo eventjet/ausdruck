@@ -92,11 +92,21 @@ final class TypeParserTest extends TestCase
             '{name: string age: int}',
             'Expected }, got age',
         ];
-        // An argument list ends at the first thing that can't start a type, so whatever that is gets blamed as the
-        // closing bracket it isn't. Forgetting the bracket is the likelier mistake, and this names it.
+        // An argument list ends at the first missing comma, so whatever follows gets blamed as the closing bracket it
+        // isn't. Forgetting the bracket is the likelier mistake, and this names it. What the token is doesn't matter:
+        // a type, a literal or an operator all end the list the same way, so a type argument list separates its
+        // elements with commas exactly like every other list in the language.
+        yield 'Type instead of a second type argument' => [
+            'list<int string>',
+            'Expected >, got string',
+        ];
         yield 'Literal instead of a second type argument' => [
             'list<int 42>',
             'Expected >, got 42',
+        ];
+        yield 'Type instead of a second function parameter' => [
+            'fn(int string) -> bool',
+            'Expected ), got string',
         ];
         yield 'Literal instead of a second function parameter' => [
             'fn(int 42) -> string',
