@@ -295,6 +295,15 @@ final class ExpressionParserTest extends TestCase
                 '(a:int > b:int) === c:bool',
                 Expr::eq(Expr::gt(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $b)),
             ],
+            // A comparison is the only place a quotient appears as a bare operand — every arithmetic slot rejects an
+            // Option — so this is the one case that exercises the comparison level's left slot against a division.
+            [
+                'a:int / b:int === c:int / d:int',
+                Expr::eq(
+                    Expr::divide(Expr::get('a', $i), Expr::get('b', $i)),
+                    Expr::divide(Expr::get('c', $i), Expr::get('d', $i)),
+                ),
+            ],
             // A method can be called on a grouped expression, so the postfix dot has to parenthesize a target looser
             // than a call's own — everything from a subtraction down to a negation.
             [
