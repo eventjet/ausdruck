@@ -949,6 +949,27 @@ final class ExpressionParserTest extends TestCase
         self::assertTrue($expr->equals($reparsed), sprintf('%s does not equal %s', $expr, $reparsed));
     }
 
+    /**
+     * Reading a `<` as a type argument list is speculative, and a list of bare names is exactly the shape that gets the
+     * speculation far enough to scan what follows it. The `$` here is therefore tokenized while trying a reading that
+     * is then abandoned—but it is still the mistake once the `<` has been re-read as a less-than, so it is still what
+     * gets reported. The tokens that were never produced must not read as the end of the input, or the trailing check
+     * in parseComplete() would see a stream that simply ended and accept the expression.
+     */
+    public function testALexicalErrorScannedWhileSpeculatingIsStillReported(): void
+    {
+        $declarations = new Declarations(variables: [
+            'a' => Type::int(),
+            'b' => Type::int(),
+            'c' => Type::int(),
+        ]);
+
+        $this->expectException(SyntaxError::class);
+        $this->expectExceptionMessage('Unexpected character $');
+
+        ExpressionParser::parse('[a:int < b, c $]', $declarations);
+    }
+
     #[DataProvider('invalidSyntaxExpressions')]
     public function testSyntaxError(string $expression, string|null $expectedMessage = null): void
     {

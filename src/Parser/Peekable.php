@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Parser;
 
 use Generator;
+use Throwable;
 
 use function array_key_exists;
 use function count;
@@ -15,7 +16,8 @@ use function count;
  * {@see self::restore()} can return to it later—which is what lets a parser try one reading of the tokens ahead and
  * fall back to another. Everything already read stays available, nothing is pulled from the generator twice, and
  * nothing is pulled before a caller asks for it—a generator that throws only does so once the item it fails on is
- * actually wanted.
+ * actually wanted. Rewinding past such a failure replays the buffered items and fails again on reaching it: the item
+ * never arrived, so the stream is short one item rather than at its end, and it says so however often it is asked.
  *
  * The cursor only moves where it's told; deciding when a reading has failed, and rewinding if it has, is the caller's
  * business. See {@see TypeParser::tryTypeArguments()} for the one place that does.
@@ -32,6 +34,12 @@ final class Peekable
     private array $buffer = [];
     /** @var non-negative-int */
     private int $cursor = 0;
+    /**
+     * What the generator threw, if it did. A generator that throws is finished for good, so the item it failed on will
+     * never arrive; keeping the failure is what lets {@see self::peek()} say so again instead of reporting that the
+     * input ended there.
+     */
+    private Throwable|null $failure = null;
 
     /**
      * @param iterable<mixed, T> $items
@@ -62,18 +70,26 @@ final class Peekable
     {
         $target = $this->cursor + $ahead;
         while (count($this->buffer) <= $target) {
-            // A generator stops on the item it yielded, so reading the next one means advancing past the last one
-            // buffered—except on the first pass, when nothing has been yielded yet. Advancing here, once an item is
-            // actually asked for, rather than right after buffering one, is what keeps the generator from running
-            // ahead of the caller: the tokenizer scans the token that was peeked and not the text after it, so a
-            // mistake further right can't throw before the parser has reported the one it already found.
-            if ($this->buffer !== []) {
-                $this->items->next();
+            if ($this->failure !== null) {
+                throw $this->failure;
             }
-            if (!$this->items->valid()) {
-                return null;
+            try {
+                // A generator stops on the item it yielded, so reading the next one means advancing past the last one
+                // buffered—except on the first pass, when nothing has been yielded yet. Advancing here, once an item is
+                // actually asked for, rather than right after buffering one, is what keeps the generator from running
+                // ahead of the caller: the tokenizer scans the token that was peeked and not the text after it, so a
+                // mistake further right can't throw before the parser has reported the one it already found.
+                if ($this->buffer !== []) {
+                    $this->items->next();
+                }
+                if (!$this->items->valid()) {
+                    return null;
+                }
+                $this->buffer[] = $this->items->current();
+            } catch (Throwable $e) {
+                $this->failure = $e;
+                throw $e;
             }
-            $this->buffer[] = $this->items->current();
         }
         return $this->buffer[$target];
     }
