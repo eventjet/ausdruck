@@ -325,11 +325,12 @@ final class ExpressionParserTest extends TestCase
     {
         yield 'string: missing closing quote' => ['"foo'];
         yield 'single pipe' => ['foo:bool | bar:bool'];
-        yield 'single equals' => ['foo:string = bar:string'];
-        yield 'double equals' => ['foo:string == bar:string'];
-        yield 'double length fat arrow' => ['foo:string ==> bar:string'];
+        // Equality is `===`; a `=` or `==` is blamed as the beginning of one, with the missing rest named.
+        yield 'single equals' => ['foo:string = bar:string', 'Expected ===, got ='];
+        yield 'double equals' => ['foo:string == bar:string', 'Expected ===, got =='];
+        yield 'double length fat arrow' => ['foo:string ==> bar:string', 'Expected ===, got =='];
         yield 'end after single pipe' => ['foo:bool |'];
-        yield 'end after single equals' => ['foo:bool =', 'Expected ==, got end of input'];
+        yield 'end after single equals' => ['foo:bool =', 'Expected ===, got ='];
         yield 'end after double equals' => ['foo:bool =='];
         yield 'close brace after triple equals' => ['foo:bool === )'];
         yield 'lambda: missing closing brace' => ['(foo, bar => foo:string'];
@@ -372,7 +373,7 @@ final class ExpressionParserTest extends TestCase
         yield 'end of string after struct field value' => ['{name: "John"'];
         yield 'missing value in struct literal' => ['{name: }'];
         yield 'missing comma between struct fields' => ['{name: "John" age: 42}'];
-        yield 'single ampersand' => ['foo:bool & bar:bool'];
+        yield 'single ampersand' => ['foo:bool & bar:bool', 'Expected &&, got &'];
         yield 'non-token, non-identifier symbol' => ['foo:bool € bar:bool'];
         yield 'identifier starting with a number' => ['42foo:bool', 'Unexpected identifier foo'];
         yield 'identifier starting with an underscore' => ['_foo:bool', 'Unexpected character _'];
@@ -609,6 +610,12 @@ final class ExpressionParserTest extends TestCase
                 'foo:bool & bar:bool',
                 '         =         ',
             ],
+            // An `=` that isn't the start of `===` is blamed with everything read after it: the operator that is
+            // actually there is underlined whole.
+            [
+                'foo:string == bar:string',
+                '           ==           ',
+            ],
             [
                 'foo:bool && bar::bool',
                 '                =    ',
@@ -622,6 +629,11 @@ final class ExpressionParserTest extends TestCase
             [
                 '(a:bool))',
                 '        =',
+            ],
+            // The `>` of an arrow is a column like any other: what follows it is blamed where it actually is.
+            [
+                'x:fn(int) -> int &',
+                '                 =',
             ],
         ];
         foreach ($cases as [$expression, $location]) {
