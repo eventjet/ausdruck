@@ -442,6 +442,13 @@ final class ExpressionParserTest extends TestCase
         yield 'string > int' => ['foo:string > bar:int', 'Can\'t compare string to int'];
         yield 'int > string' => ['foo:int > bar:string', 'Can\'t compare string to int'];
         yield 'generic syntax on string' => ['foo:string<int>'];
+        // An alias is a name for one complete type: like the argument-less built-ins, it rejects type arguments
+        // instead of silently dropping them.
+        yield 'generic syntax on an alias' => [
+            'foo:Foo<int>',
+            'Invalid type "Foo<int>": Foo does not accept arguments',
+            new Declarations(types: new Types(['Foo' => Type::int()])),
+        ];
         yield 'unknown variable type' => ['foo:notavalidtype'];
         yield 'map with no type arguments' => ['foo:map', 'The map type requires two arguments, none given'];
         yield 'map with one type argument' => ['foo:map<string>', 'Invalid type "map<string>"'];
@@ -464,6 +471,27 @@ final class ExpressionParserTest extends TestCase
             'Invalid type "Option<string, string>": Option expects exactly one argument, got 2',
         ];
         yield 'option with invalid type argument' => ['foo:Option<Foo>', 'Unknown type Foo'];
+        // Every constructor states how many type arguments it takes in one place, so the wording of a wrong count is
+        // the same whichever one it's given to, and the count itself is never restated per constructor. These pin the
+        // arities that nothing else reaches: Some at either end, and a surplus of more than one.
+        yield 'some without type argument' => ['foo:Some', 'The Some type requires one argument, none given'];
+        yield 'some with two type arguments' => [
+            'foo:Some<string, int>',
+            'Invalid type "Some<string, int>": Some expects exactly one argument, got 2',
+        ];
+        yield 'list with three type arguments' => [
+            'foo:list<string, int, bool>',
+            'Invalid type "list<string, int, bool>": list expects exactly one argument, got 3',
+        ];
+        yield 'map with three type arguments, message' => [
+            'foo:map<string, int, bool>',
+            'Invalid type "map<string, int, bool>": map expects exactly two arguments, got 3',
+        ];
+        yield 'None with a type argument' => [
+            'foo:None<int>',
+            'Invalid type "None<int>": None does not accept arguments',
+        ];
+        yield 'any with a type argument' => ['foo:any<int>', 'Invalid type "any<int>": any does not accept arguments'];
         yield 'inline variable type does not match declared' => [
             'foo:string',
             'Variable foo is declared as int, but used as string',
@@ -683,9 +711,12 @@ final class ExpressionParserTest extends TestCase
                 '"foo" > 42',
                 '=====     ',
             ],
+            // Too many type arguments blames the ones past the count the constructor takes, not all of them: the first
+            // is what was asked for, and only what follows it is the mistake. `Option<string, string>` is underlined
+            // the same way.
             [
                 'x:list<string, int>',
-                '       =========== ',
+                '               === ',
             ],
             [
                 'x:int<string>',
