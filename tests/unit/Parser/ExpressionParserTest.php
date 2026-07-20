@@ -11,6 +11,7 @@ use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
+use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -768,6 +769,19 @@ final class ExpressionParserTest extends TestCase
         }
     }
 
+    /**
+     * @return iterable<string, array{string, array<string, Type>}>
+     */
+    public static function aliasRoundTripCases(): iterable
+    {
+        yield 'alias of a list' => ['foo:Bag', ['Bag' => Type::listOf(Type::string())]];
+        yield 'alias of a map' => ['foo:Lookup', ['Lookup' => Type::mapOf(Type::string(), Type::int())]];
+        yield 'alias of an option' => ['foo:Maybe', ['Maybe' => Type::option(Type::int())]];
+        yield 'alias of a scalar' => ['foo:Count', ['Count' => Type::int()]];
+        yield 'alias of a struct' => ['foo:Person', ['Person' => Type::struct(['name' => Type::string()])]];
+        yield 'alias inside a list' => ['foo:list<Bag>', ['Bag' => Type::listOf(Type::string())]];
+    }
+
     #[DataProvider('parseCases')]
     #[DataProvider('nonCanonicalParseCases')]
     public function testParse(string $str, Expression $expected): void
@@ -785,6 +799,25 @@ final class ExpressionParserTest extends TestCase
     public function testToString(string $expected, Expression $expr): void
     {
         self::assertSame($expected, (string)$expr);
+    }
+
+    /**
+     * Printing an expression has to spell a type the parser reads back. An alias of a parameterized type is the case
+     * that gets this wrong most easily: the type it stands for has arguments, the alias itself takes none, and printing
+     * the former under the latter's name produces `Bag<string>`, which no longer parses.
+     *
+     * @param array<string, Type> $aliases
+     */
+    #[DataProvider('aliasRoundTripCases')]
+    public function testAliasedTypesRoundTrip(string $expression, array $aliases): void
+    {
+        $declarations = new Declarations(types: new Types($aliases));
+        $expr = ExpressionParser::parse($expression, $declarations);
+
+        $reparsed = ExpressionParser::parse((string)$expr, $declarations);
+
+        self::assertSame($expression, (string)$expr);
+        self::assertTrue($expr->equals($reparsed), sprintf('%s does not equal %s', $expr, $reparsed));
     }
 
     #[DataProvider('invalidSyntaxExpressions')]
