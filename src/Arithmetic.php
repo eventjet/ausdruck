@@ -6,8 +6,6 @@ namespace Eventjet\Ausdruck;
 
 use Override;
 
-use function sprintf;
-
 /**
  * The sum, difference and product: the arithmetic whose result is of the operands' own type, where {@see Division}'s is
  * an option of it. The two halves pick their arithmetic the same way — from the operands' declared type, never from
@@ -39,8 +37,7 @@ abstract class Arithmetic extends BinaryOperator
         }
         $left = Operand::int($this->left->evaluate($scope));
         $right = Operand::int($this->right->evaluate($scope));
-        return $this->applyInt($left, $right)
-            ?? throw new EvaluationError(sprintf('%s leaves the int range', $this));
+        return $this->applyInt($left, $right) ?? throw EvaluationError::outsideIntRange($this);
     }
 
     #[Override]

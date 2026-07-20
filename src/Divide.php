@@ -9,8 +9,6 @@ use Override;
 
 use function intdiv;
 
-use const PHP_INT_MIN;
-
 /**
  * The quotient of a division, truncated toward zero for int operands. Total, in the way {@see Division} describes: the
  * quotients that don't exist are every zero divisor, plus PHP_INT_MIN / -1, the one int division whose result
@@ -28,13 +26,13 @@ final class Divide extends Division
     }
 
     /**
-     * The one operand pair with a nonzero divisor and no int quotient: -PHP_INT_MIN is one past PHP_INT_MAX, and
-     * {@see intdiv()} throws for it.
+     * Dividing by -1 is negating, so the one nonzero divisor with a quotient that may not exist is handled by
+     * {@see IntArithmetic::negate()} — which is also the one input {@see intdiv()} throws for rather than answers.
      */
     #[Override]
     protected function applyInt(int $dividend, int $divisor): int|null
     {
-        return $dividend === PHP_INT_MIN && $divisor === -1 ? null : intdiv($dividend, $divisor);
+        return $divisor === -1 ? IntArithmetic::negate($dividend) : intdiv($dividend, $divisor);
     }
 
     #[Override]

@@ -35,9 +35,8 @@ final class Multiply extends Arithmetic
      * A negative multiplier reverses which quotient is the upper and which the lower, so they're ordered by value
      * rather than by which limit they came from.
      *
-     * The two multipliers that can't be asked are handled first. Zero would make {@see intdiv()} throw, and -1 is the
-     * divisor PHP_INT_MIN has no quotient for: negating is that same operation, and PHP_INT_MIN is the one int it has
-     * no answer for. It is {@see Divide}'s missing quotient, seen from the other side.
+     * The two multipliers that can't be asked are handled first. Zero would make {@see intdiv()} throw, and multiplying
+     * by -1 is negating, which is where the one missing product is: see {@see IntArithmetic::negate()}.
      */
     #[Override]
     protected function applyInt(int $left, int $right): int|null
@@ -46,7 +45,7 @@ final class Multiply extends Arithmetic
             return 0;
         }
         if ($right === -1) {
-            return $left === PHP_INT_MIN ? null : -$left;
+            return IntArithmetic::negate($left);
         }
         $onMax = intdiv(PHP_INT_MAX, $right);
         $onMin = intdiv(PHP_INT_MIN, $right);
