@@ -44,6 +44,11 @@ final class Expr
         return new Eq($left, $right);
     }
 
+    public static function neq(Expression $left, Expression $right): Comparison
+    {
+        return self::comparison(ComparisonOperator::NotEquals, $left, $right);
+    }
+
     public static function get(string $name, TypeHint|Type $type, Span|null $location = null): Get
     {
         return new Get($name, $type, $location ?? self::dummySpan());
@@ -140,6 +145,21 @@ final class Expr
         return new Gt($left, $right);
     }
 
+    public static function lt(Expression $left, Expression $right): Comparison
+    {
+        return self::comparison(ComparisonOperator::LessThan, $left, $right);
+    }
+
+    public static function gte(Expression $left, Expression $right): Comparison
+    {
+        return self::comparison(ComparisonOperator::GreaterThanOrEqual, $left, $right);
+    }
+
+    public static function lte(Expression $left, Expression $right): Comparison
+    {
+        return self::comparison(ComparisonOperator::LessThanOrEqual, $left, $right);
+    }
+
     /**
      * Negating a number literal folds into a negative literal, so that -69 is the literal -69 rather than a negation of
      * 69. The tokenizer deliberately doesn't fold the sign in, because there it couldn't tell the negative literal in
@@ -188,17 +208,27 @@ final class Expr
         return Span::char(1, 1);
     }
 
+    private static function comparison(ComparisonOperator $operator, Expression $left, Expression $right): Comparison
+    {
+        self::checkComparison($operator, $left, $right);
+        return new Comparison($operator, $left, $right);
+    }
+
     /**
-     * Which rule an operator's operands have to satisfy, for every operator in one place. The two rules answer
-     * different questions: `===` compares for equality, so its operands only have to be of the same type, while an
-     * ordering operator needs operands that have an order at all. Stating the split once means a further operator has
-     * to be classified rather than copied from whichever neighbor happened to look closest.
+     * Which rule an operator's operands have to satisfy, for all six in one place. The two rules answer different
+     * questions: `===` and `!==` compare for equality, so their operands only have to be of the same type, while the
+     * four ordering operators need operands that have an order at all. Stating the split once means a seventh operator
+     * has to be classified rather than copied from whichever neighbor happened to look closest.
      */
     private static function checkComparison(ComparisonOperator $operator, Expression $left, Expression $right): void
     {
         match ($operator) {
-            ComparisonOperator::Equals => self::assertSameType($left, $right, $operator->value),
-            ComparisonOperator::GreaterThan => self::assertComparable($left, $right),
+            ComparisonOperator::Equals,
+            ComparisonOperator::NotEquals => self::assertSameType($left, $right, $operator->value),
+            ComparisonOperator::GreaterThan,
+            ComparisonOperator::LessThan,
+            ComparisonOperator::GreaterThanOrEqual,
+            ComparisonOperator::LessThanOrEqual => self::assertComparable($left, $right),
         };
     }
 
@@ -213,8 +243,8 @@ final class Expr
     }
 
     /**
-     * The rule an equality operator follows: the two sides have to be of the same type, whatever that type is. The
-     * error points at the right-hand side, the one measured against the left, and names the operator it was made with.
+     * The rule both `===` and `!==` follow: the two sides have to be of the same type, whatever that type is. The error
+     * points at the right-hand side, the one measured against the left.
      */
     private static function assertSameType(Expression $left, Expression $right, string $operator): void
     {
@@ -233,8 +263,9 @@ final class Expr
     }
 
     /**
-     * The rule an ordering operator follows. They all compare two numbers the same way, so they share one check and
-     * one wording, and can't drift into blaming different parts of the expression for the same mistake.
+     * The rule every ordering operator (`>`, `<`, `>=`, `<=`) follows. They all compare two numbers the same way, so
+     * they share one check and one wording, and can't drift into blaming different parts of the expression for the same
+     * mistake.
      */
     private static function assertComparable(Expression $left, Expression $right): void
     {

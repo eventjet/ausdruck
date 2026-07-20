@@ -104,10 +104,48 @@ final class TypeParser
         if ($tokens->peek()?->token !== Token::OpenAngle) {
             return new TypeNode($name, [], $parsedToken->location());
         }
-        $tokens->next();
-        $args = self::parseTypeList($tokens);
+        if (TypeConstructor::tryFrom($name)?->takesTypeArguments() ?? false) {
+            // A generic constructor is committed: the `<` can only be its argument list, so whatever goes wrong in
+            // there is a genuine error, reported where it happens rather than rewound.
+            $tokens->next();
+            $args = self::parseTypeList($tokens);
+        } else {
+            // Any other name might be an operand rather than a type constructor, and the `<` a less-than: `a:int <
+            // b:int` is a comparison. Only a list that parses and closes is a type argument list, so try to read one
+            // and hand the `<` back if that isn't what's there. A closed list after a name that takes none
+            // (`int<string>`) is read as a type on purpose, so the resolver can reject it by name.
+            $args = self::tryTypeArguments($tokens);
+            if ($args === null) {
+                return new TypeNode($name, [], $parsedToken->location());
+            }
+        }
         $closeAngle = self::expect($tokens, Token::CloseAngle);
         return new TypeNode($name, $args, $parsedToken->location()->to($closeAngle->location()));
+    }
+
+    /**
+     * Reads a `<...>` type argument list, stopping on its `>` so the caller can take it. Returns null—leaving the
+     * stream exactly where it was—if what follows isn't one after all. A {@see SyntaxError} raised along the way is
+     * not an error to report: it only means these tokens aren't a type argument list either, and the caller is one
+     * that has some other reading of the `<` to fall back on. Anything already committed to a type argument list goes
+     * the direct route and lets its errors out.
+     *
+     * @param Peekable<ParsedToken> $tokens
+     * @return list<TypeNode> | null
+     */
+    private static function tryTypeArguments(Peekable $tokens): array|null
+    {
+        $snapshot = $tokens->snapshot();
+        try {
+            $tokens->next();
+            $args = self::parseTypeList($tokens);
+            if ($tokens->peek()?->token === Token::CloseAngle) {
+                return $args;
+            }
+        } catch (SyntaxError) {
+        }
+        $tokens->restore($snapshot);
+        return null;
     }
 
     /**

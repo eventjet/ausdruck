@@ -19,6 +19,7 @@ final class TokenTest extends TestCase
         $tokenCases = [
             [Token::Dot, '.'],
             [Token::TripleEquals, '==='],
+            [Token::NotEquals, '!=='],
             [Token::Quote, '"'],
             [Token::OpenParen, '('],
             [Token::CloseParen, ')'],
@@ -26,6 +27,8 @@ final class TokenTest extends TestCase
             [Token::CloseBracket, ']'],
             [Token::OpenAngle, '<'],
             [Token::CloseAngle, '>'],
+            [Token::LessThanEquals, '<='],
+            [Token::GreaterThanEquals, '>='],
             [Token::Pipe, '|'],
             [Token::Comma, ','],
             [Token::Colon, ':'],

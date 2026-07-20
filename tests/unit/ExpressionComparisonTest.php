@@ -55,6 +55,22 @@ final class ExpressionComparisonTest extends TestCase
             Expr::gt(Expr::literal(1), Expr::literal(2)),
         ];
         yield [
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield [
+            Expr::gte(Expr::literal(1), Expr::literal(2)),
+            Expr::gte(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield [
+            Expr::lte(Expr::literal(1), Expr::literal(2)),
+            Expr::lte(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield [
+            Expr::neq(Expr::literal('a'), Expr::literal('b')),
+            Expr::neq(Expr::literal('a'), Expr::literal('b')),
+        ];
+        yield [
             Expr::negative(Expr::get('a', Type::int())),
             Expr::negative(Expr::get('a', Type::int())),
         ];
@@ -232,6 +248,54 @@ final class ExpressionComparisonTest extends TestCase
         ];
         yield ComparisonOperator::GreaterThan->name . ': different type' => [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
+            Expr::eq(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield ComparisonOperator::LessThan->name . ': left is different' => [
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+            Expr::lt(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield ComparisonOperator::LessThan->name . ': right is different' => [
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+            Expr::lt(Expr::literal(1), Expr::literal(1)),
+        ];
+        yield ComparisonOperator::LessThan->name . ': different type' => [
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+            Expr::gt(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield ComparisonOperator::GreaterThanOrEqual->name . ': left is different' => [
+            Expr::gte(Expr::literal(1), Expr::literal(2)),
+            Expr::gte(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield ComparisonOperator::GreaterThanOrEqual->name . ': right is different' => [
+            Expr::gte(Expr::literal(1), Expr::literal(2)),
+            Expr::gte(Expr::literal(1), Expr::literal(1)),
+        ];
+        yield ComparisonOperator::GreaterThanOrEqual->name . ': different type' => [
+            Expr::gte(Expr::literal(1), Expr::literal(2)),
+            Expr::gt(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield ComparisonOperator::LessThanOrEqual->name . ': left is different' => [
+            Expr::lte(Expr::literal(1), Expr::literal(2)),
+            Expr::lte(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield ComparisonOperator::LessThanOrEqual->name . ': right is different' => [
+            Expr::lte(Expr::literal(1), Expr::literal(2)),
+            Expr::lte(Expr::literal(1), Expr::literal(1)),
+        ];
+        yield ComparisonOperator::LessThanOrEqual->name . ': different type' => [
+            Expr::lte(Expr::literal(1), Expr::literal(2)),
+            Expr::lt(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield ComparisonOperator::NotEquals->name . ': left is different' => [
+            Expr::neq(Expr::literal(1), Expr::literal(2)),
+            Expr::neq(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield ComparisonOperator::NotEquals->name . ': right is different' => [
+            Expr::neq(Expr::literal(1), Expr::literal(2)),
+            Expr::neq(Expr::literal(1), Expr::literal(1)),
+        ];
+        yield ComparisonOperator::NotEquals->name . ': different type' => [
+            Expr::neq(Expr::literal(1), Expr::literal(2)),
             Expr::eq(Expr::literal(1), Expr::literal(2)),
         ];
         yield Negative::class . ': different type' => [
