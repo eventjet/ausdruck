@@ -273,7 +273,7 @@ final class Expr
     {
         match ($operator) {
             ComparisonOperator::Equals,
-            ComparisonOperator::NotEquals => self::assertSameType($left, $right, $operator->value),
+            ComparisonOperator::NotEquals => self::assertSameType($left, $right, $operator->token()->value),
             ComparisonOperator::GreaterThan,
             ComparisonOperator::LessThan,
             ComparisonOperator::GreaterThanOrEqual,

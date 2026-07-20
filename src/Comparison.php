@@ -31,23 +31,10 @@ class Comparison extends BinaryOperator
         parent::__construct($left, $right);
     }
 
-    /**
-     * The six operators are spelled by six tokens, and the spelling {@see BinaryOperator::symbol()} prints comes from
-     * the token rather than from {@see ComparisonOperator}'s backing value, so the printer and the lexer can't drift.
-     * The two angle tokens are named for their other job, delimiting a type parameter list like `list<int>`; the lexer
-     * emits the same token for both, so these are the `<` and `>` the parser reads here.
-     */
     #[Override]
     final public function token(): Token
     {
-        return match ($this->operator) {
-            ComparisonOperator::Equals => Token::TripleEquals,
-            ComparisonOperator::NotEquals => Token::NotEquals,
-            ComparisonOperator::GreaterThan => Token::CloseAngle,
-            ComparisonOperator::LessThan => Token::OpenAngle,
-            ComparisonOperator::GreaterThanOrEqual => Token::GreaterThanEquals,
-            ComparisonOperator::LessThanOrEqual => Token::LessThanEquals,
-        };
+        return $this->operator->token();
     }
 
     #[Override]
