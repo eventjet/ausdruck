@@ -40,16 +40,7 @@ final class Expr
 
     public static function eq(Expression $left, Expression $right): Eq
     {
-        if (!$right->matchesType($left->getType())) {
-            throw TypeError::create(
-                sprintf(
-                    'The expressions of both sides of === must be of the same type. Left: %s, right: %s',
-                    $left->getType(),
-                    $right->getType(),
-                ),
-                $right->location(),
-            );
-        }
+        self::checkComparison(ComparisonOperator::Equals, $left, $right);
         return new Eq($left, $right);
     }
 
@@ -145,11 +136,7 @@ final class Expr
 
     public static function gt(Expression $left, Expression $right): Gt
     {
-        self::assertSameNumberType($left, $right, static fn(Expression $bad, Expression $good): string => sprintf(
-            'Can\'t compare %s to %s',
-            $bad->getType(),
-            $good->getType(),
-        ));
+        self::checkComparison(ComparisonOperator::GreaterThan, $left, $right);
         return new Gt($left, $right);
     }
 
@@ -202,6 +189,20 @@ final class Expr
     }
 
     /**
+     * Which rule an operator's operands have to satisfy, for every operator in one place. The two rules answer
+     * different questions: `===` compares for equality, so its operands only have to be of the same type, while an
+     * ordering operator needs operands that have an order at all. Stating the split once means a further operator has
+     * to be classified rather than copied from whichever neighbor happened to look closest.
+     */
+    private static function checkComparison(ComparisonOperator $operator, Expression $left, Expression $right): void
+    {
+        match ($operator) {
+            ComparisonOperator::Equals => self::assertSameType($left, $right, $operator->value),
+            ComparisonOperator::GreaterThan => self::assertComparable($left, $right),
+        };
+    }
+
+    /**
      * int and float are the only types the arithmetic and ordering operators accept. Note that this has nothing to do
      * with PHP's is_numeric(): a numeric string is a string.
      */
@@ -209,6 +210,39 @@ final class Expr
     {
         $type = $expr->getType();
         return $type->equals(Type::int()) || $type->equals(Type::float());
+    }
+
+    /**
+     * The rule an equality operator follows: the two sides have to be of the same type, whatever that type is. The
+     * error points at the right-hand side, the one measured against the left, and names the operator it was made with.
+     */
+    private static function assertSameType(Expression $left, Expression $right, string $operator): void
+    {
+        if ($right->matchesType($left->getType())) {
+            return;
+        }
+        throw TypeError::create(
+            sprintf(
+                'The expressions of both sides of %s must be of the same type. Left: %s, right: %s',
+                $operator,
+                $left->getType(),
+                $right->getType(),
+            ),
+            $right->location(),
+        );
+    }
+
+    /**
+     * The rule an ordering operator follows. They all compare two numbers the same way, so they share one check and
+     * one wording, and can't drift into blaming different parts of the expression for the same mistake.
+     */
+    private static function assertComparable(Expression $left, Expression $right): void
+    {
+        self::assertSameNumberType($left, $right, static fn(Expression $bad, Expression $good): string => sprintf(
+            'Can\'t compare %s to %s',
+            $bad->getType(),
+            $good->getType(),
+        ));
     }
 
     /**

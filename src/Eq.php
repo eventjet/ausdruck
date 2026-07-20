@@ -4,84 +4,20 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use Eventjet\Ausdruck\Parser\Span;
-use Override;
-
-use function array_key_exists;
-use function count;
-use function get_object_vars;
-use function is_object;
-use function sprintf;
-
 /**
+ * The `===` comparison: a {@see Comparison} holding {@see ComparisonOperator::Equals}, and nothing else. The class
+ * survives because {@see Expression::eq()} has declared it as its return type since before Comparison existed, and
+ * Expression is public API: consumers may type against what eq() returns, so widening the declaration to Comparison
+ * is a breaking change—the backward-compatibility check in CI flags exactly that. Folds into Comparison in the next
+ * breaking release, together with {@see Gt}.
+ *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class Eq extends Expression
+final class Eq extends Comparison
 {
-    public function __construct(public readonly Expression $left, public readonly Expression $right)
+    public function __construct(Expression $left, Expression $right)
     {
-    }
-
-    private static function compareStructs(object $left, object $right): bool
-    {
-        $leftVars = get_object_vars($left);
-        $rightVars = get_object_vars($right);
-        if (count($leftVars) !== count($rightVars)) {
-            return false;
-        }
-        /** @var mixed $value */
-        foreach ($leftVars as $key => $value) {
-            if (!array_key_exists($key, $rightVars)) {
-                return false;
-            }
-            if (!self::compareValues($value, $rightVars[$key])) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static function compareValues(mixed $left, mixed $right): bool
-    {
-        if (is_object($left) && is_object($right)) {
-            return self::compareStructs($left, $right);
-        }
-        return $left === $right;
-    }
-
-    public function __toString(): string
-    {
-        return sprintf(
-            '%s === %s',
-            Precedence::parenthesize($this->left, Precedence::Additive),
-            Precedence::parenthesize($this->right, Precedence::Additive),
-        );
-    }
-
-    #[Override]
-    public function evaluate(Scope $scope): bool
-    {
-        return self::compareValues($this->left->evaluate($scope), $this->right->evaluate($scope));
-    }
-
-    #[Override]
-    public function equals(Expression $other): bool
-    {
-        return $other instanceof self
-            && $this->left->equals($other->left)
-            && $this->right->equals($other->right);
-    }
-
-    #[Override]
-    public function getType(): Type
-    {
-        return Type::bool();
-    }
-
-    #[Override]
-    public function location(): Span
-    {
-        return $this->left->location()->to($this->right->location());
+        parent::__construct(ComparisonOperator::Equals, $left, $right);
     }
 }

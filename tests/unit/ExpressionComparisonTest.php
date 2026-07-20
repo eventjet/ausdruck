@@ -6,12 +6,11 @@ namespace Eventjet\Ausdruck\Test\Unit;
 
 use Eventjet\Ausdruck\And_;
 use Eventjet\Ausdruck\Call;
-use Eventjet\Ausdruck\Eq;
+use Eventjet\Ausdruck\ComparisonOperator;
 use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\FieldAccess;
 use Eventjet\Ausdruck\Get;
-use Eventjet\Ausdruck\Gt;
 use Eventjet\Ausdruck\Lambda;
 use Eventjet\Ausdruck\ListLiteral;
 use Eventjet\Ausdruck\Literal;
@@ -91,15 +90,15 @@ final class ExpressionComparisonTest extends TestCase
      */
     public static function notEqualsCases(): iterable
     {
-        yield Eq::class . ': left is different' => [
+        yield ComparisonOperator::Equals->name . ': left is different' => [
             Expr::eq(Expr::literal('a'), Expr::literal('a')),
             Expr::eq(Expr::literal('b'), Expr::literal('a')),
         ];
-        yield Eq::class . ': right is different' => [
+        yield ComparisonOperator::Equals->name . ': right is different' => [
             Expr::eq(Expr::literal('a'), Expr::literal('a')),
             Expr::eq(Expr::literal('a'), Expr::literal('b')),
         ];
-        yield Eq::class . ': different type' => [
+        yield ComparisonOperator::Equals->name . ': different type' => [
             Expr::eq(Expr::literal('a'), Expr::literal('a')),
             Expr::or_(Expr::literal(true), Expr::literal(false)),
         ];
@@ -219,19 +218,19 @@ final class ExpressionComparisonTest extends TestCase
             Expr::literal(1)->call('foo', Type::int(), []),
             Expr::literal(1),
         ];
-        yield Gt::class . ': left is different' => [
+        yield ComparisonOperator::GreaterThan->name . ': left is different' => [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
             Expr::gt(Expr::literal(2), Expr::literal(2)),
         ];
-        yield Gt::class . ': right is different' => [
+        yield ComparisonOperator::GreaterThan->name . ': right is different' => [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
             Expr::gt(Expr::literal(1), Expr::literal(1)),
         ];
-        yield Gt::class . ': both are different' => [
+        yield ComparisonOperator::GreaterThan->name . ': both are different' => [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
             Expr::gt(Expr::literal(2), Expr::literal(1)),
         ];
-        yield Gt::class . ': different type' => [
+        yield ComparisonOperator::GreaterThan->name . ': different type' => [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
             Expr::eq(Expr::literal(1), Expr::literal(2)),
         ];

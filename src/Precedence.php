@@ -87,7 +87,7 @@ enum Precedence: int
             $expr instanceof Lambda => self::Lambda,
             $expr instanceof Or_ => self::Or,
             $expr instanceof And_ => self::And,
-            $expr instanceof Eq, $expr instanceof Gt => self::Comparison,
+            $expr instanceof Comparison => self::Comparison,
             $expr instanceof Subtract => self::Additive,
             $expr instanceof Negative => self::Unary,
             default => self::Primary,
