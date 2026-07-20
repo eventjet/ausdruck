@@ -11,7 +11,6 @@ use function sprintf;
 use function str_split;
 
 /**
- * @phpstan-type AnyToken Token | string | Literal<string | int | float>
  * @psalm-internal Eventjet\Ausdruck\Parser
  */
 final class TypeParser
@@ -65,26 +64,36 @@ final class TypeParser
     /**
      * Reads one type off the stream. Everywhere a type may appear, one is required, so whether the tokens ahead are a
      * type at all is settled here rather than handed back for each call site to decode and word its own complaint
-     * about. The one place that has to ask is {@see self::parseTypeList()}, which peeks for its closing bracket
-     * instead.
+     * about. The one place that has to ask is {@see self::parseTypeList()}, which reads its elements with
+     * {@see self::tryParse()} so that it stops where types stop.
      *
      * @param Peekable<ParsedToken> $tokens
      */
     public static function parse(Peekable $tokens): TypeNode
     {
+        return self::tryParse($tokens) ?? throw self::expectedType($tokens);
+    }
+
+    /**
+     * One type, or null if none begins here. Whether a type begins here is decided before anything is read, so a null
+     * return leaves the stream exactly where it was; once a type has begun, going wrong in the middle of it throws.
+     * Knowing what can start a type is only this method's business—asking is {@see self::parse()}'s `?? throw` and
+     * {@see self::parseTypeList()}'s loop condition, neither of which repeats the answer.
+     *
+     * @param Peekable<ParsedToken> $tokens
+     */
+    private static function tryParse(Peekable $tokens): TypeNode|null
+    {
         $parsedToken = $tokens->peek();
         if ($parsedToken === null) {
-            throw SyntaxError::create('Expected type, got end of input', self::endOfInput($tokens));
+            return null;
         }
         if ($parsedToken->token === Token::OpenBrace) {
             return self::parseStruct($tokens);
         }
         $name = $parsedToken->token;
         if (!is_string($name)) {
-            throw SyntaxError::create(
-                sprintf('Expected type, got %s', Token::print($name)),
-                $parsedToken->location(),
-            );
+            return null;
         }
         $tokens->next();
         if ($name === 'fn') {
@@ -138,14 +147,19 @@ final class TypeParser
     }
 
     /**
-     * Whether a type starts here. A type is either a name or a struct, so nothing else can begin one.
+     * The complaint for tokens that don't begin a type, worded once for every place a type is required.
      *
      * @param Peekable<ParsedToken> $tokens
      */
-    private static function startsType(Peekable $tokens): bool
+    private static function expectedType(Peekable $tokens): SyntaxError
     {
-        $next = $tokens->peek()?->token;
-        return is_string($next) || $next === Token::OpenBrace;
+        $next = $tokens->peek();
+        return $next === null
+            ? SyntaxError::create('Expected type, got end of input', self::endOfInput($tokens))
+            : SyntaxError::create(
+                sprintf('Expected type, got %s', Token::print($next->token)),
+                $next->location(),
+            );
     }
 
     /**
@@ -162,8 +176,8 @@ final class TypeParser
     private static function parseTypeList(Peekable $tokens): array
     {
         $args = [];
-        while (self::startsType($tokens)) {
-            $args[] = self::parse($tokens);
+        while (($arg = self::tryParse($tokens)) !== null) {
+            $args[] = $arg;
             if ($tokens->peek()?->token === Token::Comma) {
                 $tokens->next();
             }
@@ -173,9 +187,8 @@ final class TypeParser
 
     /**
      * @param Peekable<ParsedToken> $tokens
-     * @param AnyToken $expected
      */
-    private static function expect(Peekable $tokens, Token|string|Literal $expected): ParsedToken
+    private static function expect(Peekable $tokens, Token $expected): ParsedToken
     {
         $actual = $tokens->peek();
         if ($actual === null) {
