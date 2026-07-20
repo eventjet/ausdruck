@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Parser\Token;
 use Override;
 
 use function intdiv;
@@ -29,9 +30,9 @@ use const PHP_INT_MIN;
 final class Divide extends BinaryOperator
 {
     #[Override]
-    public function symbol(): string
+    public function token(): Token
     {
-        return '/';
+        return Token::Slash;
     }
 
     #[Override]

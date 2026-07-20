@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Parser\Token;
 use Override;
 
 use function array_key_exists;
@@ -45,9 +46,9 @@ final class Eq extends BinaryOperator
     }
 
     #[Override]
-    public function symbol(): string
+    public function token(): Token
     {
-        return '===';
+        return Token::TripleEquals;
     }
 
     #[Override]

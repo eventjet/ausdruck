@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Parser\Token;
 use Override;
 
 use function fmod;
@@ -23,9 +24,9 @@ use function fmod;
 final class Modulo extends BinaryOperator
 {
     #[Override]
-    public function symbol(): string
+    public function token(): Token
     {
-        return '%';
+        return Token::Percent;
     }
 
     #[Override]

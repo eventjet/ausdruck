@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\ExpressionParser;
+use Eventjet\Ausdruck\Parser\Token;
+use LogicException;
 
 use function sprintf;
 
@@ -23,8 +25,9 @@ use function sprintf;
  * parentheses, so redundant ones — the parentheses in `(a:int - b:int) - c:int`, which the left-associative `-` would
  * have grouped that way anyway — are dropped.
  *
- * The levels are not stored on the nodes: grouping leaves no trace in the tree, so the same tree always prints the same
- * way regardless of whether it was built with parentheses, in the builder API, or by the parser.
+ * A binary operator's level comes from the token it is spelled with, so an operator can't exist without one. Grouping,
+ * on the other hand, is not stored anywhere: parentheses leave no trace in the tree, so the same tree always prints the
+ * same way regardless of whether it was built with them, in the builder API, or by the parser.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -98,22 +101,36 @@ enum Precedence: int
      * Only the nodes that bind loosely enough to ever need wrapping are named; everything else is primary-tight. The
      * default is deliberately forgiving rather than a hard error: {@see Expression} is public API, so a consumer can
      * add nodes this enum has never heard of, and an unknown node is almost always atomic—the safe reading is to
-     * treat it as {@see self::Primary} rather than reject it. A node whose text runs past its own operands, though —
-     * any operator, and every lambda — has to be listed here, or printing it as an operand would drop the parentheses
-     * it needs. (A number literal is the one primary-tight node that still needs wrapping in a slot; that's a lexical
-     * quirk of the postfix `.`, handled in {@see self::parenthesizeTarget()} rather than by a level of its own.)
+     * treat it as {@see self::Primary} rather than reject it. It is never reached by an operator of this library's
+     * own, though: a {@see BinaryOperator} carries the token it is spelled with, which fixes its level in
+     * {@see self::ofToken()}, so one can't be added without being placed in the cascade. (A number literal is the one
+     * primary-tight node that still needs wrapping in a slot; that's a lexical quirk of the postfix `.`, handled in
+     * {@see self::parenthesizeTarget()} rather than by a level of its own.)
      */
     private static function of(Expression $expr): self
     {
         return match (true) {
+            $expr instanceof BinaryOperator => self::ofToken($expr->token()),
             $expr instanceof Lambda => self::Lambda,
-            $expr instanceof Or_ => self::Or,
-            $expr instanceof And_ => self::And,
-            $expr instanceof Eq, $expr instanceof Gt => self::Comparison,
-            $expr instanceof Add, $expr instanceof Subtract => self::Additive,
-            $expr instanceof Multiply, $expr instanceof Divide, $expr instanceof Modulo => self::Multiplicative,
             $expr instanceof Negative => self::Unary,
             default => self::Primary,
+        };
+    }
+
+    /**
+     * The level the parser reads $token at, listing the binary levels of the cascade in the same order they appear
+     * there. A token that spells no binary operator can't reach this: the only caller passes what a
+     * {@see BinaryOperator} answered.
+     */
+    private static function ofToken(Token $token): self
+    {
+        return match ($token) {
+            Token::Or => self::Or,
+            Token::And => self::And,
+            Token::TripleEquals, Token::CloseAngle => self::Comparison,
+            Token::Plus, Token::Minus => self::Additive,
+            Token::Asterisk, Token::Slash, Token::Percent => self::Multiplicative,
+            default => throw new LogicException(sprintf('%s is not a binary operator', $token->value)),
         };
     }
 
@@ -124,7 +141,8 @@ enum Precedence: int
 
     /**
      * The next tighter level: the one the parser cascade delegates to for an operand. Only the binary operator levels
-     * ask for this, and each of them has a tighter neighbor, so the lookup can't fail.
+     * ask for this—{@see self::ofToken()} returns nothing else—and each of them has a tighter neighbor, so the lookup
+     * can't fail.
      */
     private function tighter(): self
     {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Parser\Token;
 use Override;
 
 /**
@@ -12,10 +13,14 @@ use Override;
  */
 final class Gt extends BinaryOperator
 {
+    /**
+     * {@see Token::CloseAngle} names `>` after its other job, closing a type parameter list like `list<int>`; the
+     * lexer emits the one token for both, so this is the same `>` the parser reads here.
+     */
     #[Override]
-    public function symbol(): string
+    public function token(): Token
     {
-        return '>';
+        return Token::CloseAngle;
     }
 
     #[Override]
