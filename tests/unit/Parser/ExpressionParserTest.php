@@ -49,6 +49,13 @@ final class ExpressionParserTest extends TestCase
             ['foo:string', Expr::get('foo', $s)],
             ['"my-literal"', Expr::literal('my-literal')],
             ['foo:string === bar:string', Expr::get('foo', Type::string())->eq(Expr::get('bar', Type::string()))],
+            ['foo:string !== bar:string', Expr::get('foo', $s)->neq(Expr::get('bar', $s))],
+            ['foo:int > bar:int', Expr::get('foo', $i)->gt(Expr::get('bar', $i))],
+            // `<` doubles as a generic's opening bracket, so this pins that the parser reads it as less-than here, not as
+            // the start of a broken `int<...>` type.
+            ['foo:int < bar:int', Expr::get('foo', $i)->lt(Expr::get('bar', $i))],
+            ['foo:int >= bar:int', Expr::get('foo', $i)->gte(Expr::get('bar', $i))],
+            ['foo:int <= bar:int', Expr::get('foo', $i)->lte(Expr::get('bar', $i))],
             ['foo:bool || bar:bool', Expr::get('foo', Type::bool())->or_(Expr::get('bar', Type::bool()))],
             [
                 'haystack:list<string>.some:bool(|item| item:string === needle:string)',
@@ -130,6 +137,23 @@ final class ExpressionParserTest extends TestCase
                     ),
                     Expr::get('d', $b),
                 ),
+            ],
+            // A comparison prints both of its operands at the additive level, and the cases above only ever put a
+            // looser expression on the left. These put one on the right, so dropping the parentheses there is caught:
+            // without them `a:bool === b:bool || c:bool` re-parses as `(a === b) || c`, a different tree.
+            [
+                'a:bool === (b:bool || c:bool)',
+                Expr::eq(Expr::get('a', $b), Expr::or_(Expr::get('b', $b), Expr::get('c', $b))),
+            ],
+            [
+                'a:bool !== (b:bool && c:bool)',
+                Expr::neq(Expr::get('a', $b), Expr::and_(Expr::get('b', $b), Expr::get('c', $b))),
+            ],
+            // Comparison is non-associative, so a comparison nested in a comparison's operand slot needs the
+            // parentheses whichever side it sits on.
+            [
+                'a:bool === (b:int > c:int)',
+                Expr::eq(Expr::get('a', $b), Expr::gt(Expr::get('b', $i), Expr::get('c', $i))),
             ],
             // Unary binds tighter than additive, so this subtracts a negation rather than negating a subtraction.
             [
@@ -313,6 +337,19 @@ final class ExpressionParserTest extends TestCase
                     Expr::literal(2),
                 ),
             ],
+            // A generic's closing angle glued to `===` or `!==`: the `>` must stay a bare close-angle instead of
+            // munching a `>=` that would orphan a `==`, which is no token at all.
+            [
+                'foo:list<int>===bar:list<int>',
+                Expr::eq(Expr::get('foo', Type::listOf(Type::int())), Expr::get('bar', Type::listOf(Type::int()))),
+            ],
+            [
+                'foo:list<int>!==bar:list<int>',
+                Expr::get('foo', Type::listOf(Type::int()))->neq(Expr::get('bar', Type::listOf(Type::int()))),
+            ],
+            // ...but one `=` after the angle is still `>=`/`<=`.
+            ['a:int>=1', Expr::get('a', Type::int())->gte(Expr::literal(1))],
+            ['a:int<=1', Expr::get('a', Type::int())->lte(Expr::literal(1))],
         ];
         foreach ($cases as $case) {
             yield $case[0] => $case;
@@ -338,7 +375,11 @@ final class ExpressionParserTest extends TestCase
         yield 'lambda: open brace instead of closing' => ['(foo, bar( => foo:string'];
         yield 'standalone open brace' => ['('];
         yield 'dot type' => ['foo:list<.>'];
+        // A generic constructor's `<` opens an argument list that has to close, whichever constructor it is: an
+        // unclosed one is an error, not a rewind to a less-than that was never there.
         yield 'end of string after generic open angle' => ['foo:map<'];
+        yield 'end of string after option open angle' => ['foo:Option<'];
+        yield 'end of string after some open angle' => ['foo:Some<'];
         yield 'two variables separated by a space' => ['foo:string bar:int'];
         yield 'standalone dot' => ['.'];
         yield 'prop access without an object' => ['.foo:string'];
@@ -361,6 +402,19 @@ final class ExpressionParserTest extends TestCase
         yield 'empty string' => ['', 'Expected expression, got end of input'];
         yield 'missing left hand side of >' => ['> foo:int'];
         yield 'missing right hand side of >' => ['foo:int >'];
+        yield 'missing left hand side of <' => ['< foo:int'];
+        yield 'missing right hand side of <' => ['foo:int <'];
+        yield 'missing right hand side of >=' => ['foo:int >='];
+        yield 'missing right hand side of <=' => ['foo:int <='];
+        yield 'missing right hand side of !==' => ['foo:int !=='];
+        // Equality is `===`, so inequality is `!==`; a bare `!` or `!=` is read as the beginning of one, and the
+        // error says how far it got.
+        yield 'not equals with one equals' => ['a:int != 1', 'Expected !==, got !='];
+        yield 'lone bang' => ['a:int ! 1', 'Expected !==, got !'];
+        yield 'bang at end of input' => ['a:int !', 'Expected !==, got !'];
+        // Two `=` after a `>` keep the angle bare, whatever comes next (see the `foo:list<int>===bar` parse case), so
+        // the `==` here is blamed as its own broken `===` rather than a `>=` eating its first `=`.
+        yield 'greater-equals with an extra equals' => ['a:int >== 1', 'Expected ===, got =='];
         yield 'end of string variable and colon' => ['foo:'];
         yield 'end of string after function call and colon' => ['foo:string.substr:'];
         yield 'end of string after function dot' => ['foo:string.'];
@@ -378,17 +432,20 @@ final class ExpressionParserTest extends TestCase
         yield 'non-token, non-identifier symbol' => ['foo:bool € bar:bool'];
         yield 'identifier starting with a number' => ['42foo:bool', 'Unexpected identifier foo'];
         yield 'identifier starting with an underscore' => ['_foo:bool', 'Unexpected character _'];
-        // === and > are non-associative, so a chain of them is a syntax error rather than a confusing type error.
+        // The comparison operators are non-associative, so a chain of any of them is a syntax error rather than a
+        // confusing type error against the bool the first comparison produces.
         yield 'chained ===' => ['a:int === b:int === c:int', 'Unexpected ==='];
+        yield 'chained !==' => ['a:int !== b:int !== c:int', 'Unexpected !=='];
         yield 'chained >' => ['a:int > b:int > c:int', 'Unexpected >'];
+        yield 'chained <' => ['a:int < b:int < c:int', 'Unexpected <'];
+        yield 'chained >=' => ['a:int >= b:int >= c:int', 'Unexpected >='];
+        yield 'chained <=' => ['a:int <= b:int <= c:int', 'Unexpected <='];
         // Whatever follows a complete expression is a mistake, not something to drop: silently returning the expression
         // parsed so far turns a typo or an operator we don't have into a valid expression with a surprising value.
         yield 'trailing literal' => ['1 2', 'Unexpected 2'];
         yield 'trailing literal after a complete subtraction' => ['1 - 1 999', 'Unexpected 999'];
         yield 'trailing string literal' => ['"a" "b"', 'Unexpected "b"'];
         yield 'trailing keyword' => ['true false', 'Unexpected identifier false'];
-        // `<` is not an operator, so this is a literal followed by junk rather than a comparison.
-        yield 'less than' => ['42 < 23', 'Unexpected <'];
         yield 'trailing operator' => ['a:int -', 'Expected expression, got end of input'];
         // The leftmost mistake is the one to fix first, so it's the one to report—whatever garbage follows it. Reading
         // the token that trailing junk starts with must not scan the characters after that token, or the tokenizer
@@ -441,6 +498,15 @@ final class ExpressionParserTest extends TestCase
         yield 'string > string' => ['foo:string > bar:string', 'Can\'t compare string to string'];
         yield 'string > int' => ['foo:string > bar:int', 'Can\'t compare string to int'];
         yield 'int > string' => ['foo:int > bar:string', 'Can\'t compare string to int'];
+        // The ordering operators share one comparability rule and one wording, so a mistake reads the same whichever
+        // one it's made with.
+        yield 'int < float' => ['foo:int < bar:float', 'Can\'t compare int to float'];
+        yield 'string <= string' => ['foo:string <= bar:string', 'Can\'t compare string to string'];
+        yield 'float >= int' => ['foo:float >= bar:int', 'Can\'t compare float to int'];
+        yield 'not equals: different operand types' => [
+            'foo:string !== bar:int',
+            'The expressions of both sides of !== must be of the same type. Left: string, right: int',
+        ];
         yield 'generic syntax on string' => ['foo:string<int>'];
         // An alias is a name for one complete type: like the argument-less built-ins, it rejects type arguments
         // instead of silently dropping them.
@@ -646,8 +712,16 @@ final class ExpressionParserTest extends TestCase
                 'foo:bool & bar:bool',
                 '         =         ',
             ],
-            // An `=` that isn't the start of `===` is blamed with everything read after it: the operator that is
-            // actually there is underlined whole.
+            // A `!` or `=` that isn't the start of `!==`/`===` is blamed with everything read after it: the operator
+            // that is actually there is underlined whole.
+            [
+                'a:int != 1',
+                '      ==  ',
+            ],
+            [
+                'a:int ! 1',
+                '      =  ',
+            ],
             [
                 'foo:string == bar:string',
                 '           ==           ',
@@ -665,6 +739,14 @@ final class ExpressionParserTest extends TestCase
             [
                 '(a:bool))',
                 '        =',
+            ],
+            // Reading `int <` as the start of a type argument list fails on the `list<int` that follows, but that
+            // failure is not the error: it only means the `<` was a less-than after all. So the attempt is rewound and
+            // the blame lands on the undeclared variable that really is there, not on the `>` the abandoned reading
+            // wanted.
+            [
+                'a:int < list<int',
+                '        ====    ',
             ],
             // The `>` of an arrow is a column like any other: what follows it is blamed where it actually is.
             [
@@ -725,6 +807,20 @@ final class ExpressionParserTest extends TestCase
             [
                 '"foo" === 42',
                 '          ==',
+            ],
+            [
+                '"foo" !== 42',
+                '          ==',
+            ],
+            // The right-hand operand of these lands past a two-character operator, so its column also pins that the
+            // tokenizer counts `<=` and `>=` as two columns, not one.
+            [
+                'foo:int <= bar:string',
+                '           ==========',
+            ],
+            [
+                'foo:int >= bar:string',
+                '           ==========',
             ],
             [
                 'a:int || b:bool',
@@ -868,6 +964,27 @@ final class ExpressionParserTest extends TestCase
 
         self::assertSame($expression, (string)$expr);
         self::assertTrue($expr->equals($reparsed), sprintf('%s does not equal %s', $expr, $reparsed));
+    }
+
+    /**
+     * Reading a `<` as a type argument list is speculative, and a list of bare names is exactly the shape that gets the
+     * speculation far enough to scan what follows it. The `$` here is therefore tokenized while trying a reading that
+     * is then abandoned—but it is still the mistake once the `<` has been re-read as a less-than, so it is still what
+     * gets reported. The tokens that were never produced must not read as the end of the input, or the trailing check
+     * in parseComplete() would see a stream that simply ended and accept the expression.
+     */
+    public function testALexicalErrorScannedWhileSpeculatingIsStillReported(): void
+    {
+        $declarations = new Declarations(variables: [
+            'a' => Type::int(),
+            'b' => Type::int(),
+            'c' => Type::int(),
+        ]);
+
+        $this->expectException(SyntaxError::class);
+        $this->expectExceptionMessage('Unexpected character $');
+
+        ExpressionParser::parse('[a:int < b, c $]', $declarations);
     }
 
     #[DataProvider('invalidSyntaxExpressions')]
