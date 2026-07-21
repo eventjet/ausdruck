@@ -27,6 +27,19 @@ final class Tokenizer
     private const UNDERSCORE = 95;
 
     /**
+     * Every character that begins an operator is listed once, in the match below, and its arm answers which operator it
+     * begins: the token itself for a character that is a whole operator on its own, {@see self::pair()} for one that
+     * may be completed by a second, {@see self::angle()} for the two that may be and mean something else when they
+     * aren't, and {@see self::exact()} for one that begins a token and nothing else. Giving `+` a longer reading later
+     * means changing what its arm answers, not moving the arm somewhere a different rule applies.
+     *
+     * The arms only look ahead; naming the token is all they do. Scanning past it is the loop's job below, and it needs
+     * nothing but the answer: every {@see Token}'s value is the source text that spells it, so the operator is as many
+     * characters long as its own name, wherever the arm that named it looked.
+     *
+     * Everything below that starts with a character no operator can: whitespace, a quote, a digit, or the start of an
+     * identifier. Those are told apart by asking, because they are classes of character rather than single ones.
+     *
      * @param iterable<mixed, string> $chars
      * @return iterable<ParsedToken>
      */
@@ -42,7 +55,8 @@ final class Tokenizer
             if ($char === null) {
                 break;
             }
-            $singleCharToken = match ($char) {
+            $startCol = $column;
+            $operator = match ($char) {
                 '.' => Token::Dot,
                 '(' => Token::OpenParen,
                 ')' => Token::CloseParen,
@@ -52,12 +66,27 @@ final class Tokenizer
                 ']' => Token::CloseBracket,
                 '{' => Token::OpenBrace,
                 '}' => Token::CloseBrace,
+                '=' => self::exact($chars, $line, $column, Token::TripleEquals),
+                '!' => self::exact($chars, $line, $column, Token::NotEquals),
+                '&' => self::exact($chars, $line, $column, Token::And),
+                '<' => self::angle($chars, Token::OpenAngle, Token::LessThanEquals),
+                '>' => self::angle($chars, Token::CloseAngle, Token::GreaterThanEquals),
+                // A `-` always yields Token::Minus, never a sign folded into the number literal that follows it:
+                // {@see \Eventjet\Ausdruck\Expr::negative()} does that folding once the minus is known to be a
+                // negation. Doing it here would let whitespace silently decide what `a -2` means.
+                '-' => self::pair($chars, '>', Token::Minus, Token::Arrow),
+                '|' => self::pair($chars, '|', Token::Pipe, Token::Or),
                 default => null,
             };
-            if ($singleCharToken !== null) {
-                $chars->next();
-                yield new ParsedToken($singleCharToken, $line, $column);
-                $column++;
+            if ($operator !== null) {
+                // Walking off what the arm named. The assert is the rule above, checked where it is relied on: a
+                // token whose value is not the text that spells it would leave the cursor past input it never read.
+                foreach (str_split($operator->value) as $expected) {
+                    assert($chars->peek() === $expected);
+                    $chars->next();
+                    $column++;
+                }
+                yield new ParsedToken($operator, $line, $startCol);
                 continue;
             }
             if (ctype_space($char)) {
@@ -71,32 +100,9 @@ final class Tokenizer
                 continue;
             }
             if ($char === '"') {
-                $startLine = $line;
-                $startCol = $column;
                 $chars->next();
                 $column++;
-                yield new ParsedToken(self::string($chars, $line, $column), $startLine, $startCol);
-                continue;
-            }
-            $startCol = $column;
-            $multiCharToken = match ($char) {
-                '=' => self::exact($chars, $line, $column, '===', Token::TripleEquals),
-                '!' => self::exact($chars, $line, $column, '!==', Token::NotEquals),
-                '&' => self::exact($chars, $line, $column, '&&', Token::And),
-                '<' => self::angle($chars, $column, Token::OpenAngle, Token::LessThanEquals),
-                '>' => self::angle($chars, $column, Token::CloseAngle, Token::GreaterThanEquals),
-                /**
-                 * The sign is never folded into a number literal: a `-` always yields Token::Minus, and
-                 * {@see \Eventjet\Ausdruck\Expr::negative()} turns a negated number literal back into a negative one.
-                 * If the sign were folded in here, whitespace would silently decide the meaning of `a -2`:
-                 * subtraction, or `a` followed by the literal -2.
-                 */
-                '-' => self::bareOrPair($chars, $column, '>', Token::Minus, Token::Arrow),
-                '|' => self::bareOrPair($chars, $column, '|', Token::Pipe, Token::Or),
-                default => null,
-            };
-            if ($multiCharToken !== null) {
-                yield new ParsedToken($multiCharToken, $line, $startCol);
+                yield new ParsedToken(self::string($chars, $line, $column), $line, $startCol);
                 continue;
             }
             if (is_numeric($char)) {
@@ -142,32 +148,30 @@ final class Tokenizer
     }
 
     /**
-     * Scans an operator that is the only token starting with its first character: `===`, `!==`, and `&&`. Once that
+     * Answers the operator that is the only token starting with its first character: `===`, `!==`, and `&&`. Once that
      * first character is there, the whole sequence is required; anything short of it is an error naming the operator
-     * that was expected and underlining the characters that were actually read.
+     * that was expected and underlining the characters that were actually read. The sequence is the token's own
+     * spelling, so the operator the error names is the one it was scanning for, and $ahead—how far into that spelling
+     * the reading got—is at once how far to peek, how much was read, and where the underline ends.
      *
      * @param Peekable<string> $chars
      * @param positive-int $line
-     * @param positive-int $column
-     * @param non-empty-string $sequence
+     * @param positive-int $column Where the first character is. Nothing here moves the cursor; the caller does that.
      */
-    private static function exact(Peekable $chars, int $line, int &$column, string $sequence, Token $token): Token
+    private static function exact(Peekable $chars, int $line, int $column, Token $token): Token
     {
-        $startColumn = $column;
         $read = '';
-        foreach (str_split($sequence) as $char) {
-            if ($chars->peek() !== $char) {
-                $endColumn = $column - 1;
-                // The main loop only dispatches here after peeking $sequence's first character, so that one matched.
+        foreach (str_split($token->value) as $ahead => $char) {
+            if ($chars->peek($ahead) !== $char) {
+                $endColumn = $column + $ahead - 1;
+                // The main loop only dispatches here after peeking the token's first character, so that one matched.
                 assert($endColumn >= 1);
                 throw SyntaxError::create(
-                    sprintf('Expected %s, got %s', $sequence, $read),
-                    new Span($line, $startColumn, $line, $endColumn),
+                    sprintf('Expected %s, got %s', $token->value, $read),
+                    new Span($line, $column, $line, $endColumn),
                 );
             }
             $read .= $char;
-            $chars->next();
-            $column++;
         }
         return $token;
     }
@@ -175,45 +179,31 @@ final class Tokenizer
     /**
      * `<` and `>` each stand for two things: on their own they are the angle brackets of a generic type (which the
      * expression parser also reads as less-than and greater-than), and followed by `=` they are the comparison
-     * operators `<=` and `>=`. The pair reading wins with one exception: two `=` after the angle mean a `===` follows,
-     * as in `foo:list<int>===bar`, so the angle stays bare instead of stealing the first `=` and leaving behind a `==`
-     * that is no token at all.
+     * operators `<=` and `>=`. That is {@see self::pair()}'s rule, with one exception: two `=` after the angle mean a
+     * `===` follows, as in `foo:list<int>===bar`, so the angle stays bare instead of stealing the first `=` and leaving
+     * behind a `==` that is no token at all.
      *
      * @param Peekable<string> $chars
-     * @param positive-int $column
      */
-    private static function angle(Peekable $chars, int &$column, Token $bare, Token $pair): Token
+    private static function angle(Peekable $chars, Token $bare, Token $pair): Token
     {
-        $chars->next();
-        $column++;
-        if ($chars->peek() !== '=' || $chars->peek(1) === '=') {
-            return $bare;
-        }
-        $chars->next();
-        $column++;
-        return $pair;
+        return $chars->peek(1) === '=' && $chars->peek(2) === '='
+            ? $bare
+            : self::pair($chars, '=', $bare, $pair);
     }
 
     /**
      * A character that means one token on its own and another when $second completes it: `-` and `->`, `|` and `||`.
-     * The pair always wins. For `->` it's the only reading that can be meant: no expression continues with a bare `-`
-     * followed by a `>`. For `||` it's a choice: the two bars could also be the empty parameter list of a lambda, so
-     * that list is written `| |`, and glued bars are the or they almost always are.
+     * The pair wins where it can. For `->` it's the only reading that can be meant: no expression continues with a bare
+     * `-` followed by a `>`. For `||` it's a choice: the two bars could also be the empty parameter list of a lambda,
+     * so that list is written `| |`, and glued bars are the or they almost always are.
      *
      * @param Peekable<string> $chars
-     * @param positive-int $column
      * @param non-empty-string $second The character that, if it comes next, makes this $pair instead of $bare.
      */
-    private static function bareOrPair(Peekable $chars, int &$column, string $second, Token $bare, Token $pair): Token
+    private static function pair(Peekable $chars, string $second, Token $bare, Token $pair): Token
     {
-        $chars->next();
-        $column++;
-        if ($chars->peek() !== $second) {
-            return $bare;
-        }
-        $chars->next();
-        $column++;
-        return $pair;
+        return $chars->peek(1) === $second ? $pair : $bare;
     }
 
     /**
