@@ -30,7 +30,7 @@ enum ComparisonOperator
     case LessThanOrEqual;
 
     /**
-     * The token this operator is spelled with, and so — by way of {@see BinaryOperator::symbol()} — the spelling it
+     * The token this operator is spelled with, and so — by way of {@see Precedence::binary()} — the spelling it
      * prints as and the level it binds at. The two angle tokens are named for their other job, delimiting a type
      * parameter list like `list<int>`; the lexer emits the same token for both, so these are the `<` and `>` the
      * parser reads as comparisons.
