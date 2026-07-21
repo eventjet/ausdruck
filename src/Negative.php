@@ -4,28 +4,14 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use Eventjet\Ausdruck\Parser\Span;
+use Eventjet\Ausdruck\Parser\Token;
 use Override;
-
-use function sprintf;
 
 /**
  * Never wraps a {@see Literal}: {@see Expr::negative()} folds a negated number literal into a negative one.
  */
-final class Negative extends Expression
+final class Negative extends UnaryOperator
 {
-    use LocationTrait;
-
-    public function __construct(public readonly Expression $expression, Span $location)
-    {
-        $this->location = $location;
-    }
-
-    public function __toString(): string
-    {
-        return sprintf('-%s', Precedence::parenthesize($this->expression, Precedence::Unary));
-    }
-
     /**
      * Negation is arithmetic too, and follows the rule {@see Arithmetic} sets: the operand is narrowed to the type it
      * claims, and an int result that doesn't exist is reported rather than widened. Which int result that is, and why,
@@ -42,15 +28,17 @@ final class Negative extends Expression
     }
 
     #[Override]
-    public function equals(Expression $other): bool
-    {
-        return $other instanceof self
-            && $this->expression->equals($other->expression);
-    }
-
-    #[Override]
     public function getType(): Type
     {
         return $this->expression->getType();
+    }
+
+    /**
+     * @return Token::Minus
+     */
+    #[Override]
+    protected function token(): Token
+    {
+        return Token::Minus;
     }
 }
