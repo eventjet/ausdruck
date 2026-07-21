@@ -760,6 +760,21 @@ final class ExpressionParserTest extends TestCase
                 'x:fn(int) -> int &',
                 '                 =',
             ],
+            // A token is as wide as it is written, not as wide as it prints back. `1.50` and `007` are four and
+            // three columns wide, though they re-print as `1.5` and `7`; the extent is recorded while the source is
+            // being read, so neither the literal itself nor the end of the input after one lands short of where it is.
+            [
+                '[1, 1.50 2]',
+                '         = ',
+            ],
+            [
+                '[1, 2.50',
+                '        =',
+            ],
+            [
+                '[007',
+                '    =',
+            ],
         ];
         foreach ($cases as [$expression, $location]) {
             preg_match('/^(?<spaces> *)(?<underline>=+)/', $location, $matches);
@@ -781,6 +796,15 @@ final class ExpressionParserTest extends TestCase
                     === :string
                 EXPR,
             Span::char(2, 9),
+        ];
+        // A string literal is the one token that can contain a newline, so it is the one token that can end on a
+        // line it didn't start on. Everything after it is on the line it ended on, not the line it began on.
+        yield [
+            <<<'EXPR'
+                ["a
+                b", &]
+                EXPR,
+            Span::char(2, 5),
         ];
     }
 

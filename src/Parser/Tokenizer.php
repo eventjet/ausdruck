@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
-use function assert;
 use function ctype_space;
 use function is_numeric;
 use function ord;
@@ -27,101 +26,92 @@ final class Tokenizer
     private const UNDERSCORE = 95;
 
     /**
+     * A token is whatever a scanner reads, spanning from where the scan started to the last character it took. That is
+     * said once, here, so it cannot be said differently by the next token form added: a scanner returns what it read
+     * and never sees the span it will be given. No scanner keeps a line or column of its own either, so none of them
+     * can disagree about what reading a character does—see {@see Source}.
+     *
      * @param iterable<mixed, string> $chars
      * @return iterable<ParsedToken>
      */
     public static function tokenize(iterable $chars): iterable
     {
-        /** @var positive-int $line */
-        $line = 1;
-        /** @var positive-int $column */
-        $column = 1;
-        $chars = new Peekable($chars);
-        while (true) {
-            $char = $chars->peek();
-            if ($char === null) {
-                break;
-            }
-            $singleCharToken = match ($char) {
-                '.' => Token::Dot,
-                '(' => Token::OpenParen,
-                ')' => Token::CloseParen,
-                ':' => Token::Colon,
-                ',' => Token::Comma,
-                '[' => Token::OpenBracket,
-                ']' => Token::CloseBracket,
-                '{' => Token::OpenBrace,
-                '}' => Token::CloseBrace,
-                default => null,
-            };
-            if ($singleCharToken !== null) {
-                $chars->next();
-                yield new ParsedToken($singleCharToken, $line, $column);
-                $column++;
-                continue;
-            }
+        $source = new Source($chars);
+        while (($char = $source->peek()) !== null) {
             if (ctype_space($char)) {
-                $chars->next();
-                if ($char === "\n") {
-                    $line++;
-                    $column = 1;
-                } else {
-                    $column++;
-                }
+                $source->take();
                 continue;
             }
-            if ($char === '"') {
-                $startLine = $line;
-                $startCol = $column;
-                $chars->next();
-                $column++;
-                yield new ParsedToken(self::string($chars, $line, $column), $startLine, $startCol);
-                continue;
-            }
-            $startCol = $column;
-            $multiCharToken = match ($char) {
-                '=' => self::exact($chars, $line, $column, '===', Token::TripleEquals),
-                '!' => self::exact($chars, $line, $column, '!==', Token::NotEquals),
-                '&' => self::exact($chars, $line, $column, '&&', Token::And),
-                '<' => self::angle($chars, $column, Token::OpenAngle, Token::LessThanEquals),
-                '>' => self::angle($chars, $column, Token::CloseAngle, Token::GreaterThanEquals),
-                /**
-                 * The sign is never folded into a number literal: a `-` always yields Token::Minus, and
-                 * {@see \Eventjet\Ausdruck\Expr::negative()} turns a negated number literal back into a negative one.
-                 * If the sign were folded in here, whitespace would silently decide the meaning of `a -2`:
-                 * subtraction, or `a` followed by the literal -2.
-                 */
-                '-' => self::bareOrPair($chars, $column, '>', Token::Minus, Token::Arrow),
-                '|' => self::bareOrPair($chars, $column, '|', Token::Pipe, Token::Or),
-                default => null,
-            };
-            if ($multiCharToken !== null) {
-                yield new ParsedToken($multiCharToken, $line, $startCol);
-                continue;
-            }
-            if (is_numeric($char)) {
-                yield new ParsedToken(self::number($chars, $column), $line, $startCol);
-                continue;
-            }
-            if (self::isIdentifierChar($char, first: true)) {
-                yield new ParsedToken(self::identifier($chars, $line, $column), $line, $startCol);
-                continue;
-            }
-            throw SyntaxError::create(sprintf('Unexpected character %s', $char), Span::char($line, $column));
+            $start = $source->position();
+            yield new ParsedToken(self::scan($source, $char), $source->spanFrom($start));
         }
     }
 
     /**
-     * @param Peekable<string> $chars
-     * @param positive-int $line
-     * @param positive-int $column
+     * Which token starts with $char, and reading it. Every branch leaves the source just past the token it read and
+     * says nothing about where that was; {@see self::tokenize()} measures. The character is peeked, not taken, so a
+     * branch is free to take it wherever suits the form it reads—in the dispatch for the one-character tokens, inside
+     * the scanner for the operators, in the scanning loop for numbers and identifiers.
+     *
+     * @return Token | string | Literal<string | int | float>
      */
-    private static function identifier(Peekable $chars, int $line, int &$column): string
+    private static function scan(Source $source, string $char): Token|string|Literal
+    {
+        $singleCharToken = match ($char) {
+            '.' => Token::Dot,
+            '(' => Token::OpenParen,
+            ')' => Token::CloseParen,
+            ':' => Token::Colon,
+            ',' => Token::Comma,
+            '[' => Token::OpenBracket,
+            ']' => Token::CloseBracket,
+            '{' => Token::OpenBrace,
+            '}' => Token::CloseBrace,
+            default => null,
+        };
+        if ($singleCharToken !== null) {
+            $source->take();
+            return $singleCharToken;
+        }
+        if ($char === '"') {
+            $source->take();
+            return self::string($source);
+        }
+        $multiCharToken = match ($char) {
+            '=' => self::exact($source, '===', Token::TripleEquals),
+            '!' => self::exact($source, '!==', Token::NotEquals),
+            '&' => self::exact($source, '&&', Token::And),
+            '<' => self::angle($source, Token::OpenAngle, Token::LessThanEquals),
+            '>' => self::angle($source, Token::CloseAngle, Token::GreaterThanEquals),
+            /**
+             * The sign is never folded into a number literal: a `-` always yields Token::Minus, and
+             * {@see \Eventjet\Ausdruck\Expr::negative()} turns a negated number literal back into a negative one.
+             * If the sign were folded in here, whitespace would silently decide the meaning of `a -2`:
+             * subtraction, or `a` followed by the literal -2.
+             */
+            '-' => self::bareOrPair($source, '>', Token::Minus, Token::Arrow),
+            '|' => self::bareOrPair($source, '|', Token::Pipe, Token::Or),
+            default => null,
+        };
+        if ($multiCharToken !== null) {
+            return $multiCharToken;
+        }
+        if (is_numeric($char)) {
+            return self::number($source);
+        }
+        if (self::isIdentifierChar($char, first: true)) {
+            return self::identifier($source);
+        }
+        // Nothing has been taken, so the character that has no reading is still the one under the cursor.
+        throw SyntaxError::create(sprintf('Unexpected character %s', $char), $source->position()->span());
+    }
+
+    private static function identifier(Source $source): string
     {
         $identifier = '';
 
         while (true) {
-            $char = $chars->peek();
+            $char = $source->peek();
 
             if ($char === null) {
                 break;
@@ -134,8 +124,7 @@ final class Tokenizer
             }
 
             $identifier .= $char;
-            $chars->next();
-            $column++;
+            $source->take();
         }
 
         return $identifier;
@@ -146,28 +135,23 @@ final class Tokenizer
      * first character is there, the whole sequence is required; anything short of it is an error naming the operator
      * that was expected and underlining the characters that were actually read.
      *
-     * @param Peekable<string> $chars
-     * @param positive-int $line
-     * @param positive-int $column
      * @param non-empty-string $sequence
      */
-    private static function exact(Peekable $chars, int $line, int &$column, string $sequence, Token $token): Token
+    private static function exact(Source $source, string $sequence, Token $token): Token
     {
-        $startColumn = $column;
+        $start = $source->position();
         $read = '';
         foreach (str_split($sequence) as $char) {
-            if ($chars->peek() !== $char) {
-                $endColumn = $column - 1;
-                // The main loop only dispatches here after peeking $sequence's first character, so that one matched.
-                assert($endColumn >= 1);
+            if ($source->peek() !== $char) {
+                // The main loop only dispatches here after peeking $sequence's first character, so that one matched
+                // and was taken: the span always covers at least it.
                 throw SyntaxError::create(
                     sprintf('Expected %s, got %s', $sequence, $read),
-                    new Span($line, $startColumn, $line, $endColumn),
+                    $source->spanFrom($start),
                 );
             }
             $read .= $char;
-            $chars->next();
-            $column++;
+            $source->take();
         }
         return $token;
     }
@@ -178,19 +162,14 @@ final class Tokenizer
      * operators `<=` and `>=`. The pair reading wins with one exception: two `=` after the angle mean a `===` follows,
      * as in `foo:list<int>===bar`, so the angle stays bare instead of stealing the first `=` and leaving behind a `==`
      * that is no token at all.
-     *
-     * @param Peekable<string> $chars
-     * @param positive-int $column
      */
-    private static function angle(Peekable $chars, int &$column, Token $bare, Token $pair): Token
+    private static function angle(Source $source, Token $bare, Token $pair): Token
     {
-        $chars->next();
-        $column++;
-        if ($chars->peek() !== '=' || $chars->peek(1) === '=') {
+        $source->take();
+        if ($source->peek() !== '=' || $source->peek(1) === '=') {
             return $bare;
         }
-        $chars->next();
-        $column++;
+        $source->take();
         return $pair;
     }
 
@@ -200,64 +179,54 @@ final class Tokenizer
      * followed by a `>`. For `||` it's a choice: the two bars could also be the empty parameter list of a lambda, so
      * that list is written `| |`, and glued bars are the or they almost always are.
      *
-     * @param Peekable<string> $chars
-     * @param positive-int $column
      * @param non-empty-string $second The character that, if it comes next, makes this $pair instead of $bare.
      */
-    private static function bareOrPair(Peekable $chars, int &$column, string $second, Token $bare, Token $pair): Token
+    private static function bareOrPair(Source $source, string $second, Token $bare, Token $pair): Token
     {
-        $chars->next();
-        $column++;
-        if ($chars->peek() !== $second) {
+        $source->take();
+        if ($source->peek() !== $second) {
             return $bare;
         }
-        $chars->next();
-        $column++;
+        $source->take();
         return $pair;
     }
 
     /**
-     * @param Peekable<string> $chars
-     * @param positive-int $column
      * @return Literal<int | float>
      */
-    private static function number(Peekable $chars, int &$column): Literal
+    private static function number(Source $source): Literal
     {
         $number = '';
         while (true) {
-            $char = $chars->peek();
+            $char = $source->peek();
             if ($char === null || !is_numeric($number . $char)) {
                 break;
             }
             $number .= $char;
-            $chars->next();
-            $column++;
+            $source->take();
         }
         return new Literal(str_contains($number, '.') ? (float)$number : (int)$number);
     }
 
     /**
-     * @param Peekable<string> $chars
-     * @param positive-int $line
-     * @param positive-int $column
+     * A string literal is the only token that may contain a real newline. Nothing here says so: the source counts
+     * lines as it is read, so a literal that spans several of them ends where it ends, and every token after it is
+     * still reported on the line it is written on.
+     *
      * @return Literal<string>
      */
-    private static function string(Peekable $chars, int $line, int &$column): Literal
+    private static function string(Source $source): Literal
     {
         $string = '';
         while (true) {
-            $char = $chars->peek();
+            $char = $source->take();
             if ($char === null) {
-                throw SyntaxError::create('Expected closing quote', Span::char($line, $column));
+                throw SyntaxError::create('Expected closing quote', $source->position()->span());
             }
             if ($char === '"') {
-                $chars->next();
-                $column++;
                 break;
             }
             $string .= $char;
-            $chars->next();
-            $column++;
         }
         return new Literal($string);
     }

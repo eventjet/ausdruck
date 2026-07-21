@@ -27,3 +27,14 @@
   named position says so: `Expected return type, got end of input` rather than `Expected type after colon`, and
   `Expected type for Foo, got ->` for a declaration in `TypeParser::parseDeclarations()`. Error messages are not
   covered by the backward-compatibility promise, but code matching on them will need updating.
+
+### Fixed
+
+- Tokens are now located as wide as they are written rather than as wide as they print back, so an error at the end of
+  the input points just past the whole last token instead of somewhere inside it. `{name` is reported at column 6
+  instead of column 3. This was most visible after a number literal that does not round-trip: `[007` reported column 3
+  — a column the input has not even reached — and now reports 5, and `[1, 2.50` reported 8 and now reports 9. The same
+  correction applies to the span of the token itself, so `list<1.50>` underlines all four columns of the literal.
+
+- A string literal written across two lines no longer throws off the line number of every token after it. In
+  `["a`, newline, `b", &]` the `&` is now reported on line 2, where it is written, rather than line 1.
