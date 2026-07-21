@@ -128,7 +128,7 @@ enum Precedence: int
             Token::And => self::And,
             Token::TripleEquals, Token::NotEquals, Token::CloseAngle, Token::OpenAngle,
             Token::GreaterThanEquals, Token::LessThanEquals => self::Comparison,
-            Token::Minus => self::Additive,
+            Token::Plus, Token::Minus => self::Additive,
             default => throw new LogicException(sprintf('%s is not a binary operator', $token->value)),
         };
     }

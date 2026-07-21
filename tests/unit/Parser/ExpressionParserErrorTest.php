@@ -68,6 +68,10 @@ final class ExpressionParserErrorTest extends TestCase
             'Expected ), got end of input',
         ];
         yield 'missing right hand side of minus' => ['foo:int -'];
+        yield 'missing right hand side of plus' => ['foo:int +'];
+        yield 'missing left hand side of plus' => ['+ foo:int', 'Expected expression, got +'];
+        // Unlike -, + is not a unary operator.
+        yield 'plus as a sign' => ['a:int + + 2', 'Expected expression, got +'];
         yield 'empty string' => ['', 'Expected expression, got end of input'];
         yield 'missing left hand side of >' => ['> foo:int'];
         yield 'missing right hand side of >' => ['foo:int >'];
@@ -162,6 +166,11 @@ final class ExpressionParserErrorTest extends TestCase
         yield 'subtract string from string' => ['foo:string - bar:string', 'Can\'t subtract string from string'];
         yield 'subtract string from int' => ['foo:int - bar:string', 'Can\'t subtract string from int'];
         yield 'subtract int from string' => ['foo:string - bar:int', 'Can\'t subtract int from string'];
+        yield 'add float to int' => ['foo:int + bar:float', 'Can\'t add float to int'];
+        yield 'add int to float' => ['foo:float + bar:int', 'Can\'t add int to float'];
+        yield 'add string to string' => ['foo:string + bar:string', 'Can\'t add string to string'];
+        yield 'add string to int' => ['foo:int + bar:string', 'Can\'t add string to int'];
+        yield 'add int to string' => ['foo:string + bar:int', 'Can\'t add int to string'];
         yield 'int > float' => ['foo:int > bar:float', 'Can\'t compare int to float'];
         yield 'float > int' => ['foo:float > bar:int', 'Can\'t compare float to int'];
         yield 'string > string' => ['foo:string > bar:string', 'Can\'t compare string to string'];
@@ -517,6 +526,10 @@ final class ExpressionParserErrorTest extends TestCase
             ],
             [
                 '"foo" === 72 - 23',
+                '          =======',
+            ],
+            [
+                '"foo" === 72 + 23',
                 '          =======',
             ],
             [

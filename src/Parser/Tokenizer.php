@@ -62,6 +62,7 @@ final class Tokenizer
                 ')' => Token::CloseParen,
                 ':' => Token::Colon,
                 ',' => Token::Comma,
+                '+' => Token::Plus,
                 '[' => Token::OpenBracket,
                 ']' => Token::CloseBracket,
                 '{' => Token::OpenBrace,

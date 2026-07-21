@@ -67,6 +67,7 @@ Both operands must be of the same type.
 | `===`    | Equality              | `foo:string === "bar"`   |                                           |
 | `!==`    | Inequality            | `foo:string !== "bar"`   |                                           |
 | `-`      | Subtraction           | `foo:int - bar:int`      | Operands must be of type `int` or `float` |
+| `+`      | Addition              | `foo:int + bar:int`      | Operands must be of type `int` or `float` |
 | `>`      | Greater than          | `foo:int > bar:int`      | Operands must be of type `int` or `float` |
 | `>=`     | Greater than or equal | `foo:int >= bar:int`     | Operands must be of type `int` or `float` |
 | `<`      | Less than             | `foo:int < bar:int`      | Operands must be of type `int` or `float` |
@@ -78,6 +79,21 @@ Equality is spelled `===`, so inequality is `!==`; there is no `==` or `!=`.
 
 Where's the rest? We're implementing more as we need them.
 
+#### Int overflow
+
+PHP's `int` arithmetic isn't closed: a sum or difference past the `int` range evaluates to a `float` rather than
+wrapping. An `int`-typed expression that answered one would be handing back a value of a type it doesn't have, so each
+operator decides up front whether its result exists and fails evaluation when it doesn't:
+
+```
+a:int + b:int
+```
+
+with `a` at `PHP_INT_MAX` and `b` at `1` is an evaluation error, not `9.2233720368548E+18`. `-` and unary `-` work the
+same way. Evaluating an `int`-typed expression therefore gives you an `int` or nothing at all — the widened value is
+never computed, so it can't reach a caller or quietly widen the operator above it either. `float` arithmetic has no
+such wall: it goes to `INF`, as it does in PHP.
+
 #### Precedence
 
 Operators bind from tightest to loosest in this order:
@@ -86,13 +102,14 @@ Operators bind from tightest to loosest in this order:
 |-------------------------------------|-----------------|
 | `.` (field, method)                 | Left            |
 | `-` (negation)                      | Right           |
-| `-` (subtraction)                   | Left            |
+| `-` (subtraction), `+`              | Left            |
 | `===`, `!==`, `>`, `>=`, `<`, `<=`  | Non-associative |
 | `&&`                                | Left            |
 | `\|\|`                              | Left            |
 
 As in most languages, `&&` binds tighter than `||`, so `a:bool && b:bool || c:bool` means
-`(a:bool && b:bool) || c:bool`, and `a:int - b:int - c:int` means `(a:int - b:int) - c:int`.
+`(a:bool && b:bool) || c:bool`. Operators that share a level are left-associative across it:
+`a:int - b:int + c:int` means `(a:int - b:int) + c:int`.
 
 The comparison operators are non-associative: `a:int > b:int > c:int` is a syntax error rather than a comparison
 against the `bool` that the first comparison produces. Chain with `&&` instead.

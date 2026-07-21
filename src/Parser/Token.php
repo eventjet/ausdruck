@@ -30,6 +30,7 @@ enum Token: string
     case Comma = ',';
     case Colon = ':';
     case Minus = '-';
+    case Plus = '+';
     case Arrow = '->';
 
     /**
