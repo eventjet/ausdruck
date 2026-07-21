@@ -11,10 +11,10 @@ use function implode;
 use function sprintf;
 
 /**
- * A name applied to type arguments, e.g. `map<T, U>` or a bare `int`. {@see self::keyValue()}, {@see self::function()}
- * and {@see self::struct()} build the three shapes that don't read this way: {@see FieldTypeNode},
- * {@see FunctionTypeNode} and {@see StructTypeNode} are their own classes because each carries parts -- a field's name
- * and type, a function's return type and binder, a struct's fields -- that nothing here has anywhere to put.
+ * A name applied to type arguments, e.g. `map<T, U>` or a bare `int`. {@see FieldTypeNode}, {@see FunctionTypeNode}
+ * and {@see StructTypeNode} are their own classes, built directly by {@see TypeParser} rather than through a factory
+ * here, because each carries parts -- a field's name and type, a function's return type and binder, a struct's
+ * fields -- that nothing here has anywhere to put.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -29,28 +29,6 @@ class TypeNode implements Stringable
         public readonly array $args,
         public readonly Span $location,
     ) {
-    }
-
-    /**
-     * @param list<FieldTypeNode> $fields
-     */
-    public static function struct(array $fields, Span $location): StructTypeNode
-    {
-        return new StructTypeNode($fields, $location);
-    }
-
-    public static function keyValue(self $key, self $value): FieldTypeNode
-    {
-        return new FieldTypeNode($key, $value);
-    }
-
-    /**
-     * @param list<self> $parameters
-     * @param list<self> $typeParameters
-     */
-    public static function function(array $parameters, self $returnType, array $typeParameters, Span $location): FunctionTypeNode
-    {
-        return new FunctionTypeNode($parameters, $returnType, $typeParameters, $location);
     }
 
     #[Override]

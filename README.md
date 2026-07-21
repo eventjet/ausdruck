@@ -234,8 +234,9 @@ no binder declares is not a variable: it is an alias, or an error.
 That's enforced for a signature written as a type string, where only a `fn<...>` binder can introduce a name that
 resolves to a variable. `Type::var()` itself does not enforce it: nothing stops you from building one directly and
 using it outside of any `fn()` you build alongside it. Doing that produces a variable no binder ever quantifies, which
-is inert rather than invalid — it is never a subtype of anything, including itself, and a call can never bind it to a
-concrete type. Keep every `Type::var()` inside the `fn()` whose binder is meant to quantify it.
+is still a variable everywhere else — it type-checks like any other type until it has to be printed. There, it breaks:
+printing it gives back a name (`list<T>`, say) that parsing rejects, because nothing declared `T`. Keep every
+`Type::var()` inside the `fn()` whose binder is meant to quantify it.
 
 Because the call site decides them, the inline return type is rarely worth writing: `foo:list<string>.head()` is
 already an `Option<string>`. Writing one anyway is still allowed, and is then checked against the inferred one.

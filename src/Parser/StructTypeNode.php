@@ -11,7 +11,7 @@ use function sprintf;
 
 /**
  * A struct type, `{ name: string }`: written as its fields between `{ }` rather than a name and its arguments between
- * `< >`, so it's the one shape with no name of its own. {@see TypeNode::struct()} builds one, and
+ * `< >`, so it's the one shape with no name of its own. {@see TypeParser} builds one, and
  * {@see TypeResolution::resolveStruct()} is the one place that reads $fields.
  *
  * @internal
@@ -32,6 +32,6 @@ final class StructTypeNode extends TypeNode
     #[Override]
     public function __toString(): string
     {
-        return $this->fields === [] ? '' : sprintf('{ %s }', implode(', ', $this->fields));
+        return $this->fields === [] ? '{}' : sprintf('{ %s }', implode(', ', $this->fields));
     }
 }

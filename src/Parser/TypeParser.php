@@ -219,7 +219,7 @@ final class TypeParser
                 $returnType->location(),
             );
         }
-        return TypeNode::function($params, $returnType, $typeParameters, $fnLocation->to($returnType->location));
+        return new FunctionTypeNode($params, $returnType, $typeParameters, $fnLocation->to($returnType->location));
     }
 
     /**
@@ -233,7 +233,7 @@ final class TypeParser
      * lives too.
      *
      * @param Peekable<ParsedToken> $tokens
-     * @return list<TypeNode>
+     * @return list<Identifier>
      */
     private static function parseTypeParameters(Peekable $tokens): array
     {
@@ -258,7 +258,7 @@ final class TypeParser
                 );
             }
             $tokens->next();
-            $parameters[] = new TypeNode($name, [], $parsedToken->location());
+            $parameters[] = new Identifier($name, $parsedToken->location());
             if ($tokens->peek()?->token !== Token::Comma) {
                 break;
             }
@@ -317,7 +317,7 @@ final class TypeParser
                     $type->location(),
                 );
             }
-            $fields[] = TypeNode::keyValue(new TypeNode($name, [], $nameToken->location()), $type);
+            $fields[] = new FieldTypeNode(new Identifier($name, $nameToken->location()), $type);
             $token = $tokens->peek();
             if ($token?->token !== Token::Comma) {
                 break;
@@ -325,6 +325,6 @@ final class TypeParser
             $tokens->next();
         }
         $end = self::expect($tokens, Token::CloseBrace)->location();
-        return TypeNode::struct($fields, $start->to($end));
+        return new StructTypeNode($fields, $start->to($end));
     }
 }

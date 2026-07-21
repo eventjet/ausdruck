@@ -1,0 +1,6 @@
+foo:fn(fn<T>(T) -> T) -> int
+-- Type error --
+A function type nested inside another one can't bind type variables of its own: a variable is quantified once, by whichever function type encloses it
+-- Note --
+The outer fn has no binder of its own here, so there's no enclosing scope for T to belong to even by coincidence --
+this is the plain case of a nested fn<...> being written at all, not a name collision with an outer binder.

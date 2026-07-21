@@ -16,14 +16,16 @@ use function sprintf;
 
 /**
  * One resolution of a {@see TypeNode} against a scope: the aliases {@see Types} was built with, and the type
- * variables the `fn<...>` binders enclosing the node being resolved have introduced so far. Both are names that
+ * variables the `fn<...>` binder enclosing the node being resolved has introduced, if any. Both are names that
  * resolve to a type rather than being one, which is why they're carried together instead of the aliases living on
  * {@see Types} and the variables being threaded through as a parameter—a binder can only tell whether the name it
  * wants to introduce is free to introduce by asking both at once; see {@see self::checkTypeVariable()}.
  *
- * {@see self::resolveFunction()} is the only place the scope changes, and it changes it by resolving the binder's
- * parameters and return type in a new instance with the binder's names added, rather than by mutating this one: a
- * binder is the whole of a variable's scope, so nothing a sibling subtree resolves afterward should see it.
+ * A variable is quantified once, at the top of the signature it belongs to—see {@see Type::var()}—so a function type
+ * nested inside another one's parameters or return type can never carry a binder of its own: {@see
+ * self::resolveFunction()} rejects one outright rather than letting an inner `fn<...>` shadow or extend the outer
+ * scope. $nestedInFunction is how it knows whether it's already inside a function type's scope; $typeVariables itself
+ * only ever grows once, when the one binder a signature is allowed to have is resolved.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck\Parser
@@ -37,6 +39,7 @@ final class TypeResolution
     public function __construct(
         private readonly array $aliases,
         private readonly array $typeVariables = [],
+        private readonly bool $nestedInFunction = false,
     ) {
     }
 
@@ -211,9 +214,23 @@ final class TypeResolution
      * A function type is the one type that binds names of its own: the `<T, U>` in front of its parameters says which
      * of the names inside it the call site decides rather than the declaration. The binder is in scope for the
      * parameters and the return type alike, so a fresh resolution with the binder's names added is what resolves both.
+     *
+     * A binder only makes sense at the top of the signature it quantifies—see {@see Type::var()}—so $node is rejected
+     * outright if it has one of its own while already nested inside another function type's parameters or return
+     * type. Without that rule, a nested `fn<...>` would parse into a {@see Type} with nowhere to record where the
+     * binder was written, and whichever signature encloses the whole type would silently inherit it instead.
      */
     private function resolveFunction(FunctionTypeNode $node): Type|TypeError
     {
+        if ($this->nestedInFunction && $node->typeParameters !== []) {
+            $first = $node->typeParameters[0];
+            $last = $node->typeParameters[array_key_last($node->typeParameters)];
+            return TypeError::create(
+                'A function type nested inside another one can\'t bind type variables of its own: a variable is '
+                    . 'quantified once, by whichever function type encloses it',
+                $first->location->to($last->location),
+            );
+        }
         $typeVariables = $this->typeVariables;
         foreach ($node->typeParameters as $parameter) {
             $error = $this->checkTypeVariable($parameter, $typeVariables);
@@ -222,7 +239,7 @@ final class TypeResolution
             }
             $typeVariables[$parameter->name] = true;
         }
-        $inner = new self($this->aliases, $typeVariables);
+        $inner = new self($this->aliases, $typeVariables, nestedInFunction: true);
         $argTypes = [];
         foreach ($node->args as $arg) {
             $argType = $inner->resolve($arg);
@@ -253,15 +270,16 @@ final class TypeResolution
 
     /**
      * A binder introduces a name, so the name has to be free to introduce: one the language already spells is a type
-     * rather than a placeholder for one, one an enclosing binder already introduced would make two different variables
-     * answer to the same name, and one an alias already names is a type just as much as a built-in constructor is.
+     * rather than a placeholder for one, one this same binder already declared would make two parameters answer to
+     * the same name, and one an alias already names is a type just as much as a built-in constructor is. An enclosing
+     * binder is never in question here—{@see self::resolveFunction()} rejects a nested one before it ever declares a
+     * name to collide with.
      *
-     * @param array<string, true> $typeVariables The names declared so far in the binder $parameter belongs to,
-     *     including the ones an enclosing binder introduced—which starts out the same as $this->typeVariables and
+     * @param array<string, true> $typeVariables The names declared so far in the binder $parameter belongs to, which
      *     grows as {@see self::resolveFunction()} works through the binder's parameters, so that two variables in one
-     *     binder can't answer to the same name either.
+     *     binder can't answer to the same name.
      */
-    private function checkTypeVariable(TypeNode $parameter, array $typeVariables): TypeError|null
+    private function checkTypeVariable(Identifier $parameter, array $typeVariables): TypeError|null
     {
         if (TypeConstructor::tryFrom($parameter->name) !== null) {
             return TypeError::create(TypeConstructor::reservedNameMessage($parameter->name), $parameter->location);

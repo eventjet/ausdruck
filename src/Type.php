@@ -13,7 +13,6 @@ use function array_is_list;
 use function array_key_exists;
 use function array_key_first;
 use function array_map;
-use function array_shift;
 use function array_slice;
 use function array_values;
 use function assert;
@@ -214,29 +213,6 @@ final class Type implements Stringable
         return [self::fromValue($firstKey), self::fromValue($value[$firstKey])];
     }
 
-    /**
-     * The `<T, U>` a function type with free variables prints itself with, one place for every name it's ever
-     * referred to by within this signature, in the order each is first read left to right -- parameters before the
-     * return type, the order the signature itself is written in. Empty when there is nothing to quantify, which is
-     * every function type once {@see Signature::instantiateForCall()} has substituted it.
-     */
-    private static function binder(self $func): string
-    {
-        // args[0] is the return type and the rest are parameters -- see {@see self::func()} -- but the signature is
-        // written parameters first, so that's the order first occurrence is read in too.
-        $returnType = $func->args[0];
-        $parameters = array_slice($func->args, 1);
-        $names = [];
-        foreach ([...$parameters, $returnType] as $node) {
-            foreach ($node->freeVariableNames() as $name) {
-                if (!in_array($name, $names, true)) {
-                    $names[] = $name;
-                }
-            }
-        }
-        return $names === [] ? '' : sprintf('<%s>', implode(', ', $names));
-    }
-
     #[Override]
     public function __toString(): string
     {
@@ -366,11 +342,13 @@ final class Type implements Stringable
      * to -- doesn't decide the variable there no matter when it's walked. A function that accepts anything trivially
      * accepts whatever that variable turns out to be, which is exactly what {@see self::isSubtypeOf()}'s own Func case
      * already relies on when the *declared* parameter is `any`; here it's the value's parameter that is, and the
-     * variable is left for a later, real parameter -- or the receiver, walked first below -- to decide. See
-     * {@see Signature::instantiateForCall()} for why first-wins is the useful half of the two everywhere else.
+     * variable is left for a later, real parameter -- or the receiver, one of {@see Signature::parameterTypes()},
+     * walked before the arguments a call passes -- to decide instead. See {@see Signature::instantiateForCall()} for
+     * why first-wins is the useful half of the two everywhere else.
      *
      * This is the recursive walk that applies to any type, not just a function's parameters, which is why it lives
-     * here rather than on {@see Signature}; nothing outside the type system should call it directly.
+     * here rather than on {@see Signature}; nothing outside the type system should call it directly. The Func case
+     * itself is {@see self::bindFunction()}, read through {@see Signature} rather than {@see self::$args} directly.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -391,15 +369,14 @@ final class Type implements Stringable
         if ($self->name !== $actual->name) {
             return $bindings;
         }
+        if ($self->name === 'Func') {
+            return $self->bindFunction($actual, $bindings);
+        }
         // Two types of the same shape can still be of different sizes: a lambda declares fewer parameters than the
         // signature asks for, and a struct is written with fewer fields than one reaches into. What the two have in
         // common is what there is to learn from.
         foreach (array_slice($self->args, 0, count($actual->args)) as $index => $arg) {
-            $actualArg = $actual->args[$index];
-            if ($self->name === 'Func' && $index > 0 && $actualArg->canonical()->name === 'any') {
-                continue;
-            }
-            $bindings = $arg->bind($actualArg, $bindings);
+            $bindings = $arg->bind($actual->args[$index], $bindings);
         }
         foreach (array_intersect_key($self->fields, $actual->fields) as $name => $field) {
             $bindings = $field->bind($actual->fields[$name], $bindings);
@@ -430,6 +407,45 @@ final class Type implements Stringable
     }
 
     /**
+     * The `<T, U>` a function type with free variables prints itself with, one place for every name it's ever
+     * referred to by within this signature, in the order each is first read left to right -- parameters before the
+     * return type, the order the signature itself is written in. Empty when there is nothing to quantify, which is
+     * every function type once {@see Signature::instantiateForCall()} has substituted it. $this must already be
+     * canonical and named 'Func'; call {@see self::toString()} instead.
+     */
+    private function binder(): string
+    {
+        $names = $this->freeVariableNames();
+        return $names === [] ? '' : sprintf('<%s>', implode(', ', $names));
+    }
+
+    /**
+     * {@see self::bind()}'s Func case, read through {@see Signature} instead of {@see self::$args}' return-type-first
+     * layout: the return type always binds, and a parameter binds unless $actual's own parameter in that position is
+     * `any`, which is every {@see Lambda} parameter -- see {@see self::bind()}'s own docblock for why that's the rule
+     * rather than a position. $this must already be canonical and named 'Func'; call {@see self::bind()} instead.
+     *
+     * @param array<string, self> $bindings
+     * @return array<string, self>
+     */
+    private function bindFunction(self $actual, array $bindings): array
+    {
+        $signature = $this->asFunction();
+        $actualSignature = $actual->asFunction();
+        assert($signature !== null && $actualSignature !== null);
+        $bindings = $signature->returnType()->bind($actualSignature->returnType(), $bindings);
+        $actualParameters = $actualSignature->parameterTypes();
+        foreach ($signature->parameterTypes() as $index => $parameter) {
+            $actualParameter = $actualParameters[$index] ?? null;
+            if ($actualParameter === null || $actualParameter->canonical()->name === 'any') {
+                continue;
+            }
+            $bindings = $parameter->bind($actualParameter, $bindings);
+        }
+        return $bindings;
+    }
+
+    /**
      * $withBinder is false for every call {@see self::__toString()} doesn't make itself: a nested function type prints
      * without one because its variables were never its own to quantify -- they're quantified once, by whichever
      * enclosing signature's binder introduced them, per {@see self::var()}.
@@ -437,6 +453,9 @@ final class Type implements Stringable
     private function toString(bool $withBinder): string
     {
         if ($this->name === 'Struct') {
+            if ($this->fields === []) {
+                return '{}';
+            }
             $fields = [];
             foreach ($this->fields as $name => $fieldType) {
                 $fields[] = $name . ': ' . $fieldType->toString(false);
@@ -444,12 +463,14 @@ final class Type implements Stringable
             return '{ ' . implode(', ', $fields) . ' }';
         }
         if ($this->name === 'Func') {
-            assert(count($this->args) > 0);
-            $args = $this->args;
-            $returnType = array_shift($args);
-            $binder = $withBinder ? self::binder($this) : '';
-            $params = array_map(static fn(self $arg): string => $arg->toString(false), $args);
-            return sprintf('fn%s(%s) -> %s', $binder, implode(', ', $params), $returnType->toString(false));
+            $signature = $this->asFunction();
+            assert($signature !== null);
+            $binder = $withBinder ? $this->binder() : '';
+            $params = array_map(
+                static fn(self $arg): string => $arg->toString(false),
+                $signature->parameterTypes(),
+            );
+            return sprintf('fn%s(%s) -> %s', $binder, implode(', ', $params), $signature->returnType()->toString(false));
         }
         if ($this->args === []) {
             return $this->name;
@@ -459,10 +480,13 @@ final class Type implements Stringable
     }
 
     /**
-     * The names of every variable reachable from this type, in first-occurrence order. A struct's fields and an
-     * alias's own arguments are walked the same way its args are; what the alias stands for is not, because a
-     * variable can only be free within the one signature that quantifies it, and an alias is never written inside a
-     * binder's scope -- see {@see self::substitute()} for the one place that does have to see through the alias.
+     * The names of every variable reachable from this type, in first-occurrence order -- a function type's parameters
+     * before its return type, the order its own signature is written in; anything else in the order its args are
+     * stored. A struct's fields and an alias's own arguments are walked the same way its args are; what the alias
+     * stands for is not, because a variable can only be free within the one signature that quantifies it, and an
+     * alias is never written inside a binder's scope -- see {@see self::substitute()} for the one place that does
+     * have to see through the alias. $this->name is never 'Func' while $this is such an alias, since {@see self::func()}
+     * is the only thing that names a type 'Func' and it never sets $aliasFor.
      *
      * @return list<string>
      */
@@ -471,8 +495,12 @@ final class Type implements Stringable
         if ($this->isVariable) {
             return [$this->name];
         }
+        $signature = $this->name === 'Func' ? $this->asFunction() : null;
+        $children = $signature !== null
+            ? [...$signature->parameterTypes(), $signature->returnType()]
+            : [...$this->args, ...array_values($this->fields)];
         $names = [];
-        foreach ([...$this->args, ...array_values($this->fields)] as $child) {
+        foreach ($children as $child) {
             foreach ($child->freeVariableNames() as $name) {
                 if (!in_array($name, $names, true)) {
                     $names[] = $name;

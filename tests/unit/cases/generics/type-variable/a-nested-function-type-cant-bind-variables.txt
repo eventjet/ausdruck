@@ -1,0 +1,7 @@
+foo:fn<T>(fn<T>(T) -> T) -> T
+-- Type error --
+A function type nested inside another one can't bind type variables of its own: a variable is quantified once, by whichever function type encloses it
+-- Note --
+A variable is quantified once, at the top of the signature it belongs to. The inner fn<T> is rejected for being
+nested at all -- reusing the outer's own name is beside the point, since a fresh name is rejected exactly the same
+way; see the sibling case next to this one.
