@@ -8,6 +8,7 @@ use Eventjet\Ausdruck\Add;
 use Eventjet\Ausdruck\And_;
 use Eventjet\Ausdruck\Call;
 use Eventjet\Ausdruck\ComparisonOperator;
+use Eventjet\Ausdruck\Divide;
 use Eventjet\Ausdruck\Expr;
 use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\FieldAccess;
@@ -15,6 +16,7 @@ use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Lambda;
 use Eventjet\Ausdruck\ListLiteral;
 use Eventjet\Ausdruck\Literal;
+use Eventjet\Ausdruck\Modulo;
 use Eventjet\Ausdruck\Multiply;
 use Eventjet\Ausdruck\Negative;
 use Eventjet\Ausdruck\Or_;
@@ -59,6 +61,14 @@ final class ExpressionComparisonTest extends TestCase
         yield [
             Expr::multiply(Expr::literal(1), Expr::literal(2)),
             Expr::multiply(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield [
+            Expr::divide(Expr::literal(1), Expr::literal(2)),
+            Expr::divide(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield [
+            Expr::modulo(Expr::literal(1), Expr::literal(2)),
+            Expr::modulo(Expr::literal(1), Expr::literal(2)),
         ];
         yield [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
@@ -240,6 +250,30 @@ final class ExpressionComparisonTest extends TestCase
         yield Multiply::class . ': multiplier is different' => [
             Expr::multiply(Expr::literal(1), Expr::literal(2)),
             Expr::multiply(Expr::literal(1), Expr::literal(1)),
+        ];
+        yield Multiply::class . ' and ' . Divide::class => [
+            Expr::multiply(Expr::literal(1), Expr::literal(2)),
+            Expr::divide(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield Divide::class . ': dividend is different' => [
+            Expr::divide(Expr::literal(1), Expr::literal(2)),
+            Expr::divide(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield Divide::class . ': divisor is different' => [
+            Expr::divide(Expr::literal(1), Expr::literal(2)),
+            Expr::divide(Expr::literal(1), Expr::literal(1)),
+        ];
+        yield Divide::class . ' and ' . Modulo::class => [
+            Expr::divide(Expr::literal(1), Expr::literal(2)),
+            Expr::modulo(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield Modulo::class . ': dividend is different' => [
+            Expr::modulo(Expr::literal(1), Expr::literal(2)),
+            Expr::modulo(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield Modulo::class . ': divisor is different' => [
+            Expr::modulo(Expr::literal(1), Expr::literal(2)),
+            Expr::modulo(Expr::literal(1), Expr::literal(1)),
         ];
         yield Call::class . ': target is different' => [
             Expr::literal(1)->call('foo', Type::int(), []),

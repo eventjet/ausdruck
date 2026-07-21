@@ -130,7 +130,7 @@ enum Precedence: int
             Token::TripleEquals, Token::NotEquals, Token::CloseAngle, Token::OpenAngle,
             Token::GreaterThanEquals, Token::LessThanEquals => self::Comparison,
             Token::Plus, Token::Minus => self::Additive,
-            Token::Asterisk => self::Multiplicative,
+            Token::Asterisk, Token::Slash, Token::Percent => self::Multiplicative,
             default => throw new LogicException(sprintf('%s is not a binary operator', $token->value)),
         };
     }

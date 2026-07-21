@@ -1,0 +1,7 @@
+(i:int % 3).unwrap:int() === 0
+-- Input --
+{
+  i: 9,
+}
+-- Output --
+true

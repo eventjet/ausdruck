@@ -62,29 +62,51 @@ See [Types](#types)
 
 Both operands must be of the same type.
 
-| Operator | Description           | Example                  | Note                                      |
-|----------|-----------------------|--------------------------|-------------------------------------------|
-| `===`    | Equality              | `foo:string === "bar"`   |                                           |
-| `!==`    | Inequality            | `foo:string !== "bar"`   |                                           |
-| `-`      | Subtraction           | `foo:int - bar:int`      | Operands must be of type `int` or `float` |
-| `+`      | Addition              | `foo:int + bar:int`      | Operands must be of type `int` or `float` |
-| `*`      | Multiplication        | `foo:int * bar:int`      | Operands must be of type `int` or `float` |
-| `>`      | Greater than          | `foo:int > bar:int`      | Operands must be of type `int` or `float` |
-| `>=`     | Greater than or equal | `foo:int >= bar:int`     | Operands must be of type `int` or `float` |
-| `<`      | Less than             | `foo:int < bar:int`      | Operands must be of type `int` or `float` |
-| `<=`     | Less than or equal    | `foo:int <= bar:int`     | Operands must be of type `int` or `float` |
-| `\|\|`   | Logical OR            | `foo:bool \|\| bar:bool` | Operands must be of type `bool`           |
-| &&       | Logical AND           | `foo:bool && bar:bool`   | Operands must be of type `bool`           |
+| Operator | Description           | Example                  | Note                                            |
+|----------|-----------------------|--------------------------|-------------------------------------------------|
+| `===`    | Equality              | `foo:string === "bar"`   |                                                 |
+| `!==`    | Inequality            | `foo:string !== "bar"`   |                                                 |
+| `-`      | Subtraction           | `foo:int - bar:int`      | Operands must be of type `int` or `float`       |
+| `+`      | Addition              | `foo:int + bar:int`      | Operands must be of type `int` or `float`       |
+| `*`      | Multiplication        | `foo:int * bar:int`      | Operands must be of type `int` or `float`       |
+| `/`      | Division              | `foo:int / bar:int`      | See [Division and modulo](#division-and-modulo) |
+| `%`      | Modulo                | `foo:int % bar:int`      | See [Division and modulo](#division-and-modulo) |
+| `>`      | Greater than          | `foo:int > bar:int`      | Operands must be of type `int` or `float`       |
+| `>=`     | Greater than or equal | `foo:int >= bar:int`     | Operands must be of type `int` or `float`       |
+| `<`      | Less than             | `foo:int < bar:int`      | Operands must be of type `int` or `float`       |
+| `<=`     | Less than or equal    | `foo:int <= bar:int`     | Operands must be of type `int` or `float`       |
+| `\|\|`   | Logical OR            | `foo:bool \|\| bar:bool` | Operands must be of type `bool`                 |
+| &&       | Logical AND           | `foo:bool && bar:bool`   | Operands must be of type `bool`                 |
 
 Equality is spelled `===`, so inequality is `!==`; there is no `==` or `!=`.
 
 Where's the rest? We're implementing more as we need them.
 
+#### Division and modulo
+
+Like the other arithmetic operators, `/` and `%` take two operands of the same numeric type — but the result is an
+`Option` of that type: `int / int` is an `Option<int>`. A zero divisor makes it `none` rather than an error, and `/`
+has a second `none`: `PHP_INT_MIN / -1`, the one `int` quotient that doesn't fit in an `int`. `%` doesn't share it —
+`PHP_INT_MIN % -1` is `0`, a remainder like any other. Get at the value the same way you would with `head`:
+
+```
+(a:int / b:int).unwrap:int()
+(a:int / b:int).isSome:bool()
+(i:int % 3).unwrap:int() === 0
+```
+
+`unwrap` fails evaluation on `none`, so use it where a zero divisor can't happen or should be loud; check with
+`isSome` where it's a case to handle. Because the result is an `Option`, it doesn't chain into further arithmetic or
+comparison without an `unwrap`: `a:int / b:int / c:int` is a type error.
+
+An `int` quotient truncates toward zero: `7 / 2` is `3`, and `-7 / 2` is `-3`. The remainder takes the dividend's
+sign: `-7 % 3` is `-1`. A `float` remainder is PHP's `fmod()`.
+
 #### Int overflow
 
 PHP's `int` arithmetic isn't closed: a sum, difference or product past the `int` range evaluates to a `float` rather
-than wrapping. An `int`-typed expression that answered one would be handing back a value of a type it doesn't have, so each
-operator decides up front whether its result exists and fails evaluation when it doesn't:
+than wrapping. An `int`-typed expression that answered one would be handing back a value of a type it doesn't have, so
+each operator decides up front whether its result exists and fails evaluation when it doesn't:
 
 ```
 a:int + b:int
@@ -92,27 +114,31 @@ a:int + b:int
 
 with `a` at `PHP_INT_MAX` and `b` at `1` is an evaluation error, not `9.2233720368548E+18`. `-`, `*` and unary `-` work
 the same way. Evaluating an `int`-typed expression therefore gives you an `int` or nothing at all — the widened value is
-never computed, so it can't reach a caller or quietly widen the operator above it either. `float` arithmetic has no
-such wall: it goes to `INF`, as it does in PHP.
+never computed, so it can't reach a caller or quietly widen the operator above it either.
+
+Overflow is not an `Option` case. `/` and `%` give `none` where the operands are fine but the result doesn't exist — a
+zero divisor, or `PHP_INT_MIN / -1` — which is a case worth handling in an expression. A sum that leaves the range is
+instead a mismatch between the values and the type they were declared with, so it's an error to fix rather than a branch
+to write. `float` arithmetic has neither: it goes to `INF`, as it does in PHP.
 
 #### Precedence
 
 Operators bind from tightest to loosest in this order:
 
-| Operator                            | Associativity   |
-|-------------------------------------|-----------------|
-| `.` (field, method)                 | Left            |
-| `-` (negation)                      | Right           |
-| `*`                                 | Left            |
-| `-` (subtraction), `+`              | Left            |
-| `===`, `!==`, `>`, `>=`, `<`, `<=`  | Non-associative |
-| `&&`                                | Left            |
-| `\|\|`                              | Left            |
+| Operator                           | Associativity   |
+|------------------------------------|-----------------|
+| `.` (field, method)                | Left            |
+| `-` (negation)                     | Right           |
+| `*`, `/`, `%`                      | Left            |
+| `-` (subtraction), `+`             | Left            |
+| `===`, `!==`, `>`, `>=`, `<`, `<=` | Non-associative |
+| `&&`                               | Left            |
+| `\|\|`                             | Left            |
 
 As in most languages, `&&` binds tighter than `||`, so `a:bool && b:bool || c:bool` means
-`(a:bool && b:bool) || c:bool`; `*` binds tighter than `+` and binary `-`, so `a:int + b:int * c:int` means
-`a:int + (b:int * c:int)`. Operators that share a level are left-associative across it: `a:int - b:int + c:int` means
-`(a:int - b:int) + c:int`.
+`(a:bool && b:bool) || c:bool`; `*`, `/` and `%` bind tighter than `+` and binary `-`, so `a:int + b:int * c:int`
+means `a:int + (b:int * c:int)`. Operators that share a level are left-associative across it:
+`a:int - b:int + c:int` means `(a:int - b:int) + c:int`.
 
 The comparison operators are non-associative: `a:int > b:int > c:int` is a syntax error rather than a comparison
 against the `bool` that the first comparison produces. Chain with `&&` instead.
@@ -126,7 +152,7 @@ a:bool && (b:bool || c:bool)
 (a:int - b:int) - c:int
 (a:int + b:int) * c:int
 (a:int > b:int) === c:bool
-(a:int - b:int).abs:int()
+(a:int / b:int).unwrap:int()
 ```
 
 Parentheses only group; they add no node of their own. Redundant ones — a group the precedence would have produced

@@ -64,6 +64,8 @@ final class Tokenizer
                 ',' => Token::Comma,
                 '+' => Token::Plus,
                 '*' => Token::Asterisk,
+                '/' => Token::Slash,
+                '%' => Token::Percent,
                 '[' => Token::OpenBracket,
                 ']' => Token::CloseBracket,
                 '{' => Token::OpenBrace,
