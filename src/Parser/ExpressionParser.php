@@ -147,17 +147,29 @@ final class ExpressionParser
     }
 
     /**
-     * a:int - b:int - c:int
+     * a:int + b:int - c:int
      * =====================
+     *
+     * The loop is what makes this level left-associative: each operator folds what came before into its left operand.
+     * {@see self::parseComparison()} is otherwise the same shape with an if in place of the loop, which is what makes
+     * the six comparison operators non-associative; {@see \Eventjet\Ausdruck\Precedence::leftSlot()} reads that one
+     * difference back out when an expression is printed.
      */
     private function parseAdditive(): Expression
     {
         $left = $this->parseUnary();
-        while ($this->nextToken() === Token::Minus) {
+        while (true) {
+            $build = match ($this->nextToken()) {
+                Token::Plus => $left->add(...),
+                Token::Minus => $left->subtract(...),
+                default => null,
+            };
+            if ($build === null) {
+                return $left;
+            }
             $this->tokens->next();
-            $left = $left->subtract($this->parseUnary());
+            $left = $build($this->parseUnary());
         }
-        return $left;
     }
 
     /**

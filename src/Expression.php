@@ -28,6 +28,11 @@ abstract class Expression implements Stringable
         return Expr::subtract($this, $subtrahend);
     }
 
+    public function add(self $addend): Add
+    {
+        return Expr::add($this, $addend);
+    }
+
     public function gt(self $right): Gt
     {
         return Expr::gt($this, $right);

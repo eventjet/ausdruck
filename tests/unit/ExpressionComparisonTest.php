@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
+use Eventjet\Ausdruck\Add;
 use Eventjet\Ausdruck\And_;
 use Eventjet\Ausdruck\Call;
 use Eventjet\Ausdruck\ComparisonOperator;
@@ -49,6 +50,10 @@ final class ExpressionComparisonTest extends TestCase
         yield [
             Expr::subtract(Expr::literal(1), Expr::literal(2)),
             Expr::subtract(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield [
+            Expr::add(Expr::literal(1), Expr::literal(2)),
+            Expr::add(Expr::literal(1), Expr::literal(2)),
         ];
         yield [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
@@ -209,6 +214,19 @@ final class ExpressionComparisonTest extends TestCase
         yield Subtract::class . ': different type' => [
             Expr::subtract(Expr::literal(1), Expr::literal(2)),
             Expr::literal(1),
+        ];
+        yield Add::class . ': augend is different' => [
+            Expr::add(Expr::literal(1), Expr::literal(2)),
+            Expr::add(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield Add::class . ': addend is different' => [
+            Expr::add(Expr::literal(1), Expr::literal(2)),
+            Expr::add(Expr::literal(1), Expr::literal(1)),
+        ];
+        // The operands match, so only the operator tells the two apart.
+        yield Add::class . ' and ' . Subtract::class => [
+            Expr::add(Expr::literal(1), Expr::literal(2)),
+            Expr::subtract(Expr::literal(1), Expr::literal(2)),
         ];
         yield Call::class . ': target is different' => [
             Expr::literal(1)->call('foo', Type::int(), []),

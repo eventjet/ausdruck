@@ -85,6 +85,19 @@ final class ExpressionParserTest extends TestCase
                     Expr::get('c', Type::int()),
                 ),
             ],
+            // + and - share the additive level, so a chain mixing the two is still left-associative across it.
+            [
+                'a:int + b:int + c:int',
+                Expr::add(Expr::add(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
+            ],
+            [
+                'a:int + b:int - c:int',
+                Expr::subtract(Expr::add(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
+            ],
+            [
+                'a:int - b:int + c:int',
+                Expr::add(Expr::subtract(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
+            ],
             ['"💩"', Expr::literal('💩')],
             ['foo:map<string, int>', Expr::get('foo', Type::mapOf(Type::string(), Type::int()))],
             [
@@ -161,6 +174,10 @@ final class ExpressionParserTest extends TestCase
                 'a:int - -b:int',
                 Expr::subtract(Expr::get('a', $i), Expr::negative(Expr::get('b', $i))),
             ],
+            [
+                'a:int + -b:int',
+                Expr::add(Expr::get('a', $i), Expr::negative(Expr::get('b', $i))),
+            ],
             // Operators are allowed wherever an expression is expected, not just at the top level.
             [
                 '[1 - 2]',
@@ -220,6 +237,14 @@ final class ExpressionParserTest extends TestCase
             [
                 'a:int - (b:int - c:int)',
                 Expr::subtract(Expr::get('a', $i), Expr::subtract(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            [
+                'a:int + (b:int + c:int)',
+                Expr::add(Expr::get('a', $i), Expr::add(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            [
+                'a:int - (b:int + c:int)',
+                Expr::subtract(Expr::get('a', $i), Expr::add(Expr::get('b', $i), Expr::get('c', $i))),
             ],
             [
                 '-(a:int - b:int)',
@@ -285,6 +310,10 @@ final class ExpressionParserTest extends TestCase
             ['foo:int-2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
             ['foo:int -2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
             ['foo:int- 2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
+            // The plus doesn't double as a literal's sign the way the minus does, so whitespace has nothing to
+            // decide; it just must not matter.
+            ['foo:int+2', Expr::add(Expr::get('foo', Type::int()), Expr::literal(2))],
+            ['foo:int +2', Expr::add(Expr::get('foo', Type::int()), Expr::literal(2))],
             // Trailing commas are allowed in argument and list literal element lists.
             [
                 'foo:string.substr:string(0, 3,)',
@@ -336,6 +365,13 @@ final class ExpressionParserTest extends TestCase
                 Expr::subtract(
                     Expr::subtract(Expr::get('a', Type::int()), Expr::literal(1)),
                     Expr::literal(2),
+                ),
+            ],
+            [
+                '(a:int + b:int) + c:int',
+                Expr::add(
+                    Expr::add(Expr::get('a', Type::int()), Expr::get('b', Type::int())),
+                    Expr::get('c', Type::int()),
                 ),
             ],
             // A generic's closing angle glued to `===` or `!==`: the `>` must stay a bare close-angle instead of

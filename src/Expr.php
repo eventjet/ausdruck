@@ -130,13 +130,24 @@ final class Expr
 
     public static function subtract(Expression $minuend, Expression $subtrahend): Subtract
     {
-        // Which operand is at fault doesn't change how we name the mistake, only which one we point at.
+        // Which operand is at fault doesn't change how we name the mistake, only which one we point at. The same goes
+        // for the other arithmetic operators below.
         self::assertSameNumberType($minuend, $subtrahend, static fn(): string => sprintf(
             'Can\'t subtract %s from %s',
             $subtrahend->getType(),
             $minuend->getType(),
         ));
         return new Subtract($minuend, $subtrahend);
+    }
+
+    public static function add(Expression $augend, Expression $addend): Add
+    {
+        self::assertSameNumberType($augend, $addend, static fn(): string => sprintf(
+            'Can\'t add %s to %s',
+            $addend->getType(),
+            $augend->getType(),
+        ));
+        return new Add($augend, $addend);
     }
 
     public static function gt(Expression $left, Expression $right): Gt

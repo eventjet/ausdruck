@@ -114,9 +114,16 @@ final class ExpressionTest extends TestCase
             ['nums:list<int>.some:bool(|item| item:int === 5)', new Scope(['nums' => [4, 5, 6]]), true],
             ['"Rudolph".substr:string(1, 3)', new Scope(), 'udo'],
             ['a:int - b:int - c:int', new Scope(['a' => 10, 'b' => 3, 'c' => 4]), 3],
-            // The last differences that still fit, on both ends. Subtraction decides whether its int result exists
+            ['a:int + b:int', new Scope(['a' => 2, 'b' => 3]), 5],
+            ['a:float + b:float', new Scope(['a' => 1.5, 'b' => 2.25]), 3.75],
+            // The last results that still fit, on both ends. Each operator decides whether its int result exists
             // before computing it (see Arithmetic), and these are the pairs that decision has to admit — one step
-            // further in either direction is an error, covered in evaluationErrorsCases().
+            // further in either direction is an error, covered in evaluationErrorsCases(). An operand of 0 has to
+            // pass whatever the other operand is.
+            ['a:int + b:int', new Scope(['a' => PHP_INT_MAX, 'b' => 0]), PHP_INT_MAX],
+            ['a:int + b:int', new Scope(['a' => PHP_INT_MIN, 'b' => 0]), PHP_INT_MIN],
+            ['a:int + b:int', new Scope(['a' => PHP_INT_MAX - 1, 'b' => 1]), PHP_INT_MAX],
+            ['a:int + b:int', new Scope(['a' => PHP_INT_MIN + 1, 'b' => -1]), PHP_INT_MIN],
             ['a:int - b:int', new Scope(['a' => PHP_INT_MAX, 'b' => 0]), PHP_INT_MAX],
             ['a:int - b:int', new Scope(['a' => PHP_INT_MIN, 'b' => 0]), PHP_INT_MIN],
             ['a:int - b:int', new Scope(['a' => -1, 'b' => PHP_INT_MIN]), PHP_INT_MAX],
@@ -125,6 +132,7 @@ final class ExpressionTest extends TestCase
             ['-a:int', new Scope(['a' => PHP_INT_MAX]), -PHP_INT_MAX],
             ['-a:int', new Scope(['a' => PHP_INT_MIN + 1]), PHP_INT_MAX],
             ['-a:float', new Scope(['a' => 1.5]), -1.5],
+            ['a:int - b:int + c:int', new Scope(['a' => 10, 'b' => 3, 'c' => 4]), 11],
             ['"foo" === "bar"', new Scope(), false],
             ['"foo" === "foo"', new Scope(), true],
             ['foo:any === bar:any', new Scope(['foo' => 12.34, 'bar' => 12.34]), true],
@@ -419,9 +427,20 @@ final class ExpressionTest extends TestCase
             new Scope(['foo' => []]),
             'Expected variable "foo" to be of type string, got array: Expected string, got list<never>',
         ];
-        // PHP's int arithmetic isn't closed: a difference past the range evaluates to a float rather than wrapping. An
-        // int-typed expression that answered one would be handing back a value of a type it doesn't have, so the
-        // operator decides up front whether its result exists and fails when it doesn't. See Arithmetic.
+        // PHP's int arithmetic isn't closed: a sum or difference past the range evaluates to a float rather than
+        // wrapping. An int-typed expression that answered one would be handing back a value of a type it doesn't
+        // have, so every operator decides up front whether its int result exists and fails when it doesn't. The
+        // widened value is never computed, and never escapes. See Arithmetic.
+        yield 'Sum past the int range' => [
+            ['a:int + b:int'],
+            new Scope(['a' => PHP_INT_MAX, 'b' => 1]),
+            'a:int + b:int leaves the int range',
+        ];
+        yield 'Sum below the int range' => [
+            ['a:int + b:int'],
+            new Scope(['a' => PHP_INT_MIN, 'b' => -1]),
+            'a:int + b:int leaves the int range',
+        ];
         yield 'Difference past the int range' => [
             ['a:int - b:int'],
             new Scope(['a' => PHP_INT_MAX, 'b' => -1]),
@@ -506,6 +525,8 @@ final class ExpressionTest extends TestCase
         yield 'List literal with strings' => ['["foo", myVar:string]', Type::listOf(Type::string())];
         yield 'List literal with strings and ints' => ['["foo", "bar", 42, myVar:string]', Type::listOf(Type::any())];
         yield 'Empty list literal' => ['[]', Type::listOf(Type::any())];
+        yield 'Add ints' => ['a:int + b:int', Type::int()];
+        yield 'Add floats' => ['a:float + b:float', Type::float()];
     }
 
     /**
