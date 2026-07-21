@@ -58,7 +58,7 @@ enum TypeConstructor: string
     /**
      * Whether a `<` directly after this name opens a type argument list. It does for the constructors that take at
      * least one, and for nothing else, which is what lets `a:int < b:int` read as a comparison: see
-     * {@see TypeParser::parse()}, which has to decide what the `<` is before there is a resolved type to ask.
+     * {@see TypeParser::type()}, which has to decide what the `<` is before there is a resolved type to ask.
      */
     public function takesTypeArguments(): bool
     {

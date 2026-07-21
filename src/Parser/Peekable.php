@@ -20,7 +20,7 @@ use function count;
  * never arrived, so the stream is short one item rather than at its end, and it says so however often it is asked.
  *
  * The cursor only moves where it's told; deciding when a reading has failed, and rewinding if it has, is the caller's
- * business. See {@see TypeParser::tryTypeArguments()} for the one place that does.
+ * business.
  *
  * @template T
  * @internal
@@ -62,9 +62,14 @@ final class Peekable
     }
 
     /**
+     * Impure, though it looks like a plain read: it is what pulls from the generator, so a call whose result is
+     * thrown away still buffers an item, still runs whatever the generator does to produce it, and still throws if
+     * that fails. Two calls agree only while the cursor stays put.
+     *
      * @param non-negative-int $ahead How far past the next item to look: peek() shows the next item, peek(1) the one
      *     after it.
      * @return T | null
+     * @phpstan-impure
      */
     public function peek(int $ahead = 0): mixed
     {

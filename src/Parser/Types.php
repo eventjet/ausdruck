@@ -146,7 +146,7 @@ final class Types
 
     /**
      * An alias is a name for one complete type, so like the argument-less built-ins, it rejects type arguments instead
-     * of silently dropping them—`Foo<int>` is as invalid as `int<string>`. {@see TypeParser::parse()} counts on that:
+     * of silently dropping them—`Foo<int>` is as invalid as `int<string>`. {@see TypeParser::type()} counts on that:
      * it reads a closed argument list after any name and leaves rejecting it to this resolver.
      */
     private function resolveAlias(TypeNode $node): Type|TypeError|null

@@ -142,6 +142,10 @@ The following types are supported:
   ExpressionParser::parse('foo:MyType', ['MyType' => Type::alias(Type::listOf(Type::string()))]);
   ```
 
+Type arguments are separated by commas, like every other list in the language: `map<string, int>`, not
+`map<string int>`. A trailing one is allowed — `map<string, int,>` — so a type spread over several lines can end each
+of them the same way.
+
 ### Functions
 
 Syntax: `target.functionName:returnType(arg1, arg2, ...)`

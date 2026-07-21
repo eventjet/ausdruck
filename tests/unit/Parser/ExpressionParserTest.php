@@ -415,8 +415,15 @@ final class ExpressionParserTest extends TestCase
         // Two `=` after a `>` keep the angle bare, whatever comes next (see the `foo:list<int>===bar` parse case), so
         // the `==` here is blamed as its own broken `===` rather than a `>=` eating its first `=`.
         yield 'greater-equals with an extra equals' => ['a:int >== 1', 'Expected ===, got =='];
-        yield 'end of string variable and colon' => ['foo:'];
-        yield 'end of string after function call and colon' => ['foo:string.substr:'];
+        // A colon promises a type, so running out after one asks for the type, not for whatever the colon was part of.
+        // The return type of a call is named as such; a variable's type has no name of its own to be called by.
+        yield 'end of string variable and colon' => ['foo:', 'Expected type, got end of input'];
+        yield 'non-type token after a variable colon' => ['foo:->', 'Expected type, got ->'];
+        yield 'non-type token after a call colon' => ['a:int.foo:->', 'Expected return type, got ->'];
+        yield 'end of string after function call and colon' => [
+            'foo:string.substr:',
+            'Expected return type, got end of input',
+        ];
         yield 'end of string after function dot' => ['foo:string.'];
         yield 'missing function name' => ['foo:string.:string()'];
         yield 'list literal: missing closing bracket' => ['[1, 2'];

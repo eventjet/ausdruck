@@ -30,8 +30,16 @@ final class TypeParserTest extends TestCase
             'fn(int',
             'Expected ), got end of input',
         ];
+        // A type is required everywhere one may appear, so one message serves them all; where a position has a name of
+        // its own, it says that instead of just "type".
+        //
+        // The input ran out one column past the whole `->`, not one past the column it starts in: a token is as wide
+        // as it is written.
         yield 'End of string after function arrow' => [
-            'fn(int) ->',
+            <<<'AUSDRUCK'
+                fn(int) ->
+                          =
+                AUSDRUCK,
             'Expected return type, got end of input',
         ];
         yield 'Dot after function arrow' => [
@@ -40,14 +48,14 @@ final class TypeParserTest extends TestCase
         ];
         yield 'Empty string' => [
             <<<'AUSDRUCK'
-                
+
                 =
                 AUSDRUCK,
-            'Invalid type ""',
+            'Expected type, got end of input',
         ];
         yield 'Whitespace-only string' => [
             '  ',
-            'Invalid type ""',
+            'Expected type, got end of input',
         ];
         yield 'Arrow' => [
             <<<'AUSDRUCK'
@@ -65,7 +73,10 @@ final class TypeParserTest extends TestCase
             'Expected field name, got {',
         ];
         yield 'Struct: end of input after field name' => [
-            '{name',
+            <<<'AUSDRUCK'
+                {name
+                     =
+                AUSDRUCK,
             'Expected :, got end of input',
         ];
         yield 'Struct: missing colon between field name and type' => [
@@ -91,6 +102,46 @@ final class TypeParserTest extends TestCase
         yield 'Struct: no comma between fields' => [
             '{name: string age: int}',
             'Expected }, got age',
+        ];
+        // An argument list ends at the first missing comma, so whatever follows gets blamed as the closing bracket it
+        // isn't. Forgetting the bracket is the likelier mistake, and this names it. What the token is doesn't matter:
+        // a type, a literal or an operator all end the list the same way, so a type argument list separates its
+        // elements with commas exactly like every other list in the language.
+        yield 'Type instead of a second type argument' => [
+            'list<int string>',
+            'Expected >, got string',
+        ];
+        yield 'Literal instead of a second type argument' => [
+            'list<int 42>',
+            'Expected >, got 42',
+        ];
+        yield 'Type instead of a second function parameter' => [
+            'fn(int string) -> bool',
+            'Expected ), got string',
+        ];
+        yield 'Literal instead of a second function parameter' => [
+            'fn(int 42) -> string',
+            'Expected ), got 42',
+        ];
+        yield 'Unclosed function parameter list' => [
+            'fn(int -> string',
+            'Expected ), got ->',
+        ];
+        yield 'Unclosed type argument list' => [
+            'list<int .',
+            'Expected >, got .',
+        ];
+        // A `<` after a name that isn't a generic constructor might be a less-than, so the argument list after it is
+        // only tried, and any error inside it merely rules that reading out. A broken list nested in one is nested in
+        // the trying too, which is why the outer `<` is blamed rather than the comma the inner list is missing—the
+        // reading fallen back to is a less-than, and it is that one the tokens after it then have to fit.
+        yield 'Committed type argument list broken inside a speculative one' => [
+            'MyType<list<int int>>',
+            'Unexpected <',
+        ];
+        yield 'Committed type argument list broken on its own' => [
+            'list<list<int int>>',
+            'Expected >, got int',
         ];
         // A type string is a whole type, so anything after the first complete one is an error rather than ignored.
         yield 'Trailing identifier' => [
@@ -212,8 +263,13 @@ final class TypeParserTest extends TestCase
     {
         yield 'Name is not an identifier' => ['42: int', 'Expected type name, got 42'];
         yield 'Missing colon after name' => ['Foo int', 'Expected :, got int'];
-        yield 'End of input after colon' => ['Foo:', 'Expected a type for Foo, got end of input'];
-        yield 'Non-type token after colon' => ['Foo: ->', 'Expected a type for Foo, got ->'];
+        // A declaration string holds several declarations, so the one that is broken says which it is.
+        yield 'End of input after colon' => ['Foo:', 'Expected type for Foo, got end of input'];
+        yield 'Non-type token after colon' => ['Foo: ->', 'Expected type for Foo, got ->'];
+        yield 'Second declaration is the broken one' => [
+            'Foo: int Bar: ->',
+            'Expected type for Bar, got ->',
+        ];
     }
 
     #[DataProvider('syntaxErrorCases')]
