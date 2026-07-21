@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use Eventjet\Ausdruck\Parser\Span;
+use Eventjet\Ausdruck\Parser\Token;
 use Override;
-
-use function sprintf;
 
 /**
  * A comparison of two operands by one of the six comparison operators. Everything a comparison does—printing,
  * evaluating, type-checking, comparing itself to another expression—is the same whichever operator it holds, and lives
- * here; the operator only supplies the symbol and the rule that decides it, both carried by {@see ComparisonOperator}.
+ * here or in {@see BinaryOperator}; the operator only supplies the symbol and the rule that decides it, both carried by
+ * {@see ComparisonOperator}.
  *
  * Four of the six operators are plain instances of this class, which is why it isn't abstract. `===` and `>` are the
  * exceptions: each keeps a final subclass of its own ({@see Eq}, {@see Gt}), only because {@see Expression::eq()} and
@@ -22,23 +21,20 @@ use function sprintf;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-class Comparison extends Expression
+class Comparison extends BinaryOperator
 {
     public function __construct(
         private readonly ComparisonOperator $operator,
-        public readonly Expression $left,
-        public readonly Expression $right,
+        Expression $left,
+        Expression $right,
     ) {
+        parent::__construct($left, $right);
     }
 
-    public function __toString(): string
+    #[Override]
+    final public function token(): Token
     {
-        return sprintf(
-            '%s %s %s',
-            Precedence::parenthesize($this->left, Precedence::Additive),
-            $this->operator->value,
-            Precedence::parenthesize($this->right, Precedence::Additive),
-        );
+        return $this->operator->token();
     }
 
     #[Override]
@@ -47,6 +43,13 @@ class Comparison extends Expression
         return $this->operator->compare($this->left->evaluate($scope), $this->right->evaluate($scope));
     }
 
+    /**
+     * Which operator is held is part of a comparison's identity, and it is the one piece of that identity
+     * {@see BinaryOperator::equals()} can't see: the four operators without a subclass are all the same class, so
+     * `a < b` and `a >= b` would otherwise compare equal. Matching on {@see self} rather than `static` is what lets
+     * {@see Eq} equal a plain Comparison holding {@see ComparisonOperator::Equals}—they are the same expression, and
+     * the subclass exists only to keep a return type from widening.
+     */
     #[Override]
     public function equals(Expression $other): bool
     {
@@ -60,11 +63,5 @@ class Comparison extends Expression
     public function getType(): Type
     {
         return Type::bool();
-    }
-
-    #[Override]
-    public function location(): Span
-    {
-        return $this->left->location()->to($this->right->location());
     }
 }

@@ -4,28 +4,19 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use Eventjet\Ausdruck\Parser\Span;
+use Eventjet\Ausdruck\Parser\Token;
 use Override;
-
-use function sprintf;
 
 /**
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class And_ extends Expression
+final class And_ extends BinaryOperator
 {
-    public function __construct(public readonly Expression $left, public readonly Expression $right)
+    #[Override]
+    public function token(): Token
     {
-    }
-
-    public function __toString(): string
-    {
-        return sprintf(
-            '%s && %s',
-            Precedence::parenthesize($this->left, Precedence::And),
-            Precedence::parenthesize($this->right, Precedence::Comparison),
-        );
+        return Token::And;
     }
 
     /**
@@ -38,22 +29,8 @@ final class And_ extends Expression
     }
 
     #[Override]
-    public function equals(Expression $other): bool
-    {
-        return $other instanceof self
-            && $this->left->equals($other->left)
-            && $this->right->equals($other->right);
-    }
-
-    #[Override]
     public function getType(): Type
     {
         return Type::bool();
-    }
-
-    #[Override]
-    public function location(): Span
-    {
-        return $this->left->location()->to($this->right->location());
     }
 }

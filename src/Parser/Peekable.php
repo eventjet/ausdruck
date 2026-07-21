@@ -83,6 +83,12 @@ final class Peekable
                     $this->items->next();
                 }
                 if (!$this->items->valid()) {
+                    /**
+                     * @infection-ignore-all Removing this return is an equivalent mutant, not an untested branch.
+                     * A finished generator answers null from current(), so the loop would buffer that null, run
+                     * until the buffer reached $target, and hand back the same null this returns — only after
+                     * padding the buffer with as many of them as the caller looked ahead.
+                     */
                     return null;
                 }
                 $this->buffer[] = $this->items->current();
