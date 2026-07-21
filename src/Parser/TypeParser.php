@@ -104,7 +104,11 @@ final class TypeParser
         if ($tokens->peek()?->token !== Token::OpenAngle) {
             return new TypeNode($name, [], $parsedToken->location());
         }
-        if (TypeConstructor::tryFrom($name)?->takesTypeArguments() ?? false) {
+        // Only a name with a declared arity of its own can commit to reading a type argument list. A name that isn't a
+        // built-in constructor has none, and neither has one that is never written `name<...>` in the first place —
+        // `fn`, which took its own route above, and a struct, which is written as its fields.
+        $arity = TypeConstructor::tryFrom($name)?->typeArgumentCount();
+        if ($arity !== null && $arity > 0) {
             // A generic constructor is committed: the `<` can only be its argument list, so whatever goes wrong in
             // there is a genuine error, reported where it happens rather than rewound.
             $tokens->next();
