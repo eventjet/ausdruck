@@ -105,14 +105,16 @@ final class Expr
         Span|null $location = null,
     ): Call {
         $location ??= self::dummySpan();
-        $instantiated = $signature?->instantiateForCall(
-            $target->getType(),
-            array_map(static fn(Expression $argument): Type => $argument->getType(), $arguments),
-        );
-        $type = self::returnType($name, $returnType, $instantiated, $nameLocation ?? self::dummySpan());
-        if ($instantiated !== null) {
-            self::checkReceiver($target, $name, $instantiated);
-            self::checkArguments($arguments, $name, $instantiated, $location);
+        if ($signature !== null) {
+            $signature = $signature->instantiateForCall(
+                $target->getType(),
+                array_map(static fn(Expression $argument): Type => $argument->getType(), $arguments),
+            );
+        }
+        $type = self::returnType($name, $returnType, $signature, $nameLocation ?? self::dummySpan());
+        if ($signature !== null) {
+            self::checkReceiver($target, $name, $signature);
+            self::checkArguments($arguments, $name, $signature, $location);
         }
         return new Call($target, $name, $type, $arguments, $location);
     }
@@ -380,18 +382,18 @@ final class Expr
         Span $nameLocation,
     ): Type {
         if ($annotation === null) {
-            return $signature?->returnType() ?? throw TypeError::create(
+            return $signature->returnType ?? throw TypeError::create(
                 sprintf('Function %s is not declared and has no inline type', $name),
                 $nameLocation,
             );
         }
-        if ($signature !== null && !$annotation->type->isSubtypeOf($signature->returnType())) {
+        if ($signature !== null && !$annotation->type->isSubtypeOf($signature->returnType)) {
             throw TypeError::create(
                 sprintf(
                     'Inline return type %s of function %s does not match declared return type %s',
                     $annotation->type,
                     $name,
-                    $signature->returnType(),
+                    $signature->returnType,
                 ),
                 $annotation->location,
             );

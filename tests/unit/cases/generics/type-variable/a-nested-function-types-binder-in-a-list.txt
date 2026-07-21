@@ -4,5 +4,5 @@ A function type nested inside another one can't bind type variables of its own: 
 -- Note --
 The sibling case next to this one (its-own-binder-survives-nesting-in-a-list) shows a `fn<T>` inside a list is fine on
 its own. Here the list itself sits inside another function type's parameter, so the rank-1 rule reaches through the
-list the same way it would if `fn<T>` sat there directly: $nestedInFunction stays set through every constructor below
+list the same way it would if `fn<T>` sat there directly: $nestedInSignature stays set through every constructor below
 the enclosing `fn`, not just a directly-nested function type.

@@ -6,7 +6,6 @@ namespace Eventjet\Ausdruck\Parser;
 
 use Eventjet\Ausdruck\Type;
 use Eventjet\Ausdruck\TypeConstructor;
-use LogicException;
 
 use function array_key_exists;
 use function array_key_last;
@@ -23,10 +22,12 @@ use function sprintf;
  *
  * A variable is quantified once, at the top of the signature it belongs to—see {@see Type::var()}—so a function type
  * reachable from another one's parameters or return type—however many lists, Options, or struct fields deep—can
- * never carry a binder of its own: {@see self::resolveFunction()} rejects one outright rather than letting an inner
- * `fn<...>` shadow or extend the outer scope, and $nestedInFunction stays set through every constructor below the
- * enclosing `fn`, not just a directly-nested function type, which is how it reaches all of them. $typeVariables
- * itself only ever grows once, when the one binder a signature is allowed to have is resolved.
+ * never carry a binder of its own: {@see self::resolveSignature()} rejects one outright rather than letting an inner
+ * `fn<...>` shadow or extend the outer scope, and $nestedInSignature stays set through every constructor below the
+ * enclosing `fn`—list, Option, struct field, and any function type found there—not just a directly-nested function
+ * type, which is how it reaches all of them: it is carried by $inner in {@see self::resolveSignature()}, the same
+ * instance every one of those constructors recurses back through, rather than being recomputed at each level.
+ * $typeVariables itself only ever grows once, when the one binder a signature is allowed to have is resolved.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck\Parser
@@ -40,7 +41,7 @@ final class TypeResolution
     public function __construct(
         private readonly array $aliases,
         private readonly array $typeVariables = [],
-        private readonly bool $nestedInFunction = false,
+        private readonly bool $nestedInSignature = false,
     ) {
     }
 
@@ -103,9 +104,9 @@ final class TypeResolution
 
     /**
      * A function type and a struct type are each their own node class, so they're told apart and dispatched before
-     * anything else here asks what $node is named: {@see FunctionTypeNode} is the only shape {@see TypeConstructor::Fn}
-     * is ever the name of, so there is nothing left for that case to do below, and a struct has no name at all, so it
-     * has no {@see TypeConstructor} case to be found by one.
+     * anything else here asks what $node is named: {@see FunctionTypeNode} is a shape {@see self::resolveSignature()}
+     * also handles directly, and a struct has no name at all, so it has no {@see TypeConstructor} case to be found by
+     * one.
      *
      * Otherwise: a name the language spells itself is one of the other {@see TypeConstructor}s; the name a `fn<...>`
      * binder enclosing this node introduced is a type variable; anything else is a consumer's alias, or nothing at
@@ -114,7 +115,7 @@ final class TypeResolution
     public function resolve(TypeNode $node): Type|TypeError
     {
         if ($node instanceof FunctionTypeNode) {
-            return $this->resolveFunction($node);
+            return $this->resolveSignature($node);
         }
         if ($node instanceof StructTypeNode) {
             return $this->resolveStruct($node);
@@ -130,23 +131,11 @@ final class TypeResolution
                 $node->location,
             );
         }
-        $arity = $constructor->typeArgumentCount();
-        $arityError = $arity === null ? null : self::checkArity($node, $arity);
+        $arityError = self::checkArity($node, $constructor->typeArgumentCount());
         if ($arityError !== null) {
             return $arityError;
         }
         return match ($constructor) {
-            // Unreachable: a node named fn is always a FunctionTypeNode, handled above before $constructor is even
-            // looked at. The arm still has to be here for the match over TypeConstructor to be exhaustive.
-            TypeConstructor::Fn => throw new LogicException('A node named fn must be a FunctionTypeNode'),
-            // Struct and never are reserved so nothing written by name can ever collide with the two markers
-            // {@see Type} uses internally, but neither is a name anything resolves to: a struct has no name of its
-            // own to be written with, and never is only ever inferred, not spelled. Written here, either is exactly
-            // as unknown as a name the language never reserved at all.
-            TypeConstructor::Struct, TypeConstructor::Never => TypeError::create(
-                sprintf('Unknown type %s', $node->name),
-                $node->location,
-            ),
             TypeConstructor::String => Type::string(),
             TypeConstructor::Int => Type::int(),
             TypeConstructor::Float => Type::float(),
@@ -232,16 +221,12 @@ final class TypeResolution
      * {@see Type::func()} enforces the identical rule for a signature built directly through that API instead of
      * written as a type string.
      */
-    private function resolveFunction(FunctionTypeNode $node): Type|TypeError
+    private function resolveSignature(FunctionTypeNode $node): Type|TypeError
     {
-        if ($this->nestedInFunction && $node->typeParameters !== []) {
+        if ($this->nestedInSignature && $node->typeParameters !== []) {
             $first = $node->typeParameters[0];
             $last = $node->typeParameters[array_key_last($node->typeParameters)];
-            return TypeError::create(
-                'A function type nested inside another one can\'t bind type variables of its own: a variable is '
-                    . 'quantified once, by whichever function type encloses it',
-                $first->location->to($last->location),
-            );
+            return TypeError::create(Type::nestedBinderMessage(), $first->location->to($last->location));
         }
         $typeVariables = $this->typeVariables;
         $typeVariableNames = [];
@@ -253,7 +238,7 @@ final class TypeResolution
             $typeVariables[$parameter->name] = true;
             $typeVariableNames[] = $parameter->name;
         }
-        $inner = new self($this->aliases, $typeVariables, nestedInFunction: true);
+        $inner = new self($this->aliases, $typeVariables, nestedInSignature: true);
         $argTypes = [];
         foreach ($node->args as $arg) {
             $argType = $inner->resolve($arg);
@@ -286,16 +271,16 @@ final class TypeResolution
      * A binder introduces a name, so the name has to be free to introduce: one the language already spells is a type
      * rather than a placeholder for one, one this same binder already declared would make two parameters answer to
      * the same name, and one an alias already names is a type just as much as a built-in constructor is. An enclosing
-     * binder is never in question here—{@see self::resolveFunction()} rejects a nested one before it ever declares a
+     * binder is never in question here—{@see self::resolveSignature()} rejects a nested one before it ever declares a
      * name to collide with.
      *
      * @param array<string, true> $typeVariables The names declared so far in the binder $parameter belongs to, which
-     *     grows as {@see self::resolveFunction()} works through the binder's parameters, so that two variables in one
-     *     binder can't answer to the same name.
+     *     grows as {@see self::resolveSignature()} works through the binder's parameters, so that two variables in
+     *     one binder can't answer to the same name.
      */
     private function checkTypeVariable(Identifier $parameter, array $typeVariables): TypeError|null
     {
-        if (TypeConstructor::tryFrom($parameter->name) !== null) {
+        if (TypeConstructor::isReservedName($parameter->name)) {
             return TypeError::create(TypeConstructor::reservedNameMessage($parameter->name), $parameter->location);
         }
         if (array_key_exists($parameter->name, $typeVariables)) {

@@ -12,7 +12,7 @@ use function sprintf;
 /**
  * A function type, `fn<T>(int) -> T`: the one shape with a return type and a binder of its own, so the one that
  * needs more than a name and its arguments. {@see TypeParser} builds one, and
- * {@see TypeResolution::resolveFunction()} is the one place that reads $returnType and $typeParameters -- both are
+ * {@see TypeResolution::resolveSignature()} is the one place that reads $returnType and $typeParameters -- both are
  * unconditionally there rather than nullable, so nothing has to assert that a node named `fn` has them.
  *
  * @internal

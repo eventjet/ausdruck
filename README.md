@@ -229,14 +229,11 @@ the arguments. So `numbers:list<int>.map(|n| n:int > 2)` is a `list<bool>` while
 is a `list<string>` — the same function, two return types, neither of them written down.
 
 A binder is the whole of a variable's scope, so a variable is a type anywhere below the `fn` that binds it, and a name
-no binder declares is not a variable: it is an alias, or an error.
-
-That's enforced for a signature written as a type string, where only a `fn<...>` binder can introduce a name that
-resolves to a variable. `Type::var()` itself does not enforce it: nothing stops you from building one directly and
-using it inside a `Type::func()` that doesn't also declare it. Doing that produces a variable no binder ever
-quantifies, which is still a variable everywhere else — it type-checks like any other type until it has to be printed.
-There, it breaks: printing it gives back a name (`list<T>`, say) that parsing rejects, because nothing declared `T`.
-Pass every name a `Type::var()` uses to the `Type::func()` whose binder is meant to quantify it.
+no binder declares is not a variable: it is an alias, or an error. That's enforced for a signature written as a type
+string, where only a `fn<...>` binder can introduce a name that resolves to a variable, and it's enforced for one
+built directly through `Type::func()` too: a `Type::var()` used inside a `Type::func()` that doesn't list it among
+its own type variables is rejected the moment that function type is read as a callable signature, whether that's a
+direct call to `Type::asFunction()` or, as below, a `Declarations` reading it from `functions:`.
 
 Because the call site decides them, the inline return type is rarely worth writing: `foo:list<string>.head()` is
 already an `Option<string>`. Writing one anyway is still allowed, and is then checked against the inferred one.

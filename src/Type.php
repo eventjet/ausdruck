@@ -8,12 +8,14 @@ use InvalidArgumentException;
 use Override;
 use Stringable;
 
+use function array_fill_keys;
 use function array_intersect_key;
 use function array_is_list;
 use function array_key_exists;
 use function array_key_first;
 use function array_map;
 use function array_slice;
+use function assert;
 use function count;
 use function get_object_vars;
 use function gettype;
@@ -30,7 +32,6 @@ final class Type implements Stringable
     /**
      * @param list<self> $args
      * @param array<string, Type> $fields
-     * @param list<string> $typeVariables
      */
     private function __construct(
         public readonly string $name,
@@ -38,7 +39,7 @@ final class Type implements Stringable
         public readonly self|null $aliasFor = null,
         public readonly array $fields = [],
         private readonly bool $isVariable = false,
-        private readonly array $typeVariables = [],
+        private readonly Signature|null $signature = null,
     ) {
     }
 
@@ -90,7 +91,7 @@ final class Type implements Stringable
      */
     public static function alias(string $name, self $type): self
     {
-        if (TypeConstructor::tryFrom($name) !== null) {
+        if (TypeConstructor::isReservedName($name)) {
             throw new InvalidArgumentException(TypeConstructor::reservedNameMessage($name, 'an alias'));
         }
         return new self($name, aliasFor: $type);
@@ -110,26 +111,23 @@ final class Type implements Stringable
      * variables of the same name in one signature are the same variable. A name a type constructor already spells,
      * like `int` or `list`, is not a variable name: {@see Parser\TypeResolution::checkTypeVariable()} rejects it where
      * a signature is written as a type string, and this rejects it here too, so the same rule holds for a signature
-     * built directly through this API.
+     * built directly through this API. Naming a variable that no enclosing {@see self::func()} declares is rejected
+     * too, but not here -- see {@see self::asFunction()}, which is where the enclosing binder is finally known.
      *
      * @throws InvalidArgumentException if $name is a type the language spells itself.
      */
     public static function var(string $name): self
     {
-        if (TypeConstructor::tryFrom($name) !== null) {
+        if (TypeConstructor::isReservedName($name)) {
             throw new InvalidArgumentException(TypeConstructor::reservedNameMessage($name));
         }
         return new self($name, isVariable: true);
     }
 
     /**
-     * A function type keeps its return type and its parameters in one list of args: args[0] is the return type, and
-     * everything after it is a parameter. {@see Signature} is how anything outside this class reads that layout;
-     * call {@see self::asFunction()} to read a function type instead of reaching into its args. {@see self} reads
-     * the same layout again, through its own private {@see self::funcReturn()} / {@see self::funcParameters()}
-     * accessors, rather than going through the nullable {@see Signature} and asserting the result non-null on every
-     * call -- every caller inside this class already knows $this was built by this method, so there's nothing for
-     * that null check to guard against; see those accessors' own docblocks.
+     * A function type keeps its return type, its parameters and its own `fn<...>` binder in one {@see Signature},
+     * which is also the only thing {@see self::asFunction()} ever returns: nothing outside this class reads a
+     * function type any other way.
      *
      * @param list<Type> $parameters The types the PHP callable receives, in order. A function that is called as a
      *     receiver function -- `foo:string.substr:string(0, 3)` -- receives the expression it's called on as the first
@@ -137,9 +135,10 @@ final class Type implements Stringable
      * @param list<string> $typeVariables The names this function type's own `fn<...>` binder declares, in the order
      *     written -- what {@see self::toString()} prints back, and what {@see Signature::instantiateForCall()} has
      *     something to substitute for. A variable named inside $return or $parameters that isn't listed here is one
-     *     no binder of this type's own quantifies; see {@see self::var()}.
+     *     no binder of this type's own quantifies, which {@see self::asFunction()} rejects once the binder that
+     *     would have to quantify it is known -- see that method's own docblock for why not here.
      * @throws InvalidArgumentException if $return or a parameter contains, at any depth, a function type that
-     *     declares a binder of its own -- the same rank-1 rule {@see Parser\TypeResolution::resolveFunction()}
+     *     declares a binder of its own -- the same rank-1 rule {@see Parser\TypeResolution::resolveSignature()}
      *     enforces when a signature is written as a type string, enforced here too so a signature built directly
      *     through this API can't nest a binder the parser would reject. Left unenforced, {@see self::substitute()}
      *     would walk straight through the inner binder's own scope when the outer signature is instantiated,
@@ -148,11 +147,11 @@ final class Type implements Stringable
      */
     public static function func(self $return, array $parameters = [], array $typeVariables = []): self
     {
-        self::rejectNestedBinder($return);
+        self::checkBinderScope($return, null);
         foreach ($parameters as $parameter) {
-            self::rejectNestedBinder($parameter);
+            self::checkBinderScope($parameter, null);
         }
-        return new self('fn', [$return, ...$parameters], typeVariables: $typeVariables);
+        return new self('fn', signature: new Signature($return, $parameters, $typeVariables));
     }
 
     public static function fromValue(mixed $value): self
@@ -198,28 +197,60 @@ final class Type implements Stringable
     }
 
     /**
-     * {@see self::func()}'s nested-binder check: a variable is quantified once, by whichever function type encloses
-     * it, so nothing reachable from one of $this's own parameters or its return type -- however many lists, Options,
-     * struct fields, or aliases deep -- may declare a binder of its own. Walks {@see self::$args} and
-     * {@see self::$fields} rather than going through {@see self::canonical()} first, so it sees an alias's target the
-     * same way {@see self::bind()} and {@see self::substitute()} eventually would.
+     * The message {@see self::checkBinderScope()} rejects a function type nested inside another one's parameters or
+     * return type with -- worded once here, rather than separately by {@see self} and
+     * {@see Parser\TypeResolution::resolveSignature()}, the two places a signature can be built and so the two
+     * places this rule is enforced.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
      */
-    private static function rejectNestedBinder(self $type): void
+    public static function nestedBinderMessage(): string
     {
-        if ($type->name === 'fn' && $type->typeVariables !== []) {
-            throw new InvalidArgumentException(
-                'A function type nested inside another one can\'t bind type variables of its own: a variable is '
-                    . 'quantified once, by whichever function type encloses it',
-            );
+        return 'A function type nested inside another one can\'t bind type variables of its own: a variable is '
+            . 'quantified once, by whichever function type encloses it';
+    }
+
+    /**
+     * {@see self::func()}'s two checks, one traversal: a function type reachable from $type's own args, fields, or
+     * alias target -- however deep -- can't declare a binder of its own, which is checkable the moment $type exists,
+     * and every variable reachable the same way has to be one $declaredVariables lists, which isn't checkable until
+     * the signature's own binder is known. $declaredVariables is null while {@see self::func()} is still building
+     * that signature -- there is no complete binder to check a variable against yet, since a variable with no binder
+     * of its own, like the `T` in `fn(T) -> bool` nested inside `fn<T>(list<T>, fn(T) -> bool) -> list<T>`, is
+     * legitimately deferring to whichever binder ends up enclosing it -- so only the nested-binder rule runs; see
+     * {@see self::asFunction()}, which walks again with the enclosing binder's own names once the whole signature
+     * exists and there is no "later" left to defer to.
+     *
+     * @param array<string, true>|null $declaredVariables
+     */
+    private static function checkBinderScope(self $type, array|null $declaredVariables): void
+    {
+        if ($type->isVariable) {
+            if ($declaredVariables !== null && !array_key_exists($type->name, $declaredVariables)) {
+                throw new InvalidArgumentException(
+                    sprintf('%s isn\'t declared by this function type\'s own binder, so nothing quantifies it', $type->name),
+                );
+            }
+            return;
+        }
+        if ($type->signature !== null) {
+            if ($type->signature->typeVariables !== []) {
+                throw new InvalidArgumentException(self::nestedBinderMessage());
+            }
+            self::checkBinderScope($type->signature->returnType, $declaredVariables);
+            foreach ($type->signature->parameters as $parameter) {
+                self::checkBinderScope($parameter, $declaredVariables);
+            }
         }
         foreach ($type->args as $arg) {
-            self::rejectNestedBinder($arg);
+            self::checkBinderScope($arg, $declaredVariables);
         }
         foreach ($type->fields as $field) {
-            self::rejectNestedBinder($field);
+            self::checkBinderScope($field, $declaredVariables);
         }
         if ($type->aliasFor !== null) {
-            self::rejectNestedBinder($type->aliasFor);
+            self::checkBinderScope($type->aliasFor, $declaredVariables);
         }
     }
 
@@ -301,16 +332,16 @@ final class Type implements Stringable
     {
         $self = $this->canonical();
         $other = $other->canonical();
-        if ($self->isNone()) {
-            return $other->isNone() || $other->isOption();
+        if ($self->name === 'None') {
+            return $other->name === 'None' || $other->name === 'Option';
         }
-        if ($other->isOption() && (!$self->isOption() && $self->name !== 'Some')) {
+        if ($other->name === 'Option' && $self->name !== 'Option') {
             return $self->isSubtypeOf($other->args[0]);
         }
-        if ($self->isNever()) {
+        if ($self->name === 'never') {
             return true;
         }
-        if ($other->isAny()) {
+        if ($other->name === 'any') {
             return true;
         }
         if ($self->name === 'Option') {
@@ -326,13 +357,14 @@ final class Type implements Stringable
             return $self->args[0]->isSubtypeOf($other->args[0]);
         }
         if ($self->name === 'fn') {
-            if (!$self->funcReturn()->isSubtypeOf($other->funcReturn())) {
+            $signature = $self->signature;
+            $otherSignature = $other->signature;
+            assert($signature !== null && $otherSignature !== null);
+            if (!$signature->returnType->isSubtypeOf($otherSignature->returnType)) {
                 return false;
             }
-            $params = $self->funcParameters();
-            $otherParams = $other->funcParameters();
-            foreach ($params as $i => $param) {
-                $otherParam = $otherParams[$i] ?? null;
+            foreach ($signature->parameters as $i => $param) {
+                $otherParam = $otherSignature->parameters[$i] ?? null;
                 if ($otherParam === null) {
                     return false;
                 }
@@ -355,33 +387,32 @@ final class Type implements Stringable
     }
 
     /**
-     * This type as a function's signature, or null if it isn't one: only {@see self::func()} builds a type
-     * {@see Signature} accepts. Everything that reads a function type -- its return type, its receiver, the arguments
-     * a call passes, generic instantiation -- goes through the {@see Signature} this returns rather than this type's
-     * args directly. This is the one place that sees through an alias for {@see Signature}, which is why it, and not
-     * {@see Signature::tryFrom()}, is the way to get one.
+     * This type as a function's signature, or null if it isn't one: only {@see self::func()} builds a type with a
+     * {@see Signature} to return here. This is also where a variable {@see self::func()} left unchecked -- one with
+     * no binder of its own to defer to, reachable from the return type or a parameter -- is finally checked against
+     * the one binder that could quantify it, the signature's own: see {@see self::checkBinderScope()}'s docblock for
+     * why this is the first point that check can run, and {@see self::var()}'s for why it can't run any earlier.
+     *
+     * @throws InvalidArgumentException if a variable reachable from the return type or a parameter isn't one this
+     *     signature's own binder declares.
      */
     public function asFunction(): Signature|null
     {
-        return Signature::tryFrom($this->canonical());
+        $signature = $this->canonical()->signature;
+        if ($signature === null) {
+            return null;
+        }
+        $declaredVariables = array_fill_keys($signature->typeVariables, true);
+        self::checkBinderScope($signature->returnType, $declaredVariables);
+        foreach ($signature->parameters as $parameter) {
+            self::checkBinderScope($parameter, $declaredVariables);
+        }
+        return $signature;
     }
 
     public function isStruct(): bool
     {
         return $this->canonical()->name === 'Struct';
-    }
-
-    /**
-     * Whether this function type's own binder declares any variables at all -- always false once
-     * {@see Signature::instantiateForCall()} has already substituted it, which is what lets that method skip
-     * substituting a signature with nothing left to substitute. $this must already be canonical and named 'fn'.
-     *
-     * @internal
-     * @psalm-internal Eventjet\Ausdruck
-     */
-    public function hasTypeVariables(): bool
-    {
-        return $this->typeVariables !== [];
     }
 
     public function getFieldType(string $name): self|null
@@ -409,9 +440,9 @@ final class Type implements Stringable
      * to -- doesn't decide the variable there no matter when it's walked. A function that accepts anything trivially
      * accepts whatever that variable turns out to be, which is exactly what {@see self::isSubtypeOf()}'s own function
      * case already relies on when the *declared* parameter is `any`; here it's the value's parameter that is, and the
-     * variable is left for a later, real parameter -- or the receiver, one of {@see Signature::parameterTypes()},
-     * walked before the arguments a call passes -- to decide instead. See {@see Signature::instantiateForCall()} for
-     * why first-wins is the useful half of the two everywhere else.
+     * variable is left for a later, real parameter -- or the receiver, one of {@see Signature::$parameters}, walked
+     * before the arguments a call passes -- to decide instead. See {@see Signature::instantiateForCall()} for why
+     * first-wins is the useful half of the two everywhere else.
      *
      * This is the recursive walk that applies to any type, not just a function's parameters, which is why it lives
      * here rather than on {@see Signature}; nothing outside the type system should call it directly. The function
@@ -453,7 +484,10 @@ final class Type implements Stringable
 
     /**
      * This type with every variable replaced by what it was bound to, and every variable nothing bound replaced by
-     * `any`.
+     * `any`. A function type's own binder is dropped in the same step, explicitly, rather than as a side effect of
+     * rebuilding {@see self} without it: {@see Signature::instantiateForCall()} is the only caller that reaches a
+     * function type here, and it only ever does so once the binder's variables have already been substituted for
+     * what the call decided, which is what makes the binder empty rather than merely unread from this point on.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -465,26 +499,26 @@ final class Type implements Stringable
         if ($this->isVariable) {
             return $bindings[$this->name] ?? self::any();
         }
+        if ($this->signature !== null) {
+            return new self(
+                $this->name,
+                aliasFor: $this->aliasFor?->substitute($bindings),
+                signature: new Signature(
+                    $this->signature->returnType->substitute($bindings),
+                    array_map(
+                        static fn(self $parameter): self => $parameter->substitute($bindings),
+                        $this->signature->parameters,
+                    ),
+                    $this->signature->typeVariables,
+                ),
+            );
+        }
         return new self(
             $this->name,
             array_map(static fn(self $arg): self => $arg->substitute($bindings), $this->args),
             $this->aliasFor?->substitute($bindings),
             array_map(static fn(self $field): self => $field->substitute($bindings), $this->fields),
         );
-    }
-
-    /**
-     * The `<T, U>` this function type prints itself with, exactly as {@see self::func()} was given it: empty when
-     * there is nothing to quantify, which is every function type once {@see Signature::instantiateForCall()} has
-     * substituted it, and every function type reachable from another one's parameters or return type -- however many
-     * lists, Options, or struct fields deep -- which {@see Parser\TypeResolution::resolveFunction()} never lets
-     * declare a binder of its own and {@see self::func()}'s own nested-binder check enforces the same way when a
-     * signature is built directly through this API: there is no scope left here to re-derive one from. $this must
-     * already be canonical and named 'fn'; call {@see self::toString()} instead.
-     */
-    private function binder(): string
-    {
-        return $this->typeVariables === [] ? '' : sprintf('<%s>', implode(', ', $this->typeVariables));
     }
 
     /**
@@ -498,10 +532,12 @@ final class Type implements Stringable
      */
     private function bindFunction(self $actual, array $bindings): array
     {
-        $bindings = $this->funcReturn()->bind($actual->funcReturn(), $bindings);
-        $actualParameters = $actual->funcParameters();
-        foreach ($this->funcParameters() as $index => $parameter) {
-            $actualParameter = $actualParameters[$index] ?? null;
+        $signature = $this->signature;
+        $actualSignature = $actual->signature;
+        assert($signature !== null && $actualSignature !== null);
+        $bindings = $signature->returnType->bind($actualSignature->returnType, $bindings);
+        foreach ($signature->parameters as $index => $parameter) {
+            $actualParameter = $actualSignature->parameters[$index] ?? null;
             if ($actualParameter === null || $actualParameter->canonical()->isAny()) {
                 continue;
             }
@@ -523,38 +559,17 @@ final class Type implements Stringable
             return '{ ' . implode(', ', $fields) . ' }';
         }
         if ($this->name === 'fn') {
-            $params = array_map(static fn(self $arg): string => $arg->toString(), $this->funcParameters());
-            return sprintf('fn%s(%s) -> %s', $this->binder(), implode(', ', $params), $this->funcReturn()->toString());
+            $signature = $this->signature;
+            assert($signature !== null);
+            $binder = $signature->typeVariables === [] ? '' : sprintf('<%s>', implode(', ', $signature->typeVariables));
+            $params = array_map(static fn(self $arg): string => $arg->toString(), $signature->parameters);
+            return sprintf('fn%s(%s) -> %s', $binder, implode(', ', $params), $signature->returnType->toString());
         }
         if ($this->args === []) {
             return $this->name;
         }
         $args = array_map(static fn(self $arg): string => $arg->toString(), $this->args);
         return sprintf('%s<%s>', $this->name, implode(', ', $args));
-    }
-
-    /**
-     * The return type of a function type, read directly off {@see self::$args} rather than through
-     * {@see self::asFunction()}: every caller of this is {@see Type} itself, reading a type only {@see self::func()}
-     * could have built, so there is nothing here for a null check to guard against. {@see Signature} is still the way
-     * for anything outside this class to read one -- see {@see self::asFunction()}. $this must already be canonical
-     * and named 'fn'.
-     */
-    private function funcReturn(): self
-    {
-        return $this->args[0];
-    }
-
-    /**
-     * The parameter types of a function type, receiver included -- {@see self::funcReturn()}'s sibling, and the same
-     * reason it exists instead of going through {@see self::asFunction()}. $this must already be canonical and named
-     * 'fn'.
-     *
-     * @return list<self>
-     */
-    private function funcParameters(): array
-    {
-        return array_slice($this->args, 1);
     }
 
     private function canonical(): self

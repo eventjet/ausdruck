@@ -230,7 +230,7 @@ final class TypeTest extends TestCase
 
         $instantiated = $signature->instantiateForCall(Type::listOf(Type::int()), []);
 
-        self::assertTrue($instantiated->returnType()->equals(Type::int()));
+        self::assertTrue($instantiated->returnType->equals(Type::int()));
         self::assertTrue($instantiated->receiverType()?->isSubtypeOf(Type::listOf(Type::int())) ?? false);
     }
 
@@ -276,9 +276,36 @@ final class TypeTest extends TestCase
         $signature = $alias->asFunction();
 
         self::assertNotNull($signature);
-        self::assertTrue($signature->returnType()->equals(Type::string()));
+        self::assertTrue($signature->returnType->equals(Type::string()));
         self::assertTrue($signature->receiverType()?->equals(Type::int()) ?? false);
         self::assertEquals([Type::bool()], $signature->argumentTypes());
+    }
+
+    /**
+     * {@see Type::func()} can't reject this itself: a variable with no binder of its own -- the `T` in a lambda
+     * parameter's `fn(T) -> bool`, say -- legitimately defers to whichever binder ends up enclosing it, and while
+     * {@see Type::func()} is still building that enclosing signature, "ends up" hasn't happened yet.
+     * {@see Type::asFunction()} is the first point it's known for certain that nothing ever will, which is why the
+     * check lives there instead.
+     */
+    public function testAsFunctionRejectsAVariableItsOwnBinderDoesntDeclare(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('T isn\'t declared by this function type\'s own binder, so nothing quantifies it');
+
+        Type::func(Type::var('T'), [Type::listOf(Type::var('T'))])->asFunction();
+    }
+
+    /**
+     * The same rejection, for a variable one binder over from the one that would have to declare it: a signature
+     * declaring `U` doesn't make `T` -- used nowhere else -- any less unbound.
+     */
+    public function testAsFunctionRejectsAVariableOnlyAWiderBinderDeclares(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('T isn\'t declared by this function type\'s own binder, so nothing quantifies it');
+
+        Type::func(Type::var('T'), [Type::var('U')], ['U'])->asFunction();
     }
 
     /**
