@@ -16,6 +16,7 @@ use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
+use function intdiv;
 use function is_array;
 use function is_callable;
 use function is_string;
@@ -27,6 +28,8 @@ use const PHP_INT_MIN;
 
 final class ExpressionTest extends TestCase
 {
+    use AssertsEvaluatedValues;
+
     /**
      * @return iterable<string, array{
      *     string | Expression | callable(): Expression,
@@ -112,17 +115,65 @@ final class ExpressionTest extends TestCase
             ['nums:list<int>.some:bool(|item| item:int === 5)', new Scope(['nums' => [4, 5, 6]]), true],
             ['"Rudolph".substr:string(1, 3)', new Scope(), 'udo'],
             ['a:int - b:int - c:int', new Scope(['a' => 10, 'b' => 3, 'c' => 4]), 3],
-            // The last differences that still fit, on both ends. Subtraction decides whether its int result exists
+            ['a:int + b:int', new Scope(['a' => 2, 'b' => 3]), 5],
+            ['a:float + b:float', new Scope(['a' => 1.5, 'b' => 2.25]), 3.75],
+            ['a:int * b:int', new Scope(['a' => 4, 'b' => 6]), 24],
+            ['a:float * b:float', new Scope(['a' => 1.5, 'b' => 2.0]), 3.0],
+            // The last results that still fit, on both ends. Each operator decides whether its int result exists
             // before computing it (see Arithmetic), and these are the pairs that decision has to admit — one step
-            // further in either direction is an error, covered in evaluationErrorsCases().
+            // further in either direction is an error, covered in evaluationErrorsCases(). An operand of 0, or of 1
+            // where it's the identity, has to pass whatever the other operand is.
+            ['a:int + b:int', new Scope(['a' => PHP_INT_MAX, 'b' => 0]), PHP_INT_MAX],
+            ['a:int + b:int', new Scope(['a' => PHP_INT_MIN, 'b' => 0]), PHP_INT_MIN],
+            ['a:int + b:int', new Scope(['a' => PHP_INT_MAX - 1, 'b' => 1]), PHP_INT_MAX],
+            ['a:int + b:int', new Scope(['a' => PHP_INT_MIN + 1, 'b' => -1]), PHP_INT_MIN],
             ['a:int - b:int', new Scope(['a' => PHP_INT_MAX, 'b' => 0]), PHP_INT_MAX],
             ['a:int - b:int', new Scope(['a' => PHP_INT_MIN, 'b' => 0]), PHP_INT_MIN],
             ['a:int - b:int', new Scope(['a' => -1, 'b' => PHP_INT_MIN]), PHP_INT_MAX],
             ['a:int - b:int', new Scope(['a' => PHP_INT_MIN + 1, 'b' => 1]), PHP_INT_MIN],
-            // Negation is arithmetic too: PHP_INT_MIN is the one int it has no answer for, one step past the boundary.
+            ['a:int * b:int', new Scope(['a' => PHP_INT_MAX, 'b' => 1]), PHP_INT_MAX],
+            ['a:int * b:int', new Scope(['a' => PHP_INT_MIN, 'b' => 1]), PHP_INT_MIN],
+            ['a:int * b:int', new Scope(['a' => PHP_INT_MIN, 'b' => 0]), 0],
+            ['a:int * b:int', new Scope(['a' => PHP_INT_MAX, 'b' => -1]), -PHP_INT_MAX],
+            // A product landing exactly on a bound, from either side and with either sign of multiplier. PHP_INT_MIN
+            // is reachable as a product where -PHP_INT_MIN is not a value at all, so the two ends aren't symmetric.
+            ['a:int * b:int', new Scope(['a' => intdiv(PHP_INT_MIN, 2), 'b' => 2]), PHP_INT_MIN],
+            ['a:int * b:int', new Scope(['a' => intdiv(PHP_INT_MIN, -2), 'b' => -2]), PHP_INT_MIN],
+            ['a:int * b:int', new Scope(['a' => intdiv(PHP_INT_MAX, 2), 'b' => 2]), PHP_INT_MAX - 1],
+            ['a:int * b:int', new Scope(['a' => intdiv(PHP_INT_MAX, -2), 'b' => -2]), PHP_INT_MAX - 1],
             ['-a:int', new Scope(['a' => PHP_INT_MAX]), -PHP_INT_MAX],
             ['-a:int', new Scope(['a' => PHP_INT_MIN + 1]), PHP_INT_MAX],
             ['-a:float', new Scope(['a' => 1.5]), -1.5],
+            // An int quotient truncates toward zero.
+            ['a:int / b:int', new Scope(['a' => 7, 'b' => 2]), 3],
+            ['a:int / b:int', new Scope(['a' => -7, 'b' => 2]), -3],
+            ['a:float / b:float', new Scope(['a' => 7.0, 'b' => 2.0]), 3.5],
+            // A zero divisor makes the quotient none, whatever the number type. Negative zero counts as zero.
+            ['a:int / b:int', new Scope(['a' => 1, 'b' => 0]), null],
+            ['a:float / b:float', new Scope(['a' => 1.0, 'b' => 0.0]), null],
+            ['x:float / negZero:float', new Scope(['x' => 1.0, 'negZero' => -0.0]), null],
+            // PHP_INT_MIN / -1 is the other quotient int doesn't have: it overflows by one, and intdiv() would throw.
+            // Its neighbors — same dividend, same divisor — divide normally, and the matching remainder exists: it's 0.
+            ['a:int / b:int', new Scope(['a' => PHP_INT_MIN, 'b' => -1]), null],
+            ['a:int / b:int', new Scope(['a' => PHP_INT_MIN, 'b' => 1]), PHP_INT_MIN],
+            ['a:int / b:int', new Scope(['a' => 7, 'b' => -1]), -7],
+            ['a:int % b:int', new Scope(['a' => PHP_INT_MIN, 'b' => -1]), 0],
+            ['(a:int / b:int).isSome()', new Scope(['a' => 1, 'b' => 0]), false],
+            ['(a:int / b:int).isSome()', new Scope(['a' => 1, 'b' => 2]), true],
+            ['(a:int / b:int).unwrap:int()', new Scope(['a' => 9, 'b' => 2]), 4],
+            // The remainder takes the dividend's sign, for floats (fmod) just like for ints (%).
+            ['a:int % b:int', new Scope(['a' => 7, 'b' => 3]), 1],
+            ['a:int % b:int', new Scope(['a' => -7, 'b' => 3]), -1],
+            ['a:float % b:float', new Scope(['a' => 5.5, 'b' => 2.0]), 1.5],
+            ['a:float % b:float', new Scope(['a' => -5.5, 'b' => 2.0]), -1.5],
+            ['a:int % b:int', new Scope(['a' => 7, 'b' => 0]), null],
+            ['a:float % b:float', new Scope(['a' => 5.5, 'b' => 0.0]), null],
+            ['(a:int % 3).unwrap:int() === 0', new Scope(['a' => 9]), true],
+            ['(a:int % 3).unwrap:int() === 0', new Scope(['a' => 10]), false],
+            ['a:int + b:int * c:int', new Scope(['a' => 2, 'b' => 3, 'c' => 4]), 14],
+            ['(a:int + b:int) * c:int', new Scope(['a' => 2, 'b' => 3, 'c' => 4]), 20],
+            ['a:int - b:int + c:int', new Scope(['a' => 10, 'b' => 3, 'c' => 4]), 11],
+            ['a:int * b:int / c:int', new Scope(['a' => 10, 'b' => 3, 'c' => 4]), 7],
             ['"foo" === "bar"', new Scope(), false],
             ['"foo" === "foo"', new Scope(), true],
             ['foo:any === bar:any', new Scope(['foo' => 12.34, 'bar' => 12.34]), true],
@@ -417,9 +468,31 @@ final class ExpressionTest extends TestCase
             new Scope(['foo' => []]),
             'Expected variable "foo" to be of type string, got array: Expected string, got list<never>',
         ];
-        // PHP's int arithmetic isn't closed: a difference past the range evaluates to a float rather than wrapping. An
-        // int-typed expression that answered one would be handing back a value of a type it doesn't have, so the
-        // operator decides up front whether its result exists and fails when it doesn't. See Arithmetic.
+        // Operands evaluate left to right, so the dividend runs even when the divisor turns out to be zero.
+        yield 'Division evaluates its dividend even when the divisor is zero' => [
+            ['a:int / b:int'],
+            new Scope(['b' => 0]),
+            'Unknown variable "a"',
+        ];
+        yield 'Unwrapping a none quotient' => [
+            ['(a:int / b:int).unwrap:int()'],
+            new Scope(['a' => 1, 'b' => 0]),
+            'Expected int, got None',
+        ];
+        // PHP's int arithmetic isn't closed: a sum, difference or product past the range evaluates to a float rather
+        // than wrapping. An int-typed expression that answered one would be handing back a value of a type it doesn't
+        // have, so every operator decides up front whether its int result exists and fails when it doesn't. The
+        // widened value is never computed, and never escapes. See Arithmetic.
+        yield 'Sum past the int range' => [
+            ['a:int + b:int'],
+            new Scope(['a' => PHP_INT_MAX, 'b' => 1]),
+            'a:int + b:int leaves the int range',
+        ];
+        yield 'Sum below the int range' => [
+            ['a:int + b:int'],
+            new Scope(['a' => PHP_INT_MIN, 'b' => -1]),
+            'a:int + b:int leaves the int range',
+        ];
         yield 'Difference past the int range' => [
             ['a:int - b:int'],
             new Scope(['a' => PHP_INT_MAX, 'b' => -1]),
@@ -430,11 +503,58 @@ final class ExpressionTest extends TestCase
             new Scope(['a' => PHP_INT_MIN, 'b' => 1]),
             'a:int - b:int leaves the int range',
         ];
-        // Negating and subtracting meet the same wall: -PHP_INT_MIN is one past PHP_INT_MAX, so it has no int result.
+        yield 'Product past the int range' => [
+            ['a:int * b:int'],
+            new Scope(['a' => PHP_INT_MAX, 'b' => 2]),
+            'a:int * b:int leaves the int range',
+        ];
+        yield 'Product below the int range' => [
+            ['a:int * b:int'],
+            new Scope(['a' => PHP_INT_MIN, 'b' => 2]),
+            'a:int * b:int leaves the int range',
+        ];
+        // A negative multiplier reverses which bound the product approaches, so both ends have to be tried against
+        // one: a multiplicand at either extreme passes a different one of the two.
+        yield 'Product past the int range through a negative multiplier' => [
+            ['a:int * b:int'],
+            new Scope(['a' => PHP_INT_MIN, 'b' => -2]),
+            'a:int * b:int leaves the int range',
+        ];
+        yield 'Product below the int range through a negative multiplier' => [
+            ['a:int * b:int'],
+            new Scope(['a' => PHP_INT_MAX, 'b' => -2]),
+            'a:int * b:int leaves the int range',
+        ];
+        // Negating and multiplying by -1 are the same operation, and PHP_INT_MIN is the one int neither has an answer
+        // for: -PHP_INT_MIN is one past PHP_INT_MAX. It's the quotient Divide is missing too.
+        yield 'Product of PHP_INT_MIN and -1' => [
+            ['a:int * b:int'],
+            new Scope(['a' => PHP_INT_MIN, 'b' => -1]),
+            'a:int * b:int leaves the int range',
+        ];
         yield 'Negating PHP_INT_MIN' => [
             ['-a:int'],
             new Scope(['a' => PHP_INT_MIN]),
             '-a:int leaves the int range',
+        ];
+        // The operator whose result left the range is the one blamed, wherever it sits: an operand can't reach the
+        // operator above it already widened, so no one else has to report the overflow second-hand.
+        yield 'The operator that overflowed is the one blamed, not the one above it' => [
+            ['(a:int + b:int) / c:int'],
+            new Scope(['a' => PHP_INT_MAX, 'b' => 1, 'c' => 2]),
+            'a:int + b:int leaves the int range',
+        ];
+        yield 'The operator that overflowed is the one blamed, on either side' => [
+            ['a:int % (b:int * c:int)'],
+            new Scope(['a' => 1, 'b' => PHP_INT_MAX, 'c' => 2]),
+            'b:int * c:int leaves the int range',
+        ];
+        // Operands evaluate before the quotient is asked to exist, so an overflow can't hide behind a divisor that
+        // happens to be zero.
+        yield 'Overflow is reported rather than excused by a zero divisor' => [
+            ['(a:int + b:int) / c:int'],
+            new Scope(['a' => PHP_INT_MAX, 'b' => 1, 'c' => 0]),
+            'a:int + b:int leaves the int range',
         ];
     }
 
@@ -504,6 +624,14 @@ final class ExpressionTest extends TestCase
         yield 'List literal with strings' => ['["foo", myVar:string]', Type::listOf(Type::string())];
         yield 'List literal with strings and ints' => ['["foo", "bar", 42, myVar:string]', Type::listOf(Type::any())];
         yield 'Empty list literal' => ['[]', Type::listOf(Type::any())];
+        yield 'Add ints' => ['a:int + b:int', Type::int()];
+        yield 'Add floats' => ['a:float + b:float', Type::float()];
+        yield 'Multiply ints' => ['a:int * b:int', Type::int()];
+        yield 'Multiply floats' => ['a:float * b:float', Type::float()];
+        yield 'Divide ints' => ['a:int / b:int', Type::option(Type::int())];
+        yield 'Divide floats' => ['a:float / b:float', Type::option(Type::float())];
+        yield 'Modulo ints' => ['a:int % b:int', Type::option(Type::int())];
+        yield 'Modulo floats' => ['a:float % b:float', Type::option(Type::float())];
     }
 
     /**
@@ -535,7 +663,7 @@ final class ExpressionTest extends TestCase
         };
 
         /** @psalm-suppress MixedMethodCall False positive */
-        self::assertEquals($expected, $expression->evaluate($scope));
+        self::assertEvaluatesTo($expected, $expression->evaluate($scope));
     }
 
     #[DataProvider('toStringCases')]
