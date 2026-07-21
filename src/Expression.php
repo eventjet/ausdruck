@@ -85,6 +85,16 @@ abstract class Expression implements Stringable
     }
 
     /**
+     * Returns self rather than the concrete {@see Not}: Not is internal, so this method, being @api, can't name it as
+     * its return type. Returning self is the shape every builder here is headed for, not a rule this one is the
+     * exception to.
+     */
+    public function not(): self
+    {
+        return Expr::not($this);
+    }
+
+    /**
      * Unlike the other builders, this one can't check its operands: there are no declarations here to look the
      * function's signature up in, so there is nothing to check the receiver and the arguments against. The call is
      * checked against $type when it's evaluated. Parse the expression instead of building it if you want the

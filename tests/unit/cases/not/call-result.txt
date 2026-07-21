@@ -1,0 +1,5 @@
+!haystack:list<string>.contains:bool(needle:string)
+-- Input --
+{ haystack: ["foo", "bar"], needle: "baz" }
+-- Output --
+true

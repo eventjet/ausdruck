@@ -83,9 +83,9 @@ enum Precedence: int
      * {@see self::binary()}: neither printer picks anything by hand beyond looking the token's level up. The operand
      * sits at {@see self::Unary}, the level itself rather than the tighter one a binary operator's right slot gets:
      * {@see ExpressionParser::parseUnary()} reads its operand by calling itself, so a unary operator's operand may be
-     * another one—`--a:int`—with nothing between them.
+     * another one—`!!a:bool`, `--a:int`—with nothing between them.
      *
-     * @param Token::Minus $token
+     * @param Token::Minus|Token::Not $token
      */
     public static function unary(Token $token, Expression $operand): string
     {

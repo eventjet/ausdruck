@@ -1,0 +1,5 @@
+!a:bool
+-- Input --
+{ a: true }
+-- Output --
+false
