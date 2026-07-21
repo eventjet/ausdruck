@@ -22,6 +22,9 @@ use function is_string;
 use function md5;
 use function sprintf;
 
+use const PHP_INT_MAX;
+use const PHP_INT_MIN;
+
 final class ExpressionTest extends TestCase
 {
     /**
@@ -109,6 +112,17 @@ final class ExpressionTest extends TestCase
             ['nums:list<int>.some:bool(|item| item:int === 5)', new Scope(['nums' => [4, 5, 6]]), true],
             ['"Rudolph".substr:string(1, 3)', new Scope(), 'udo'],
             ['a:int - b:int - c:int', new Scope(['a' => 10, 'b' => 3, 'c' => 4]), 3],
+            // The last differences that still fit, on both ends. Subtraction decides whether its int result exists
+            // before computing it (see Arithmetic), and these are the pairs that decision has to admit — one step
+            // further in either direction is an error, covered in evaluationErrorsCases().
+            ['a:int - b:int', new Scope(['a' => PHP_INT_MAX, 'b' => 0]), PHP_INT_MAX],
+            ['a:int - b:int', new Scope(['a' => PHP_INT_MIN, 'b' => 0]), PHP_INT_MIN],
+            ['a:int - b:int', new Scope(['a' => -1, 'b' => PHP_INT_MIN]), PHP_INT_MAX],
+            ['a:int - b:int', new Scope(['a' => PHP_INT_MIN + 1, 'b' => 1]), PHP_INT_MIN],
+            // Negation is arithmetic too: PHP_INT_MIN is the one int it has no answer for, one step past the boundary.
+            ['-a:int', new Scope(['a' => PHP_INT_MAX]), -PHP_INT_MAX],
+            ['-a:int', new Scope(['a' => PHP_INT_MIN + 1]), PHP_INT_MAX],
+            ['-a:float', new Scope(['a' => 1.5]), -1.5],
             ['"foo" === "bar"', new Scope(), false],
             ['"foo" === "foo"', new Scope(), true],
             ['foo:any === bar:any', new Scope(['foo' => 12.34, 'bar' => 12.34]), true],
@@ -402,6 +416,25 @@ final class ExpressionTest extends TestCase
             ['foo:string'],
             new Scope(['foo' => []]),
             'Expected variable "foo" to be of type string, got array: Expected string, got list<never>',
+        ];
+        // PHP's int arithmetic isn't closed: a difference past the range evaluates to a float rather than wrapping. An
+        // int-typed expression that answered one would be handing back a value of a type it doesn't have, so the
+        // operator decides up front whether its result exists and fails when it doesn't. See Arithmetic.
+        yield 'Difference past the int range' => [
+            ['a:int - b:int'],
+            new Scope(['a' => PHP_INT_MAX, 'b' => -1]),
+            'a:int - b:int leaves the int range',
+        ];
+        yield 'Difference below the int range' => [
+            ['a:int - b:int'],
+            new Scope(['a' => PHP_INT_MIN, 'b' => 1]),
+            'a:int - b:int leaves the int range',
+        ];
+        // Negating and subtracting meet the same wall: -PHP_INT_MIN is one past PHP_INT_MAX, so it has no int result.
+        yield 'Negating PHP_INT_MIN' => [
+            ['-a:int'],
+            new Scope(['a' => PHP_INT_MIN]),
+            '-a:int leaves the int range',
         ];
     }
 

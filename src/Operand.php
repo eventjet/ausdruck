@@ -20,6 +20,11 @@ use function sprintf;
  * for an expression that was built through {@see Expr}. They exist so the nodes can go from mixed to int, float, bool or
  * object without a cast. Anything thrown here is a bug in this library, not in the expression that was evaluated.
  *
+ * {@see self::int()} used to be the exception. PHP's int arithmetic isn't closed, so an operand whose own arithmetic
+ * had overflowed arrived here as a float, honestly and for a reason no type error explained. {@see Arithmetic} now
+ * decides whether an int result exists before computing it, so the widened value is never produced and there is no
+ * longer a way for one to reach any of these.
+ *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
@@ -50,6 +55,26 @@ final class Operand
         return is_int($value) || is_float($value)
             ? $value
             : throw new EvaluationError(sprintf('Expected an int or float operand, got %s', get_debug_type($value)));
+    }
+
+    /**
+     * @infection-ignore-all Unreachable; see the class docblock.
+     */
+    public static function int(mixed $value): int
+    {
+        return is_int($value)
+            ? $value
+            : throw new EvaluationError(sprintf('Expected an int operand, got %s', get_debug_type($value)));
+    }
+
+    /**
+     * @infection-ignore-all Unreachable; see the class docblock.
+     */
+    public static function float(mixed $value): float
+    {
+        return is_float($value)
+            ? $value
+            : throw new EvaluationError(sprintf('Expected a float operand, got %s', get_debug_type($value)));
     }
 
     /**

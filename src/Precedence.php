@@ -112,8 +112,6 @@ enum Precedence: int
             $expr instanceof BinaryOperator => self::ofToken($expr->token()),
             $expr instanceof Lambda => self::Lambda,
             $expr instanceof Negative => self::Unary,
-            // Subtract joins BinaryOperator when the arithmetic operators land; until then it names its own level.
-            $expr instanceof Subtract => self::Additive,
             default => self::Primary,
         };
     }
@@ -130,6 +128,7 @@ enum Precedence: int
             Token::And => self::And,
             Token::TripleEquals, Token::NotEquals, Token::CloseAngle, Token::OpenAngle,
             Token::GreaterThanEquals, Token::LessThanEquals => self::Comparison,
+            Token::Minus => self::Additive,
             default => throw new LogicException(sprintf('%s is not a binary operator', $token->value)),
         };
     }
