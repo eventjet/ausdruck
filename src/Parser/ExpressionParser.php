@@ -10,6 +10,7 @@ use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\FieldAccess;
 use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\ListLiteral;
+use Eventjet\Ausdruck\Precedence;
 use Eventjet\Ausdruck\StructLiteral;
 use Eventjet\Ausdruck\Type;
 
@@ -152,7 +153,7 @@ final class ExpressionParser
      *
      * The loop is what makes this level left-associative: each operator folds what came before into its left operand.
      * {@see self::parseComparison()} is otherwise the same shape with an if in place of the loop, which is what makes
-     * the six comparison operators non-associative; {@see \Eventjet\Ausdruck\Precedence::leftSlot()} reads that one
+     * the six comparison operators non-associative; {@see Precedence::leftSlot()} reads that one
      * difference back out when an expression is printed.
      */
     private function parseAdditive(): Expression

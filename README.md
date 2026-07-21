@@ -60,7 +60,8 @@ See [Types](#types)
 
 ### Operators
 
-Operators take two operands of the same type, except `!`, which takes a single boolean and goes in front of it.
+Operators take two operands of the same type, except the two prefix operators: unary `-`, which takes a single number,
+and `!`, which takes a single boolean. Both go in front of their operand.
 
 | Operator | Description           | Example                  | Note                                            |
 |----------|-----------------------|--------------------------|-------------------------------------------------|
@@ -77,6 +78,7 @@ Operators take two operands of the same type, except `!`, which takes a single b
 | `<=`     | Less than or equal    | `foo:int <= bar:int`     | Operands must be of type `int` or `float`       |
 | `\|\|`   | Logical OR            | `foo:bool \|\| bar:bool` | Operands must be of type `bool`                 |
 | &&       | Logical AND           | `foo:bool && bar:bool`   | Operands must be of type `bool`                 |
+| `-`      | Negation              | `-foo:int`               | The operand must be of type `int` or `float`    |
 | `!`      | Logical NOT           | `!foo:bool`              | The operand must be of type `bool`              |
 
 Equality is spelled `===`, so inequality is `!==`; there is no `==` or `!=`.
