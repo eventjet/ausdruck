@@ -16,8 +16,8 @@ use function sprintf;
  * to undo what the cascade does when an expression is printed back out.
  *
  * An operand is printed with {@see self::parenthesize()}, passing the level the parser reads that operand at. A binary
- * operator picks nothing by hand: {@see self::binary()} looks the node's level up in {@see self::of()} and derives both
- * operand slots from it, so how a node prints can't disagree with how it re-parses.
+ * operator picks nothing by hand: {@see self::binary()} looks the token's level up in {@see self::ofToken()} and
+ * derives both operand slots from it, so how a node prints can't disagree with how it re-parses.
  * {@see ExpressionParser::parseOr()} reads the right side of `||` by calling {@see ExpressionParser::parseAnd()}, so
  * `||` prints its right side at {@see self::And}, one level tighter than its own. An operand looser than the level it
  * sits at is wrapped in parentheses, because printing it bare would let the surrounding operator capture one of its
@@ -25,9 +25,12 @@ use function sprintf;
  * parentheses, so redundant ones — the parentheses in `(a:int - b:int) - c:int`, which the left-associative `-` would
  * have grouped that way anyway — are dropped.
  *
- * A binary operator's level comes from the token it is spelled with, so an operator can't exist without one. Grouping,
- * on the other hand, is not stored anywhere: parentheses leave no trace in the tree, so the same tree always prints the
- * same way regardless of whether it was built with them, in the builder API, or by the parser.
+ * A binary operator's level comes from the token it is spelled with, so an operator can't exist without one. That token
+ * is also what the printer here spells the operator with, which makes this the only place in the library where an
+ * operator node is spelled back into an expression: an operator can only be printed the way the lexer reads it back.
+ *
+ * Grouping, on the other hand, is not stored anywhere: parentheses leave no trace in the tree, so the same tree always
+ * prints the same way regardless of whether it was built with them, in the builder API, or by the parser.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -63,21 +66,23 @@ enum Precedence: int
     }
 
     /**
-     * Prints a binary operator node. Its level comes from {@see self::of()}, and both operand slots follow from the
-     * level alone: the right slot is one level tighter, because every level of the cascade reads its right operand by
-     * calling the next one down, and the left slot is the level's {@see self::leftSlot()}. `a:int - (b:int - c:int)`
-     * keeps its parentheses because the right slot is the tighter one; `(a:int - b:int) - c:int` loses them because
-     * the additive left slot isn't; `(a:int === b:int) === c:bool` keeps them on either side because the comparison
-     * level's left slot is tighter too.
+     * Prints a binary operator from the token it is spelled with and its two operands. Its level comes from
+     * {@see self::ofToken()}, and both operand slots follow from the level alone: the right slot is one level
+     * tighter, because every level of the cascade reads its right operand by calling the next one down, and the left
+     * slot is the level's {@see self::leftSlot()}. `a:int - (b:int - c:int)` keeps its parentheses because the right
+     * slot is the tighter one; `(a:int - b:int) - c:int` loses them because the additive left slot isn't;
+     * `(a:int === b:int) === c:bool` keeps them on either side because the comparison level's left slot is tighter
+     * too. It is a {@see Token} rather than a string because a spelling the lexer has no token for is not something a
+     * caller may ask for, and taking the token is what makes that unsayable.
      */
-    public static function binary(BinaryOperator $operator): string
+    public static function binary(Token $token, Expression $left, Expression $right): string
     {
-        $level = self::of($operator);
+        $level = self::ofToken($token);
         return sprintf(
             '%s %s %s',
-            self::parenthesize($operator->left, $level->leftSlot()),
-            $operator->symbol(),
-            self::parenthesize($operator->right, $level->tighter()),
+            self::parenthesize($left, $level->leftSlot()),
+            $token->value,
+            self::parenthesize($right, $level->tighter()),
         );
     }
 

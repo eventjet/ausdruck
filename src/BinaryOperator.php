@@ -25,16 +25,7 @@ abstract class BinaryOperator extends Expression
 
     final public function __toString(): string
     {
-        return Precedence::binary($this);
-    }
-
-    /**
-     * How the operator is spelled in the language, e.g. `+`. Taken from the token the parser reads it as, so the
-     * printer can't spell an operator differently than the lexer reads it.
-     */
-    final public function symbol(): string
-    {
-        return $this->token()->value;
+        return Precedence::binary($this->token(), $this->left, $this->right);
     }
 
     /**
