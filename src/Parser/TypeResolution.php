@@ -7,6 +7,7 @@ namespace Eventjet\Ausdruck\Parser;
 use Eventjet\Ausdruck\Type;
 use Eventjet\Ausdruck\TypeConstructor;
 
+use function array_fill_keys;
 use function array_key_exists;
 use function array_key_last;
 use function assert;
@@ -100,6 +101,29 @@ final class TypeResolution
             2 => 'two arguments',
             default => sprintf('%d arguments', $count),
         };
+    }
+
+    /**
+     * The first name $node->typeParameters declares that {@see Type::asFunction()} doesn't also derive for
+     * $funcType, or null if every declared name is put to use. A binder is written, not inferred, so a name that
+     * appears in it has to earn its place the same way any other written thing does.
+     *
+     * @param list<Identifier> $typeParameters
+     */
+    private static function firstUnused(array $typeParameters, Type $funcType): Identifier|null
+    {
+        if ($typeParameters === []) {
+            return null;
+        }
+        $signature = $funcType->asFunction();
+        assert($signature !== null);
+        $derived = array_fill_keys($signature->typeVariables, true);
+        foreach ($typeParameters as $parameter) {
+            if (!array_key_exists($parameter->name, $derived)) {
+                return $parameter;
+            }
+        }
+        return null;
     }
 
     /**
@@ -217,9 +241,14 @@ final class TypeResolution
      * outright if it has one of its own while already nested anywhere below another function type's parameters or
      * return type—however many lists, Options, or struct fields deep: rank-1 polymorphism, a rule about the
      * signatures this language lets you write rather than a limitation of what {@see Type} can record, the same way
-     * `list<list<T>>` is representable but `T` still has to be quantified somewhere outside both `list`s.
-     * {@see Type::func()} enforces the identical rule for a signature built directly through that API instead of
-     * written as a type string.
+     * `list<list<T>>` is representable but `T` still has to be quantified somewhere outside both `list`s. This is the
+     * one place that rule is enforced: {@see Type::func()} takes no binder a caller could nest one into, so there is
+     * nothing left for it to reject the same shape with.
+     *
+     * $node->typeParameters is what's written, not what {@see Type::asFunction()} would later derive from how the
+     * result is actually used, so the two are checked against each other once the type is built: a name written here
+     * that doesn't appear in a parameter or the return type is declared for nothing, and rejected rather than quietly
+     * accepted -- see {@see self::firstUnused()}.
      */
     private function resolveSignature(FunctionTypeNode $node): Type|TypeError
     {
@@ -229,14 +258,12 @@ final class TypeResolution
             return TypeError::create(Type::nestedBinderMessage(), $first->location->to($last->location));
         }
         $typeVariables = $this->typeVariables;
-        $typeVariableNames = [];
         foreach ($node->typeParameters as $parameter) {
             $error = $this->checkTypeVariable($parameter, $typeVariables);
             if ($error !== null) {
                 return $error;
             }
             $typeVariables[$parameter->name] = true;
-            $typeVariableNames[] = $parameter->name;
         }
         $inner = new self($this->aliases, $typeVariables, nestedInSignature: true);
         $argTypes = [];
@@ -251,7 +278,18 @@ final class TypeResolution
         if ($returnType instanceof TypeError) {
             return $returnType;
         }
-        return Type::func($returnType, $argTypes, $typeVariableNames);
+        $funcType = Type::func($returnType, $argTypes);
+        $unused = self::firstUnused($node->typeParameters, $funcType);
+        if ($unused !== null) {
+            return TypeError::create(
+                sprintf(
+                    '%s is declared but doesn\'t appear in the parameters or the return type, so no call could ever decide it',
+                    $unused->name,
+                ),
+                $unused->location,
+            );
+        }
+        return $funcType;
     }
 
     private function resolveStruct(StructTypeNode $node): Type|TypeError
@@ -274,14 +312,23 @@ final class TypeResolution
      * binder is never in question here—{@see self::resolveSignature()} rejects a nested one before it ever declares a
      * name to collide with.
      *
+     * A name a {@see TypeConstructor} case already spells is the one restriction that belongs here and nowhere else:
+     * within the signature this binder introduces the name for, the bare word could no longer mean the type once it
+     * also means the variable, which is a fact about this written text, not about {@see Type}'s own representation --
+     * {@see Type::var()} takes the same name without complaint, since two separate PHP calls are never ambiguous
+     * about which of them is meant the way one reused word in one signature would be.
+     *
      * @param array<string, true> $typeVariables The names declared so far in the binder $parameter belongs to, which
      *     grows as {@see self::resolveSignature()} works through the binder's parameters, so that two variables in
      *     one binder can't answer to the same name.
      */
     private function checkTypeVariable(Identifier $parameter, array $typeVariables): TypeError|null
     {
-        if (TypeConstructor::isReservedName($parameter->name)) {
-            return TypeError::create(TypeConstructor::reservedNameMessage($parameter->name), $parameter->location);
+        if (TypeConstructor::tryFrom($parameter->name) !== null) {
+            return TypeError::create(
+                sprintf('%s can\'t be a type variable: it is a type of its own', $parameter->name),
+                $parameter->location,
+            );
         }
         if (array_key_exists($parameter->name, $typeVariables)) {
             return TypeError::create(

@@ -11,7 +11,6 @@ use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Type;
-use InvalidArgumentException;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -191,41 +190,13 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * A name a type constructor already spells is a type, not a placeholder for one—the same rule {@see Types}
-     * enforces where a signature is written as a type string, enforced here too so a signature built directly through
-     * this API can't spell one the parser would reject.
-     */
-    public function testVariableNamedAfterATypeConstructorIsRejected(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('int can\'t be a type variable: it is a type of its own');
-
-        Type::var('int');
-    }
-
-    /**
-     * The same reservation {@see Type::var()} enforces, for the same reason plus one of its own: a few checks --
-     * {@see self::toString()}'s `Struct` and `fn` cases -- read an alias's own name directly, without seeing through
-     * it first, to decide whether $this *is* a function type or a struct. A name a type constructor already spells
-     * collides with exactly that check, so `Type::alias('Struct', ...)` used to print as `{}` and
-     * `Type::alias('fn', ...)` crashed outright; this closes both at the door instead.
-     */
-    public function testAliasNamedAfterATypeConstructorIsRejected(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Struct can\'t be an alias: it is a type of its own');
-
-        Type::alias('Struct', Type::listOf(Type::int()));
-    }
-
-    /**
      * bind() only sees through an alias on the actual side, so a variable under an alias on the signature side has to
      * be reachable too, or instantiating a signature built directly through this API silently drops it to `any`
      * instead of what the call actually decided.
      */
     public function testVariableUnderAnAliasOnTheSignatureSideIsBound(): void
     {
-        $signature = Type::func(Type::var('T'), [Type::alias('Bag', Type::listOf(Type::var('T')))], ['T'])->asFunction();
+        $signature = Type::func(Type::var('T'), [Type::alias('Bag', Type::listOf(Type::var('T')))])->asFunction();
         self::assertNotNull($signature);
 
         $instantiated = $signature->instantiateForCall(Type::listOf(Type::int()), []);
@@ -282,66 +253,15 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * {@see Type::func()} can't reject this itself: a variable with no binder of its own -- the `T` in a lambda
-     * parameter's `fn(T) -> bool`, say -- legitimately defers to whichever binder ends up enclosing it, and while
-     * {@see Type::func()} is still building that enclosing signature, "ends up" hasn't happened yet.
-     * {@see Type::asFunction()} is the first point it's known for certain that nothing ever will, which is why the
-     * check lives there instead.
+     * A variable used only in the return type -- nothing in the parameters reaches it -- is still part of the
+     * derived binder: {@see Type::asFunction()} walks the return type too, not just the parameters. Nothing decides
+     * it from a call, so {@see Signature::instantiateForCall()} leaves it as `any`, but it isn't unbound.
      */
-    public function testAsFunctionRejectsAVariableItsOwnBinderDoesntDeclare(): void
+    public function testAsFunctionDerivesAVariableUsedOnlyInTheReturnType(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('T isn\'t declared by this function type\'s own binder, so nothing quantifies it');
+        $signature = Type::func(Type::var('T'))->asFunction();
 
-        Type::func(Type::var('T'), [Type::listOf(Type::var('T'))])->asFunction();
-    }
-
-    /**
-     * The same rejection, for a variable one binder over from the one that would have to declare it: a signature
-     * declaring `U` doesn't make `T` -- used nowhere else -- any less unbound.
-     */
-    public function testAsFunctionRejectsAVariableOnlyAWiderBinderDeclares(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('T isn\'t declared by this function type\'s own binder, so nothing quantifies it');
-
-        Type::func(Type::var('T'), [Type::var('U')], ['U'])->asFunction();
-    }
-
-    /**
-     * The parser rejects this same nesting when a signature is written as a type string -- see the
-     * generics/type-variable fixtures -- because {@see Signature::instantiateForCall()}'s substitution can't tell
-     * the inner binder's own variables from the outer signature's: instantiating the outer call would replace T
-     * inside the nested fn<T> with whatever the outer call decided, corrupting a signature that was never meant to
-     * be touched by that call at all. Built directly through this API, there's no parser to catch it first, so
-     * Type::func() enforces the same rule itself.
-     */
-    public function testFunctionTypeRejectsAParameterWithANestedBinderOfItsOwn(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            'A function type nested inside another one can\'t bind type variables of its own: a variable is '
-                . 'quantified once, by whichever function type encloses it',
-        );
-
-        Type::func(Type::int(), [Type::listOf(Type::func(Type::var('T'), [Type::var('T')], ['T']))]);
-    }
-
-    /**
-     * The same rejection as {@see self::testFunctionTypeRejectsAParameterWithANestedBinderOfItsOwn()}, for the
-     * return type instead of a parameter, and with the nested binder immediately there rather than behind a list --
-     * the shape that, left unrejected, {@see Signature::instantiateForCall()} would silently collapse to
-     * `fn(any) -> any` instead of leaving the inner fn<T> generic.
-     */
-    public function testFunctionTypeRejectsAReturnTypeWithANestedBinderOfItsOwn(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            'A function type nested inside another one can\'t bind type variables of its own: a variable is '
-                . 'quantified once, by whichever function type encloses it',
-        );
-
-        Type::func(Type::func(Type::var('T'), [Type::var('T')], ['T']), [Type::var('U')], ['U']);
+        self::assertSame(['T'], $signature?->typeVariables);
     }
 
     /**

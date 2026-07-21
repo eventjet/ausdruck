@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use function sprintf;
-
 /**
  * Every type the language spells itself with a name of its own that's written in angle brackets or bare -- `fn` is
  * its own node shape ({@see Parser\FunctionTypeNode}) rather than a case here, since {@see Parser\TypeResolution::resolve()}
@@ -19,9 +17,16 @@ use function sprintf;
  *
  * The case names are the names as written, which is why some of them are PHP keywords.
  *
- * This lives in {@see Type}'s own namespace, not the parser's: {@see Type::var()} rejects a name the language spells
- * itself the same way {@see Parser\TypeResolution} does, and a type is a thing the parser depends on, not the other
+ * This lives in {@see Type}'s own namespace, not the parser's: a type is a thing the parser depends on, not the other
  * way around.
+ *
+ * A case here is also the one genuine restriction on a type variable's name: within the `fn<...>` binder that
+ * declares it, a name a case here already spells could never again be written as the type it names, only as the
+ * variable shadowing it, so {@see Parser\TypeResolution::checkTypeVariable()} rejects one. That is a rule about what a
+ * reader can tell apart in written syntax, which is the one place it's enforced -- {@see Type::var()} and
+ * {@see Type::alias()} take whatever name they're given, since two PHP calls picking `Type::var('int')` and
+ * `Type::int()` are never ambiguous about which is which the way two occurrences of the bare word `int` in one
+ * signature would be.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -38,33 +43,6 @@ enum TypeConstructor: string
     case Option = 'Option';
     case Some = 'Some';
     case None = 'None';
-
-    /**
-     * The message {@see Type::var()}, {@see Type::alias()}, and {@see Parser\TypeResolution}'s binder check reject a
-     * reserved name with, worded once here so the three can't drift apart. $usage is what the name was being claimed
-     * as -- "a type variable" for the two binder-facing callers, "an alias" for {@see Type::alias()} -- since the two
-     * reservations exist for different reasons and a shared message that named only one of them would be wrong for
-     * the other.
-     */
-    public static function reservedNameMessage(string $name, string $usage = 'a type variable'): string
-    {
-        return sprintf('%s can\'t be %s: it is a type of its own', $name, $usage);
-    }
-
-    /**
-     * Whether $name is off-limits to a type variable or an alias: every name a case above already spells, plus two
-     * that aren't a case here and never will be, because neither is ever written as a name at all -- `fn` is its own
-     * node shape, and `Struct` is the marker {@see Type::struct()} names a struct type with internally, a struct
-     * itself being written only as its fields. `never`, the bottom type {@see Type::fromValue()} infers for an empty
-     * list or map, is the third: nothing ever writes it either, only infers it. A name {@see Type} gives special
-     * meaning to is exactly as unavailable to a variable or an alias as one the language does spell, or
-     * {@see Type::var('Struct')} would build a variable that {@see Type::isStruct()} and every other name-based check
-     * then misreads as an actual struct.
-     */
-    public static function isReservedName(string $name): bool
-    {
-        return $name === 'fn' || $name === 'Struct' || $name === 'never' || self::tryFrom($name) !== null;
-    }
 
     /**
      * How many type arguments this constructor is written with in angle brackets.

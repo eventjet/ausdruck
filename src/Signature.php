@@ -10,15 +10,21 @@ use function count;
 
 /**
  * A function type read as what it's for: a return type, a receiver, and the arguments a call passes in parentheses.
- * Get one from {@see Type::asFunction()}, which is also the only thing that constructs one starting from a
- * {@see Type}: it hands this the type variables and parameter types found in the type's own `fn<...>` binder, once
- * it has checked every variable reachable from them is one the binder actually declares.
+ * Get one from {@see Type::asFunction()}, the only thing that constructs one starting from a {@see Type}: it derives
+ * $typeVariables from where {@see Type::var()} actually turns out to be used in the return type and the parameters,
+ * rather than trusting a $typeVariables a caller hands it -- which is exactly why the constructor below isn't the
+ * door to come in through. A `Signature` built directly, by contrast, is only as trustworthy as whatever built it:
+ * nothing stops $typeVariables from disagreeing with $returnType and $parameters, or naming a variable neither one
+ * uses, or missing one both of them do.
  *
  * @api
  */
 final class Signature
 {
     /**
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     *
      * @param list<Type> $parameters The types the PHP callable receives, in order, receiver first -- `substr` is
      *     declared as `fn(string, int, int) -> string` and called as `foo:string.substr:string(0, 3)`, so its
      *     parameters are `[string, int, int]` and `foo` is checked against the first of them; see
@@ -74,10 +80,10 @@ final class Signature
      * expression that's wrong.
      *
      * A signature that names no variable at all is returned unchanged rather than substituted for nothing: since
-     * {@see Type::asFunction()} already rejects a variable no binder declares, an empty $typeVariables here means
-     * there is no {@see Type::var()} left anywhere in $returnType or $parameters for {@see Type::bind()} to find, so
-     * substituting would walk the whole signature only to rebuild it unchanged. Skipping it is purely that
-     * optimization -- correct either way, not load-bearing for either.
+     * {@see Type::asFunction()} derives $typeVariables from where {@see Type::var()} is actually used, an empty
+     * $typeVariables here means there is no variable left anywhere in $returnType or $parameters for
+     * {@see Type::bind()} to find, so substituting would walk the whole signature only to rebuild it unchanged.
+     * Skipping it is purely that optimization -- correct either way, not load-bearing for either.
      *
      * @param list<Type> $argumentTypes
      */

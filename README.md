@@ -230,15 +230,18 @@ is a `list<string>` — the same function, two return types, neither of them wri
 
 A binder is the whole of a variable's scope, so a variable is a type anywhere below the `fn` that binds it, and a name
 no binder declares is not a variable: it is an alias, or an error. That's enforced for a signature written as a type
-string, where only a `fn<...>` binder can introduce a name that resolves to a variable, and it's enforced for one
-built directly through `Type::func()` too: a `Type::var()` used inside a `Type::func()` that doesn't list it among
-its own type variables is rejected the moment that function type is read as a callable signature, whether that's a
-direct call to `Type::asFunction()` or, as below, a `Declarations` reading it from `functions:`.
+string, where only a `fn<...>` binder can introduce a name that resolves to a variable. The binder itself is derived,
+not declared: it's exactly the variables that turn out to be used in the parameters and the return type, so a written
+`fn<T, U>(int) -> int` where neither `T` nor `U` appears anywhere is rejected -- a name in the binder has to earn its
+place. `Type::func()`, built directly through the PHP API instead of parsed from a type string, follows the same
+rule: a `Type::var()` used inside it is picked up automatically, wherever it's used, by whichever `Type::func()`
+encloses it.
 
 Because the call site decides them, the inline return type is rarely worth writing: `foo:list<string>.head()` is
 already an `Option<string>`. Writing one anyway is still allowed, and is then checked against the inferred one.
 
-In PHP, a type variable is `Type::var()`, and the names its binder declares are `Type::func()`'s third argument:
+In PHP, a type variable is `Type::var()`, and a signature's own binder needs no separate argument -- `Type::func()`
+derives it from `Type::var()`, wherever it's used in the return type and the parameters:
 
 ```php
 use Eventjet\Ausdruck\Parser\Declarations;
@@ -248,7 +251,6 @@ use Eventjet\Ausdruck\Type;
 $zip = Type::func(
     Type::listOf(Type::struct(['a' => Type::var('T'), 'b' => Type::var('U')])),
     [Type::listOf(Type::var('T')), Type::listOf(Type::var('U'))],
-    ['T', 'U'],
 );
 $declarations = new Declarations(functions: ['zip' => $zip]);
 ```

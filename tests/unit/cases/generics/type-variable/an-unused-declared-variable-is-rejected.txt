@@ -1,0 +1,7 @@
+foo:fn<T, U>(int) -> int
+-- Type error --
+T is declared but doesn't appear in the parameters or the return type, so no call could ever decide it
+-- Note --
+The binder is derived from where a variable is actually used (see Type::asFunction()), not read back from what was
+written, so a written name has to earn its place. T is checked, and rejected, before U ever gets a turn -- the first
+of the two unused names is the one reported.

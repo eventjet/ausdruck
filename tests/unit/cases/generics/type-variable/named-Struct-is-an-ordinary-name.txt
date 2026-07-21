@@ -1,0 +1,8 @@
+foo:fn<Struct>(Struct) -> Struct
+-- Expression type --
+fn<Struct>(Struct) -> Struct
+-- Note --
+Struct isn't reserved: it's the name Type::struct() gives a struct internally, but a struct is never written that
+way -- always as its fields -- and Type carries which kind of type this is as a field of its own, not by comparing
+names, so a variable named Struct can never be misread as one. A variable can be named Struct like any other name the
+language doesn't spell.

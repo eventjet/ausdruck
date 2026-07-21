@@ -1,6 +1,0 @@
-foo:fn<T, U>(int) -> int
--- Expression type --
-fn<T, U>(int) -> int
--- Note --
-Neither T nor U appears in the parameters or the return type, so there is nothing to scan for and find. The binder
-is what was written, not what turned out to be used, so both names still print.
