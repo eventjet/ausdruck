@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Parser;
 
 use Eventjet\Ausdruck\Type;
-use Eventjet\Ausdruck\TypeConstructor;
 
 /**
  * The public entry point for resolving a {@see TypeNode} against a set of aliases. Resolution itself is
@@ -24,9 +23,10 @@ final class Types
     }
 
     /**
-     * A name the language spells itself is one of the {@see TypeConstructor}s; anything else is a consumer's alias, or
-     * nothing at all—unless a `fn<...>` binder above the node names it a type variable instead, which is
-     * {@see TypeResolution}'s to decide.
+     * Delegates outright: resolving $node is entirely {@see TypeResolution}'s job, started here with an empty type
+     * variable scope because a fresh, top-level $node has no enclosing `fn<...>` binder to have added any. This method
+     * exists only so a caller resolving against a set of aliases -- what {@see Types} is @api for -- gets to do that
+     * without also being handed {@see TypeResolution}'s own, @internal, binder-scope parameter.
      */
     public function resolve(TypeNode $node): Type|TypeError
     {

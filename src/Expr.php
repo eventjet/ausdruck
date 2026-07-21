@@ -84,12 +84,14 @@ final class Expr
      * @param TypeAnnotation|null $returnType The return type the call site spells out, or null if it doesn't spell one
      *     out. What the call evaluates to is resolved from this and the declaration; see {@see self::returnType()}.
      * @param list<Expression> $arguments
-     * @param Type|null $signature The declared type of the function, or null if it has no declaration. Only a
+     * @param Signature|null $signature The function's declared signature, or null if it has no declaration. Only a
      *     declaration says which receiver and arguments a function accepts, so a call to an undeclared function has
      *     nothing to check its operands against. That's the case for functions that are used with nothing but an
      *     inline return type, and for every call built through {@see Expression::call()}, which has no declarations to
-     *     consult. A declaration may be generic, in which case it says what this call accepts only once
-     *     {@see Signature::instantiateForCall()} has resolved its type variables against the types at hand.
+     *     consult. {@see Parser\Declarations::$functions} is never anything but a function's signature, so there is no
+     *     second, non-function shape here to fail null-safely into "undeclared" against. A declaration may be
+     *     generic, in which case it says what this call accepts only once {@see Signature::instantiateForCall()} has
+     *     resolved its type variables against the types at hand.
      * @param Span|null $nameLocation Where the function is named, which is what an error about the function itself
      *     rather than about one of its operands points at.
      */
@@ -98,12 +100,12 @@ final class Expr
         string $name,
         TypeAnnotation|null $returnType,
         array $arguments,
-        Type|null $signature,
+        Signature|null $signature,
         Span|null $nameLocation = null,
         Span|null $location = null,
     ): Call {
         $location ??= self::dummySpan();
-        $instantiated = $signature?->asFunction()?->instantiateForCall(
+        $instantiated = $signature?->instantiateForCall(
             $target->getType(),
             array_map(static fn(Expression $argument): Type => $argument->getType(), $arguments),
         );
@@ -399,7 +401,7 @@ final class Expr
 
     /**
      * A receiver function takes the expression it's called on as its first argument: `substr` is declared as
-     * func(string, [string, int, int]) and called as `foo:string.substr:string(0, 3)`, so `foo` has to be a string.
+     * `fn(string, int, int) -> string` and called as `foo:string.substr:string(0, 3)`, so `foo` has to be a string.
      */
     private static function checkReceiver(Expression $target, string $name, Signature $signature): void
     {

@@ -24,7 +24,7 @@ final class FunctionTypeNode extends TypeNode
      * @param list<TypeNode> $parameters
      * @param list<TypeNode> $typeParameters The type variables this function type binds, which are only ever the
      *     names themselves. They are nodes rather than strings so that each one carries the span an error about it
-     *     points at; see {@see Types::resolve()}.
+     *     points at; see {@see TypeResolution::checkTypeVariable()}.
      */
     public function __construct(
         array $parameters,

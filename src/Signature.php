@@ -43,7 +43,7 @@ final class Signature
     }
 
     /**
-     * The type a receiver function is called on: `substr` is declared as func(string, [string, int, int]) and called as
+     * The type a receiver function is called on: `substr` is declared as `fn(string, int, int) -> string` and called as
      * `foo:string.substr:string(0, 3)`, so its receiver type is string. Null if the function declares no parameters at
      * all, which is what makes it unusable as a receiver function.
      */
@@ -60,17 +60,6 @@ final class Signature
     public function argumentTypes(): array
     {
         return array_slice($this->parameterTypes(), 1);
-    }
-
-    /**
-     * Instantiates this signature against a call, spelling out the one layout convention it depends on -- receiver
-     * first, then the arguments a call passes in parentheses -- so that nowhere else has to.
-     *
-     * @param list<Type> $argumentTypes
-     */
-    public function instantiateForCall(Type $receiver, array $argumentTypes): self
-    {
-        return $this->instantiate([$receiver, ...$argumentTypes]);
     }
 
     /**
@@ -92,21 +81,26 @@ final class Signature
      * This signature with its type variables resolved against the receiver and argument types a call applies it to:
      * the signature the call is actually checked against, with no variables left in it.
      *
-     * The parameters are walked in order and a variable keeps the first type that lands on it, so the receiver decides
-     * `T` for `func(bool, [list<T>, T])` before the argument is looked at. That order is what makes a lambda argument
-     * harmless: a lambda's parameters are typed `any` and would decide nothing useful, but by then the receiver has
-     * already decided. A variable no parameter reaches becomes `any`—nothing constrained it, so nothing about the call
-     * should be rejected on its account, and an argument that isn't there is reported as the missing argument it is.
+     * The parameters -- receiver first, then the arguments a call passes in parentheses, the one layout convention
+     * this spells out so that nowhere else has to -- are walked in order and a variable keeps the first type that
+     * lands on it, so the receiver decides `T` for `fn(list<T>, T) -> bool` before the argument is looked at. A
+     * variable no parameter reaches becomes `any`—nothing constrained it, so nothing about the call should be rejected
+     * on its account, and an argument that isn't there is reported as the missing argument it is.
+     *
+     * A lambda argument is harmless regardless of where its parameter falls in that order: a lambda's own parameters
+     * are always typed `any`, since a lambda never knows its parameter types ahead of the call it's an argument to, and
+     * {@see Type::bind()} doesn't let a parameter typed `any` decide a variable that sits in a function's own parameter
+     * position, walked first or not.
      *
      * Nothing here is an error. Where a variable's binding and a later parameter disagree, the substituted signature
      * says what was expected and {@see Expr::call()}'s receiver and argument checks report it, pointing at the
      * expression that's wrong.
      *
-     * @param list<Type> $arguments The types the call applies, receiver first, in the order {@see self::parameterTypes()}
-     *     lists the parameters.
+     * @param list<Type> $argumentTypes
      */
-    private function instantiate(array $arguments): self
+    public function instantiateForCall(Type $receiver, array $argumentTypes): self
     {
+        $arguments = [$receiver, ...$argumentTypes];
         $bindings = [];
         // Only the parameters an argument faces have anything to say. A call with the wrong number of arguments is
         // still instantiated, from the ones it does have, so that Expr::call() can report the count against a

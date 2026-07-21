@@ -15,11 +15,13 @@ use function array_key_first;
 use function array_map;
 use function array_shift;
 use function array_slice;
+use function array_values;
 use function assert;
 use function count;
 use function get_object_vars;
 use function gettype;
 use function implode;
+use function in_array;
 use function is_array;
 use function is_string;
 use function sprintf;
@@ -90,14 +92,14 @@ final class Type implements Stringable
 
     /**
      * A type variable: the placeholder a generic function's signature writes where the concrete type is decided by the
-     * call site rather than by the declaration. `head` is declared as `func(Option<T>, [list<T>])`, and a call on a
-     * `list<string>` is checked against `func(Option<string>, [list<string>])`; see {@see Signature::instantiateForCall()}.
+     * call site rather than by the declaration. `head` is declared as `fn<T>(list<T>) -> Option<T>`, and a call on a
+     * `list<string>` is checked against `fn(list<string>) -> Option<string>`; see {@see Signature::instantiateForCall()}.
      *
      * Variables are quantified at the top of the signature they appear in, so there is no binder to build here and two
      * variables of the same name in one signature are the same variable. A name a type constructor already spells,
-     * like `int` or `list`, is not a variable name: {@see Parser\Types} rejects it where a signature is written as a
-     * type string, and this rejects it here too, so the same rule holds for a signature built directly through this
-     * API.
+     * like `int` or `list`, is not a variable name: {@see Parser\TypeResolution::checkTypeVariable()} rejects it where
+     * a signature is written as a type string, and this rejects it here too, so the same rule holds for a signature
+     * built directly through this API.
      *
      * @throws InvalidArgumentException if $name is a type the language spells itself.
      */
@@ -212,24 +214,33 @@ final class Type implements Stringable
         return [self::fromValue($firstKey), self::fromValue($value[$firstKey])];
     }
 
+    /**
+     * The `<T, U>` a function type with free variables prints itself with, one place for every name it's ever
+     * referred to by within this signature, in the order each is first read left to right -- parameters before the
+     * return type, the order the signature itself is written in. Empty when there is nothing to quantify, which is
+     * every function type once {@see Signature::instantiateForCall()} has substituted it.
+     */
+    private static function binder(self $func): string
+    {
+        // args[0] is the return type and the rest are parameters -- see {@see self::func()} -- but the signature is
+        // written parameters first, so that's the order first occurrence is read in too.
+        $returnType = $func->args[0];
+        $parameters = array_slice($func->args, 1);
+        $names = [];
+        foreach ([...$parameters, $returnType] as $node) {
+            foreach ($node->freeVariableNames() as $name) {
+                if (!in_array($name, $names, true)) {
+                    $names[] = $name;
+                }
+            }
+        }
+        return $names === [] ? '' : sprintf('<%s>', implode(', ', $names));
+    }
+
     #[Override]
     public function __toString(): string
     {
-        if ($this->name === 'Struct') {
-            $fields = [];
-            foreach ($this->fields as $name => $fieldType) {
-                /** @psalm-suppress ImplicitToStringCast */
-                $fields[] = $name . ': ' . $fieldType;
-            }
-            return '{ ' . implode(', ', $fields) . ' }';
-        }
-        if ($this->name === 'Func') {
-            assert(count($this->args) > 0);
-            $args = $this->args;
-            $returnType = array_shift($args);
-            return sprintf('fn(%s) -> %s', implode(', ', $args), $returnType);
-        }
-        return $this->name . ($this->args === [] ? '' : sprintf('<%s>', implode(', ', $this->args)));
+        return $this->toString(true);
     }
 
     /**
@@ -282,10 +293,8 @@ final class Type implements Stringable
             return $self->args[0]->isSubtypeOf($other->args[0]);
         }
         if ($self->name === 'Func') {
-            // $self and $other are already known to both be Func here, so both are already the canonical type
-            // Signature accepts -- see {@see Signature::tryFrom()}.
-            $signature = Signature::tryFrom($self);
-            $otherSignature = Signature::tryFrom($other);
+            $signature = $self->asFunction();
+            $otherSignature = $other->asFunction();
             assert($signature !== null && $otherSignature !== null);
             if (!$signature->returnType()->isSubtypeOf($otherSignature->returnType())) {
                 return false;
@@ -344,8 +353,21 @@ final class Type implements Stringable
      * through their aliases first, so a `Numbers` standing for `list<int>` still binds `T` in a `list<T>` regardless
      * of which side names the alias and which spells the type out.
      *
-     * The first binding for a variable is the one that's kept. See {@see Signature::instantiateForCall()} for why that is the
-     * useful half of the two.
+     * Shape, here, is the same shape {@see self::isSubtypeOf()} accepts as a match, not just equal names: $actual is
+     * always the type of a value this type would have to accept, so wherever isSubtypeOf() would let $actual through
+     * by a coercion rather than a plain name match, there is something to learn from that too. A value that isn't
+     * itself an `Option` is still accepted where an `Option<X>` is expected as long as the value is a subtype of `X`,
+     * so `X` faces the value directly. `None`, which isSubtypeOf() accepts into an `Option` unconditionally without
+     * looking inside it, teaches nothing either way, which the ordinary name-mismatch case already gives for free.
+     *
+     * The first binding for a variable is the one that's kept, with one exception: a function's parameters, unlike
+     * everywhere else a variable can appear, are contravariant, so a parameter actually typed `any` -- which is every
+     * {@see Lambda} parameter, since a lambda's own parameter types are never known ahead of the call it's an argument
+     * to -- doesn't decide the variable there no matter when it's walked. A function that accepts anything trivially
+     * accepts whatever that variable turns out to be, which is exactly what {@see self::isSubtypeOf()}'s own Func case
+     * already relies on when the *declared* parameter is `any`; here it's the value's parameter that is, and the
+     * variable is left for a later, real parameter -- or the receiver, walked first below -- to decide. See
+     * {@see Signature::instantiateForCall()} for why first-wins is the useful half of the two everywhere else.
      *
      * This is the recursive walk that applies to any type, not just a function's parameters, which is why it lives
      * here rather than on {@see Signature}; nothing outside the type system should call it directly.
@@ -363,6 +385,9 @@ final class Type implements Stringable
         }
         $self = $this->canonical();
         $actual = $actual->canonical();
+        if ($self->name === 'Option' && !$actual->isOption() && !$actual->isNone()) {
+            return $self->args[0]->bind($actual, $bindings);
+        }
         if ($self->name !== $actual->name) {
             return $bindings;
         }
@@ -370,7 +395,11 @@ final class Type implements Stringable
         // signature asks for, and a struct is written with fewer fields than one reaches into. What the two have in
         // common is what there is to learn from.
         foreach (array_slice($self->args, 0, count($actual->args)) as $index => $arg) {
-            $bindings = $arg->bind($actual->args[$index], $bindings);
+            $actualArg = $actual->args[$index];
+            if ($self->name === 'Func' && $index > 0 && $actualArg->canonical()->name === 'any') {
+                continue;
+            }
+            $bindings = $arg->bind($actualArg, $bindings);
         }
         foreach (array_intersect_key($self->fields, $actual->fields) as $name => $field) {
             $bindings = $field->bind($actual->fields[$name], $bindings);
@@ -398,6 +427,59 @@ final class Type implements Stringable
             $this->aliasFor?->substitute($bindings),
             array_map(static fn(self $field): self => $field->substitute($bindings), $this->fields),
         );
+    }
+
+    /**
+     * $withBinder is false for every call {@see self::__toString()} doesn't make itself: a nested function type prints
+     * without one because its variables were never its own to quantify -- they're quantified once, by whichever
+     * enclosing signature's binder introduced them, per {@see self::var()}.
+     */
+    private function toString(bool $withBinder): string
+    {
+        if ($this->name === 'Struct') {
+            $fields = [];
+            foreach ($this->fields as $name => $fieldType) {
+                $fields[] = $name . ': ' . $fieldType->toString(false);
+            }
+            return '{ ' . implode(', ', $fields) . ' }';
+        }
+        if ($this->name === 'Func') {
+            assert(count($this->args) > 0);
+            $args = $this->args;
+            $returnType = array_shift($args);
+            $binder = $withBinder ? self::binder($this) : '';
+            $params = array_map(static fn(self $arg): string => $arg->toString(false), $args);
+            return sprintf('fn%s(%s) -> %s', $binder, implode(', ', $params), $returnType->toString(false));
+        }
+        if ($this->args === []) {
+            return $this->name;
+        }
+        $args = array_map(static fn(self $arg): string => $arg->toString(false), $this->args);
+        return sprintf('%s<%s>', $this->name, implode(', ', $args));
+    }
+
+    /**
+     * The names of every variable reachable from this type, in first-occurrence order. A struct's fields and an
+     * alias's own arguments are walked the same way its args are; what the alias stands for is not, because a
+     * variable can only be free within the one signature that quantifies it, and an alias is never written inside a
+     * binder's scope -- see {@see self::substitute()} for the one place that does have to see through the alias.
+     *
+     * @return list<string>
+     */
+    private function freeVariableNames(): array
+    {
+        if ($this->isVariable) {
+            return [$this->name];
+        }
+        $names = [];
+        foreach ([...$this->args, ...array_values($this->fields)] as $child) {
+            foreach ($child->freeVariableNames() as $name) {
+                if (!in_array($name, $names, true)) {
+                    $names[] = $name;
+                }
+            }
+        }
+        return $names;
     }
 
     private function canonical(): self

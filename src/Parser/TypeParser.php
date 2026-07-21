@@ -229,7 +229,8 @@ final class TypeParser
      * The names a generic function's signature writes where the call site decides the type. Unlike the `<` after any
      * other name, this one can only be a binder—`fn` is never an operand—so it commits, and a name is expected after
      * it rather than a type. Nothing here says what a name may be: a name that a type constructor already spells is
-     * rejected by {@see Types::resolve()}, which is where the rest of what a type variable means lives too.
+     * rejected by {@see TypeResolution::checkTypeVariable()}, which is where the rest of what a type variable means
+     * lives too.
      *
      * @param Peekable<ParsedToken> $tokens
      * @return list<TypeNode>

@@ -1,0 +1,10 @@
+(|x| x:int > 1).findFirst(nums:list<int>)
+-- Functions --
+findFirst: fn<T>(fn(T) -> bool, list<T>) -> T
+-- Expression type --
+int
+-- Note --
+The lambda is walked first here -- it's the receiver -- and a lambda's own parameters are always typed `any`, since a
+lambda never knows its parameter types ahead of the call it's an argument to. `any` facing a declared parameter is
+still where nothing decides the variable, whichever position that parameter is in: it's `list<T>`, walked second, that
+decides T. Declaring the built-ins receiver-first is a readability choice, not what makes this safe.

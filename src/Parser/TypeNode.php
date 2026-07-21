@@ -11,11 +11,10 @@ use function implode;
 use function sprintf;
 
 /**
- * A name applied to type arguments, e.g. `map<T, U>` or a bare `int`. {@see self::struct()} builds the one other
- * shape that reads this way -- a struct is its fields between `{ }` rather than a name between `< >` -- and
- * {@see self::keyValue()} and {@see self::function()} build the two shapes that don't: {@see FieldTypeNode} and
- * {@see FunctionTypeNode} are their own classes because a field and a function type carry parts nothing else does,
- * not a delimiter away from this one.
+ * A name applied to type arguments, e.g. `map<T, U>` or a bare `int`. {@see self::keyValue()}, {@see self::function()}
+ * and {@see self::struct()} build the three shapes that don't read this way: {@see FieldTypeNode},
+ * {@see FunctionTypeNode} and {@see StructTypeNode} are their own classes because each carries parts -- a field's name
+ * and type, a function's return type and binder, a struct's fields -- that nothing here has anywhere to put.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -23,22 +22,21 @@ use function sprintf;
 class TypeNode implements Stringable
 {
     /**
-     * @param list<self> $args The type's arguments, e.g. `T` and `U` in `map<T, U>`, or a struct's fields.
+     * @param list<self> $args The type's arguments, e.g. `T` and `U` in `map<T, U>`.
      */
     public function __construct(
         public readonly string $name,
         public readonly array $args,
         public readonly Span $location,
-        public readonly Delimiters $delimiters = Delimiters::AngleBrackets,
     ) {
     }
 
     /**
-     * @param list<self> $fields
+     * @param list<FieldTypeNode> $fields
      */
-    public static function struct(array $fields, Span $location): self
+    public static function struct(array $fields, Span $location): StructTypeNode
     {
-        return new self('', $fields, $location, Delimiters::CurlyBraces);
+        return new StructTypeNode($fields, $location);
     }
 
     public static function keyValue(self $key, self $value): FieldTypeNode
@@ -60,6 +58,6 @@ class TypeNode implements Stringable
     {
         return $this->args === []
             ? $this->name
-            : sprintf('%s%s%s%s', $this->name, $this->delimiters->start(), implode(', ', $this->args), $this->delimiters->end());
+            : sprintf('%s<%s>', $this->name, implode(', ', $this->args));
     }
 }

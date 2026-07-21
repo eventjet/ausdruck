@@ -98,9 +98,10 @@ final class TypeResolution
     }
 
     /**
-     * A function type is its own node class, so it's told apart and dispatched before anything else here asks what
-     * $node is named: {@see FunctionTypeNode} is the only shape {@see TypeConstructor::Fn} is ever the name of, so
-     * there is nothing left for that case to do below.
+     * A function type and a struct type are each their own node class, so they're told apart and dispatched before
+     * anything else here asks what $node is named: {@see FunctionTypeNode} is the only shape {@see TypeConstructor::Fn}
+     * is ever the name of, so there is nothing left for that case to do below, and a struct has no name at all, so it
+     * has no {@see TypeConstructor} case to be found by one.
      *
      * Otherwise: a name the language spells itself is one of the other {@see TypeConstructor}s; the name a `fn<...>`
      * binder enclosing this node introduced is a type variable; anything else is a consumer's alias, or nothing at
@@ -110,6 +111,9 @@ final class TypeResolution
     {
         if ($node instanceof FunctionTypeNode) {
             return $this->resolveFunction($node);
+        }
+        if ($node instanceof StructTypeNode) {
+            return $this->resolveStruct($node);
         }
         if (array_key_exists($node->name, $this->typeVariables)) {
             // A variable stands for one complete type, so like an alias it takes no arguments of its own.
@@ -141,7 +145,6 @@ final class TypeResolution
             TypeConstructor::Option => $this->resolveOption($node),
             TypeConstructor::Some => $this->resolveSome($node),
             TypeConstructor::None => Type::none(),
-            TypeConstructor::Struct => $this->resolveStruct($node),
         };
     }
 
@@ -235,17 +238,15 @@ final class TypeResolution
         return Type::func($returnType, $argTypes);
     }
 
-    private function resolveStruct(TypeNode $node): Type|TypeError
+    private function resolveStruct(StructTypeNode $node): Type|TypeError
     {
         $fields = [];
-        foreach ($node->args as $field) {
-            assert(count($field->args) === 2);
-            [$nameNode, $typeNode] = $field->args;
-            $type = $this->resolve($typeNode);
+        foreach ($node->fields as $field) {
+            $type = $this->resolve($field->fieldType);
             if ($type instanceof TypeError) {
                 return $type;
             }
-            $fields[$nameNode->name] = $type;
+            $fields[$field->fieldName->name] = $type;
         }
         return Type::struct($fields);
     }

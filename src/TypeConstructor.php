@@ -9,11 +9,11 @@ use function sprintf;
 /**
  * Every type the language spells itself, as opposed to the ones a consumer adds as aliases. This is the only list of
  * them, and how many type arguments each one takes is stated once, in {@see self::typeArgumentCount()}. Both of the
- * questions the parser asks about a constructor are answers to that one number: {@see Parser\Types::resolve()} checks
- * the count it was given against it, and {@see Parser\TypeParser::parse()} asks whether it is greater than zero before
- * committing a `<` to being a type argument list. Deriving them means a constructor can't be given an arity in one
- * place and checked against a different one in another—the exhaustive match forces a new case to be given a count,
- * and there is no second count for it to disagree with.
+ * questions the parser asks about a constructor are answers to that one number: {@see Parser\TypeResolution::checkArity()}
+ * checks the count it was given against it, and {@see Parser\TypeParser::parse()} asks whether it is greater than zero
+ * before committing a `<` to being a type argument list. Deriving them means a constructor can't be given an arity in
+ * one place and checked against a different one in another—the exhaustive match forces a new case to be given a
+ * count, and there is no second count for it to disagree with.
  *
  * The case names are the names as written, which is why some of them are PHP keywords.
  *
@@ -37,11 +37,6 @@ enum TypeConstructor: string
     case Option = 'Option';
     case Some = 'Some';
     case None = 'None';
-    /**
-     * A struct is written as its fields—`{name: string}`—so it never appears as a name at all, and the empty string
-     * stands in for the one it doesn't have.
-     */
-    case Struct = '';
 
     /**
      * The message both {@see Type::var()} and {@see Parser\TypeResolution}'s binder check reject a reserved name
@@ -54,8 +49,9 @@ enum TypeConstructor: string
 
     /**
      * How many type arguments this constructor is written with in angle brackets. Null means it is not written with
-     * angle brackets at all: {@see self::Fn} takes its argument types in parentheses, and {@see self::Struct} is
-     * written as its fields, so neither has a count for a `<` to be checked against.
+     * angle brackets at all: {@see self::Fn} takes its argument types in parentheses, so it has no count for a `<` to
+     * be checked against. A struct has no case here at all -- it's written as its fields and never appears as a name,
+     * so there's no count to ask for in the first place.
      *
      * @return int<0, max>|null
      */
@@ -65,7 +61,7 @@ enum TypeConstructor: string
             self::Map => 2,
             self::List, self::Option, self::Some => 1,
             self::String, self::Int, self::Float, self::Bool, self::Any, self::None => 0,
-            self::Fn, self::Struct => null,
+            self::Fn => null,
         };
     }
 }

@@ -5,5 +5,5 @@ withFallback: fn<T, U>(list<T>, U, Option<U>) -> { item: T, fallback: U }
 { item: string, fallback: int }
 -- Note --
 A value is a subtype of an Option of it, so the third argument is accepted although the parameter and the argument
-aren't the same shape. There is nothing to learn from a parameter that doesn't line up with its argument—and nothing to
-unlearn either: T and U are still what the first two decided.
+aren't the same shape. That coercion is something to learn from, not nothing: it makes U face int a second time here,
+agreeing with what the second argument already decided, so there is nothing new and nothing to unlearn.
