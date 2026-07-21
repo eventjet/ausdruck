@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
+use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
+use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Type;
 use InvalidArgumentException;
 use LogicException;
@@ -202,6 +204,21 @@ final class TypeTest extends TestCase
     }
 
     /**
+     * The same reservation {@see Type::var()} enforces, for the same reason plus one of its own: a few checks --
+     * {@see self::toString()}'s `Struct` and `fn` cases -- read an alias's own name directly, without seeing through
+     * it first, to decide whether $this *is* a function type or a struct. A name a type constructor already spells
+     * collides with exactly that check, so `Type::alias('Struct', ...)` used to print as `{}` and
+     * `Type::alias('fn', ...)` crashed outright; this closes both at the door instead.
+     */
+    public function testAliasNamedAfterATypeConstructorIsRejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Struct can\'t be an alias: it is a type of its own');
+
+        Type::alias('Struct', Type::listOf(Type::int()));
+    }
+
+    /**
      * bind() only sees through an alias on the actual side, so a variable under an alias on the signature side has to
      * be reachable too, or instantiating a signature built directly through this API silently drops it to `any`
      * instead of what the call actually decided.
@@ -265,6 +282,42 @@ final class TypeTest extends TestCase
     }
 
     /**
+     * The parser rejects this same nesting when a signature is written as a type string -- see the
+     * generics/type-variable fixtures -- because {@see Signature::instantiateForCall()}'s substitution can't tell
+     * the inner binder's own variables from the outer signature's: instantiating the outer call would replace T
+     * inside the nested fn<T> with whatever the outer call decided, corrupting a signature that was never meant to
+     * be touched by that call at all. Built directly through this API, there's no parser to catch it first, so
+     * Type::func() enforces the same rule itself.
+     */
+    public function testFunctionTypeRejectsAParameterWithANestedBinderOfItsOwn(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'A function type nested inside another one can\'t bind type variables of its own: a variable is '
+                . 'quantified once, by whichever function type encloses it',
+        );
+
+        Type::func(Type::int(), [Type::listOf(Type::func(Type::var('T'), [Type::var('T')], ['T']))]);
+    }
+
+    /**
+     * The same rejection as {@see self::testFunctionTypeRejectsAParameterWithANestedBinderOfItsOwn()}, for the
+     * return type instead of a parameter, and with the nested binder immediately there rather than behind a list --
+     * the shape that, left unrejected, {@see Signature::instantiateForCall()} would silently collapse to
+     * `fn(any) -> any` instead of leaving the inner fn<T> generic.
+     */
+    public function testFunctionTypeRejectsAReturnTypeWithANestedBinderOfItsOwn(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'A function type nested inside another one can\'t bind type variables of its own: a variable is '
+                . 'quantified once, by whichever function type encloses it',
+        );
+
+        Type::func(Type::func(Type::var('T'), [Type::var('T')], ['T']), [Type::var('U')], ['U']);
+    }
+
+    /**
      * A list's element type is compared by asking what kind of type the left side is, and an alias only answers that
      * once it's been seen through. Asking the alias directly makes it none of the kinds that carry a check, so a list
      * of one thing would pass as a list of another.
@@ -288,6 +341,19 @@ final class TypeTest extends TestCase
         self::assertFalse($alias->isSubtypeOf(Type::struct(['name' => Type::int()])));
         self::assertFalse($alias->isSubtypeOf(Type::struct(['age' => Type::int()])));
         self::assertTrue($alias->isSubtypeOf(Type::struct(['name' => Type::string()])));
+    }
+
+    /**
+     * isStruct() and getFieldType() already see through an alias to answer this; isOption() has to as well, or
+     * {@see Get::evaluate()}'s null check -- which reads isOption() directly rather than going through
+     * isSubtypeOf() -- rejects a missing variable declared with an alias for an Option the same way it would reject
+     * one that's actually required.
+     */
+    public function testAliasOfAnOptionIsRecognizedAsOne(): void
+    {
+        $alias = Type::alias('Maybe', Type::option(Type::string()));
+
+        self::assertTrue($alias->isOption());
     }
 
     #[DataProvider('failingAssertCases')]

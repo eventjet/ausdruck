@@ -10,9 +10,12 @@ use function count;
 /**
  * A function type read as what it's for: a return type, a receiver, and the arguments a call passes in parentheses.
  * {@see Type::func()} keeps all of that in one list of args, args[0] the return type and the rest the parameters,
- * receiver first -- and this is the only place that knows it. Get one from {@see Type::asFunction()}, which is also
- * the only thing that constructs one: it hands this the type with its alias, if any, already seen through, so
- * everything here can read $type's args directly instead of unwrapping it itself.
+ * receiver first -- and this is the only place outside {@see Type} itself that knows it. ({@see Type} reads the same
+ * layout again, through a private pair of accessors kept non-nullable for the callers already sure of what they're
+ * reading; see {@see Type::func()}'s own docblock for why that duplication is there instead of routed through here.)
+ * Get one from {@see Type::asFunction()}, which is also the only thing that constructs one: it hands this the type
+ * with its alias, if any, already seen through, so everything here can read $type's args directly instead of
+ * unwrapping it itself.
  *
  * @api
  */

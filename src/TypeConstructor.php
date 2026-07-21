@@ -46,12 +46,15 @@ enum TypeConstructor: string
     case Never = 'never';
 
     /**
-     * The message both {@see Type::var()} and {@see Parser\TypeResolution}'s binder check reject a reserved name
-     * with, worded once here so the two can't drift apart.
+     * The message {@see Type::var()}, {@see Type::alias()}, and {@see Parser\TypeResolution}'s binder check reject a
+     * reserved name with, worded once here so the three can't drift apart. $usage is what the name was being claimed
+     * as -- "a type variable" for the two binder-facing callers, "an alias" for {@see Type::alias()} -- since the two
+     * reservations exist for different reasons and a shared message that named only one of them would be wrong for
+     * the other.
      */
-    public static function reservedNameMessage(string $name): string
+    public static function reservedNameMessage(string $name, string $usage = 'a type variable'): string
     {
-        return sprintf('%s can\'t be a type variable: it is a type of its own', $name);
+        return sprintf('%s can\'t be %s: it is a type of its own', $name, $usage);
     }
 
     /**

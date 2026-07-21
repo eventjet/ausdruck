@@ -1,0 +1,6 @@
+foo:fn({ a: fn<T>(T) -> T }) -> int
+-- Type error --
+A function type nested inside another one can't bind type variables of its own: a variable is quantified once, by whichever function type encloses it
+-- Note --
+Same rule as the list case: a struct field is a shape the rank-1 restriction reaches through too, once the struct
+itself is part of an enclosing function type's parameter or return type.

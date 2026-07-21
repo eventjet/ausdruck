@@ -22,10 +22,11 @@ use function sprintf;
  * wants to introduce is free to introduce by asking both at once; see {@see self::checkTypeVariable()}.
  *
  * A variable is quantified once, at the top of the signature it belongs to—see {@see Type::var()}—so a function type
- * nested inside another one's parameters or return type can never carry a binder of its own: {@see
- * self::resolveFunction()} rejects one outright rather than letting an inner `fn<...>` shadow or extend the outer
- * scope. $nestedInFunction is how it knows whether it's already inside a function type's scope; $typeVariables itself
- * only ever grows once, when the one binder a signature is allowed to have is resolved.
+ * reachable from another one's parameters or return type—however many lists, Options, or struct fields deep—can
+ * never carry a binder of its own: {@see self::resolveFunction()} rejects one outright rather than letting an inner
+ * `fn<...>` shadow or extend the outer scope, and $nestedInFunction stays set through every constructor below the
+ * enclosing `fn`, not just a directly-nested function type, which is how it reaches all of them. $typeVariables
+ * itself only ever grows once, when the one binder a signature is allowed to have is resolved.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck\Parser
@@ -224,11 +225,12 @@ final class TypeResolution
      * parameters and the return type alike, so a fresh resolution with the binder's names added is what resolves both.
      *
      * A binder only makes sense at the top of the signature it quantifies—see {@see Type::var()}—so $node is rejected
-     * outright if it has one of its own while already nested inside another function type's parameters or return
-     * type: rank-1 polymorphism, not a limitation of what {@see Type} can record. A nested `fn<...>` binder would be
-     * perfectly representable—{@see Type::func()} takes one for exactly this node—it just isn't a signature this
-     * language lets you write, the same way `list<list<T>>` is representable but `T` still has to be quantified
-     * somewhere outside both `list`s.
+     * outright if it has one of its own while already nested anywhere below another function type's parameters or
+     * return type—however many lists, Options, or struct fields deep: rank-1 polymorphism, a rule about the
+     * signatures this language lets you write rather than a limitation of what {@see Type} can record, the same way
+     * `list<list<T>>` is representable but `T` still has to be quantified somewhere outside both `list`s.
+     * {@see Type::func()} enforces the identical rule for a signature built directly through that API instead of
+     * written as a type string.
      */
     private function resolveFunction(FunctionTypeNode $node): Type|TypeError
     {
