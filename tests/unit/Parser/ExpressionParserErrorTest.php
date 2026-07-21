@@ -70,6 +70,8 @@ final class ExpressionParserErrorTest extends TestCase
         yield 'missing right hand side of minus' => ['foo:int -'];
         yield 'missing right hand side of plus' => ['foo:int +'];
         yield 'missing right hand side of star' => ['foo:int *'];
+        yield 'missing right hand side of slash' => ['foo:int /'];
+        yield 'missing right hand side of percent' => ['foo:int %'];
         yield 'missing left hand side of plus' => ['+ foo:int', 'Expected expression, got +'];
         yield 'missing left hand side of star' => ['* foo:int', 'Expected expression, got *'];
         // Unlike -, + is not a unary operator.
@@ -178,6 +180,26 @@ final class ExpressionParserErrorTest extends TestCase
         yield 'multiply string by string' => ['foo:string * bar:string', 'Can\'t multiply string by string'];
         yield 'multiply string by int' => ['foo:string * bar:int', 'Can\'t multiply string by int'];
         yield 'multiply int by string' => ['foo:int * bar:string', 'Can\'t multiply int by string'];
+        yield 'divide int by float' => ['foo:int / bar:float', 'Can\'t divide int by float'];
+        yield 'divide float by int' => ['foo:float / bar:int', 'Can\'t divide float by int'];
+        yield 'divide string by string' => ['foo:string / bar:string', 'Can\'t divide string by string'];
+        yield 'divide string by int' => ['foo:string / bar:int', 'Can\'t divide string by int'];
+        yield 'divide int by string' => ['foo:int / bar:string', 'Can\'t divide int by string'];
+        yield 'int modulo float' => ['foo:int % bar:float', 'Can\'t take int modulo float'];
+        yield 'float modulo int' => ['foo:float % bar:int', 'Can\'t take float modulo int'];
+        yield 'string modulo string' => ['foo:string % bar:string', 'Can\'t take string modulo string'];
+        yield 'string modulo int' => ['foo:string % bar:int', 'Can\'t take string modulo int'];
+        yield 'int modulo string' => ['foo:int % bar:string', 'Can\'t take int modulo string'];
+        // A quotient is an Option of the operand type, so it doesn't chain into further arithmetic, comparison or
+        // negation without an unwrap.
+        yield 'chained division' => ['a:int / b:int / c:int', 'Can\'t divide Option<int> by int'];
+        yield 'chained modulo' => ['a:int % b:int % c:int', 'Can\'t take Option<int> modulo int'];
+        yield 'subtracting from a quotient' => ['a:int / b:int - c:int', 'Can\'t subtract int from Option<int>'];
+        yield 'negating a quotient' => ['-(a:int / b:int)', 'Can\'t negate Option<int>'];
+        yield 'comparing a quotient to its operand type' => [
+            'a:int / b:int === 3',
+            'The expressions of both sides of === must be of the same type. Left: Option<int>, right: int',
+        ];
         yield 'int > float' => ['foo:int > bar:float', 'Can\'t compare int to float'];
         yield 'float > int' => ['foo:float > bar:int', 'Can\'t compare float to int'];
         yield 'string > string' => ['foo:string > bar:string', 'Can\'t compare string to string'];
@@ -541,6 +563,14 @@ final class ExpressionParserErrorTest extends TestCase
             ],
             [
                 '"foo" === 72 * 23',
+                '          =======',
+            ],
+            [
+                '"foo" === 72 / 23',
+                '          =======',
+            ],
+            [
+                '"foo" === 72 % 23',
                 '          =======',
             ],
             [

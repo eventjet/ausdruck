@@ -160,6 +160,34 @@ final class Expr
         return new Multiply($multiplicand, $multiplier);
     }
 
+    /**
+     * The quotient's type is an option of the operands' type: division is total, and a zero divisor evaluates to none.
+     * See {@see Divide}.
+     */
+    public static function divide(Expression $dividend, Expression $divisor): Divide
+    {
+        self::assertSameNumberType($dividend, $divisor, static fn(): string => sprintf(
+            'Can\'t divide %s by %s',
+            $dividend->getType(),
+            $divisor->getType(),
+        ));
+        return new Divide($dividend, $divisor);
+    }
+
+    /**
+     * The remainder's type is an option of the operands' type: modulo is total, and a zero divisor evaluates to none.
+     * See {@see Modulo}.
+     */
+    public static function modulo(Expression $dividend, Expression $divisor): Modulo
+    {
+        self::assertSameNumberType($dividend, $divisor, static fn(): string => sprintf(
+            'Can\'t take %s modulo %s',
+            $dividend->getType(),
+            $divisor->getType(),
+        ));
+        return new Modulo($dividend, $divisor);
+    }
+
     public static function gt(Expression $left, Expression $right): Gt
     {
         self::checkComparison(ComparisonOperator::GreaterThan, $left, $right);

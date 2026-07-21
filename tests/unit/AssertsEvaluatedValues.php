@@ -14,9 +14,9 @@ use function is_object;
  * included.
  *
  * assertEquals() is too weak to say that. It can't tell 0 from null, null from false, or 24 from 24.0 — and those are
- * exactly the distinctions the evaluation cases exist to pin. `isSome` on a none answers false rather than the null
- * inside it, and an int subtraction gives back an int rather than a float: under assertEquals either case passes
- * whether or not the library still holds up its end.
+ * exactly the distinctions the evaluation cases exist to pin. `PHP_INT_MIN % -1` is 0 rather than none, an int
+ * operation gives back an int, and a zero divisor gives none rather than a number: under assertEquals every one of
+ * those cases passes whether or not the library still holds up its end.
  *
  * Structs are the one place identity isn't available: the library builds its own objects, so an expectation is never
  * the same instance as the result. They are therefore compared field by field, and lists element by element, until the

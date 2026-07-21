@@ -85,8 +85,8 @@ final class ExpressionParserTest extends TestCase
                     Expr::get('c', Type::int()),
                 ),
             ],
-            // + and - share the additive level, * the multiplicative one, so a chain mixing operators of one level
-            // is still left-associative across them.
+            // + and - share the additive level, * / % the multiplicative one, so a chain mixing operators of one
+            // level is still left-associative across them.
             [
                 'a:int + b:int + c:int',
                 Expr::add(Expr::add(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
@@ -102,6 +102,14 @@ final class ExpressionParserTest extends TestCase
             [
                 'a:int * b:int * c:int',
                 Expr::multiply(Expr::multiply(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
+            ],
+            [
+                'a:int * b:int / c:int',
+                Expr::divide(Expr::multiply(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
+            ],
+            [
+                'a:int * b:int % c:int',
+                Expr::modulo(Expr::multiply(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
             ],
             ['"💩"', Expr::literal('💩')],
             ['foo:map<string, int>', Expr::get('foo', Type::mapOf(Type::string(), Type::int()))],
@@ -279,6 +287,20 @@ final class ExpressionParserTest extends TestCase
                 Expr::multiply(Expr::get('a', $i), Expr::add(Expr::get('b', $i), Expr::get('c', $i))),
             ],
             [
+                'a:int / (b:int * c:int)',
+                Expr::divide(Expr::get('a', $i), Expr::multiply(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            [
+                'a:int % (b:int - c:int)',
+                Expr::modulo(Expr::get('a', $i), Expr::subtract(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            // A multiplicative-level divisor keeps its parentheses too: dropped, a:int % b:int * c:int would re-parse
+            // as (a:int % b:int) * c:int — a different tree.
+            [
+                'a:int % (b:int * c:int)',
+                Expr::modulo(Expr::get('a', $i), Expr::multiply(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            [
                 'a:int - (b:int + c:int)',
                 Expr::subtract(Expr::get('a', $i), Expr::add(Expr::get('b', $i), Expr::get('c', $i))),
             ],
@@ -299,6 +321,15 @@ final class ExpressionParserTest extends TestCase
                 '(a:int > b:int) === c:bool',
                 Expr::eq(Expr::gt(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $b)),
             ],
+            // A comparison is the only place a quotient appears as a bare operand — every arithmetic slot rejects an
+            // Option — so this is the one case that exercises the comparison level's left slot against a division.
+            [
+                'a:int / b:int === c:int / d:int',
+                Expr::eq(
+                    Expr::divide(Expr::get('a', $i), Expr::get('b', $i)),
+                    Expr::divide(Expr::get('c', $i), Expr::get('d', $i)),
+                ),
+            ],
             // A method can be called on a grouped expression, so the postfix dot has to parenthesize a target looser
             // than a call's own — everything from a subtraction down to a negation.
             [
@@ -308,6 +339,19 @@ final class ExpressionParserTest extends TestCase
             [
                 '(a:int * b:int).abs:int()',
                 Expr::multiply(Expr::get('a', $i), Expr::get('b', $i))->call('abs', $i, []),
+            ],
+            // The way to get at a quotient: / makes an Option, and isSome/unwrap are calls on it.
+            [
+                '(a:int / b:int).isSome:bool()',
+                Expr::divide(Expr::get('a', $i), Expr::get('b', $i))->call('isSome', $b, []),
+            ],
+            [
+                '(a:int / b:int).unwrap:int()',
+                Expr::divide(Expr::get('a', $i), Expr::get('b', $i))->call('unwrap', $i, []),
+            ],
+            [
+                '(a:int % b:int).unwrap:int()',
+                Expr::modulo(Expr::get('a', $i), Expr::get('b', $i))->call('unwrap', $i, []),
             ],
             [
                 '(-a:int).abs:int()',
@@ -359,6 +403,8 @@ final class ExpressionParserTest extends TestCase
             ['foo:int+2', Expr::add(Expr::get('foo', Type::int()), Expr::literal(2))],
             ['foo:int +2', Expr::add(Expr::get('foo', Type::int()), Expr::literal(2))],
             ['foo:int*2', Expr::multiply(Expr::get('foo', Type::int()), Expr::literal(2))],
+            ['foo:int/2', Expr::divide(Expr::get('foo', Type::int()), Expr::literal(2))],
+            ['foo:int%2', Expr::modulo(Expr::get('foo', Type::int()), Expr::literal(2))],
             // Trailing commas are allowed in argument and list literal element lists.
             [
                 'foo:string.substr:string(0, 3,)',

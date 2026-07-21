@@ -173,7 +173,7 @@ final class ExpressionParser
     }
 
     /**
-     * a:int * b:int * c:int
+     * a:int * b:int / c:int
      * =====================
      */
     private function parseMultiplicative(): Expression
@@ -182,6 +182,8 @@ final class ExpressionParser
         while (true) {
             $build = match ($this->nextToken()) {
                 Token::Asterisk => $left->multiply(...),
+                Token::Slash => $left->divide(...),
+                Token::Percent => $left->modulo(...),
                 default => null,
             };
             if ($build === null) {

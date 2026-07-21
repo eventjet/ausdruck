@@ -1,0 +1,8 @@
+(a:float % b:float).unwrap:float()
+-- Input --
+{
+  a: 5.5,
+  b: 2.0,
+}
+-- Output --
+1.5
