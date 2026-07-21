@@ -11,28 +11,25 @@ use function implode;
 use function sprintf;
 
 /**
+ * A name applied to type arguments, e.g. `map<T, U>` or a bare `int`. {@see self::struct()} builds the one other
+ * shape that reads this way -- a struct is its fields between `{ }` rather than a name between `< >` -- and
+ * {@see self::keyValue()} and {@see self::function()} build the two shapes that don't: {@see FieldTypeNode} and
+ * {@see FunctionTypeNode} are their own classes because a field and a function type carry parts nothing else does,
+ * not a delimiter away from this one.
+ *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class TypeNode implements Stringable
+class TypeNode implements Stringable
 {
     /**
-     * @param list<self> $args The type's arguments. For a function type, these are its parameters -- see
-     *     {@see self::function()} -- and its return type is $returnType instead, not one of them.
-     * @param Delimiters | 'kv' $delimiters
-     * @param list<self> $typeParameters The type variables a function type binds, which are only ever the names
-     *     themselves. They are nodes rather than strings so that each one carries the span an error about it points
-     *     at; see {@see Types::resolve()}. Meaningless where $returnType is null.
-     * @param self|null $returnType The return type of a function type, and what marks this node as one: every other
-     *     shape leaves it null. See {@see self::function()} and {@see TypeResolution::resolveFunction()}.
+     * @param list<self> $args The type's arguments, e.g. `T` and `U` in `map<T, U>`, or a struct's fields.
      */
     public function __construct(
         public readonly string $name,
         public readonly array $args,
         public readonly Span $location,
-        public readonly Delimiters|string $delimiters = Delimiters::AngleBrackets,
-        public readonly array $typeParameters = [],
-        public readonly self|null $returnType = null,
+        public readonly Delimiters $delimiters = Delimiters::AngleBrackets,
     ) {
     }
 
@@ -44,34 +41,23 @@ final class TypeNode implements Stringable
         return new self('', $fields, $location, Delimiters::CurlyBraces);
     }
 
-    public static function keyValue(self $key, self $value): self
+    public static function keyValue(self $key, self $value): FieldTypeNode
     {
-        return new self('', [$key, $value], $key->location->to($value->location), 'kv');
+        return new FieldTypeNode($key, $value);
     }
 
     /**
      * @param list<self> $parameters
      * @param list<self> $typeParameters
      */
-    public static function function(array $parameters, self $returnType, array $typeParameters, Span $location): self
+    public static function function(array $parameters, self $returnType, array $typeParameters, Span $location): FunctionTypeNode
     {
-        return new self('fn', $parameters, $location, typeParameters: $typeParameters, returnType: $returnType);
+        return new FunctionTypeNode($parameters, $returnType, $typeParameters, $location);
     }
 
     #[Override]
     public function __toString(): string
     {
-        if ($this->delimiters === 'kv') {
-            return sprintf('%s: %s', $this->args[0], $this->args[1]);
-        }
-        if ($this->returnType !== null) {
-            return sprintf(
-                'fn%s(%s) -> %s',
-                $this->typeParameters === [] ? '' : sprintf('<%s>', implode(', ', $this->typeParameters)),
-                implode(', ', $this->args),
-                $this->returnType,
-            );
-        }
         return $this->args === []
             ? $this->name
             : sprintf('%s%s%s%s', $this->name, $this->delimiters->start(), implode(', ', $this->args), $this->delimiters->end());

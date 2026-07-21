@@ -318,15 +318,15 @@ final class ExpressionParserErrorTest extends TestCase
         ];
         yield 'lambda returning the wrong type' => [
             'x:list<string>.some(|i| i:string)',
-            'Argument 1 of some must be of type func(string): bool, got func(any): string',
+            'Argument 1 of some must be of type fn(string) -> bool, got fn(any) -> string',
         ];
         yield 'passing a string to a function expecting a lambda' => [
             'x:list<string>.some("foo")',
-            'Argument 1 of some must be of type func(string): bool, got string',
+            'Argument 1 of some must be of type fn(string) -> bool, got string',
         ];
         yield 'passing a lambda to a function expecting an int' => [
             'x:string.substr(|i| i:int, 3)',
-            'Argument 1 of substr must be of type int, got func(any): int',
+            'Argument 1 of substr must be of type int, got fn(any) -> int',
         ];
         // The receiver is what a generic signature normally learns its type variable from, so where the receiver is
         // the mistake, the variable is decided by the argument instead: `contains` is declared over `list<T>` and `T`,

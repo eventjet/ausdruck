@@ -1,3 +1,3 @@
 foo:fn<T>(Option<T>) -> T
 -- Expression type --
-func(Option<T>): T
+fn(Option<T>) -> T

@@ -1,6 +1,6 @@
 foo:map<fn(int) -> int, string>
 -- Type error --
-Invalid type "map<fn(int) -> int, string>": map expects the key type to be int or string, got func(int): int
+Invalid type "map<fn(int) -> int, string>": map expects the key type to be int or string, got fn(int) -> int
 -- Note --
 A rejected type is printed back the way it was written, which is the one place a function type's own written form shows
 up. Its generic sibling is the case next to this one.

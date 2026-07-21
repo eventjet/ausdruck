@@ -30,6 +30,9 @@ final class Declarations
             if (array_key_exists($name, $fns)) {
                 throw new InvalidArgumentException(sprintf('Can\'t override built-in function %s', $name));
             }
+            if ($type->asFunction() === null) {
+                throw new InvalidArgumentException(sprintf('%s is declared as %s, which is not a function type', $name, $type));
+            }
             $fns[$name] = $type;
         }
         $this->functions = $fns;

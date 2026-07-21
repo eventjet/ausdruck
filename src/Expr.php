@@ -89,7 +89,7 @@ final class Expr
      *     nothing to check its operands against. That's the case for functions that are used with nothing but an
      *     inline return type, and for every call built through {@see Expression::call()}, which has no declarations to
      *     consult. A declaration may be generic, in which case it says what this call accepts only once
-     *     {@see Signature::instantiate()} has resolved its type variables against the types at hand.
+     *     {@see Signature::instantiateForCall()} has resolved its type variables against the types at hand.
      * @param Span|null $nameLocation Where the function is named, which is what an error about the function itself
      *     rather than about one of its operands points at.
      */

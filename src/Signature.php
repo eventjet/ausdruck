@@ -10,7 +10,9 @@ use function count;
 /**
  * A function type read as what it's for: a return type, a receiver, and the arguments a call passes in parentheses.
  * {@see Type::func()} keeps all of that in one list of args, args[0] the return type and the rest the parameters,
- * receiver first -- and this is the only place that knows it. Get one from {@see Type::asFunction()}.
+ * receiver first -- and this is the only place that knows it. Get one from {@see Type::asFunction()}, which is also
+ * the only thing that constructs one: it hands this the type with its alias, if any, already seen through, so
+ * everything here can read $type's args directly instead of unwrapping it itself.
  *
  * @api
  */
@@ -22,15 +24,14 @@ final class Signature
 
     /**
      * $type as a function's signature, or null if it isn't one: only {@see Type::func()} builds a type this accepts.
+     * $type must already be canonical -- see {@see Type::asFunction()}, the only caller.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
      */
     public static function tryFrom(Type $type): self|null
     {
-        return self::canonicalize($type)->name === 'Func' ? new self($type) : null;
-    }
-
-    private static function canonicalize(Type $type): Type
-    {
-        return $type->aliasFor ?? $type;
+        return $type->name === 'Func' ? new self($type) : null;
     }
 
     /**
@@ -38,7 +39,7 @@ final class Signature
      */
     public function returnType(): Type
     {
-        return self::canonicalize($this->type)->args[0];
+        return $this->type->args[0];
     }
 
     /**
@@ -62,6 +63,32 @@ final class Signature
     }
 
     /**
+     * Instantiates this signature against a call, spelling out the one layout convention it depends on -- receiver
+     * first, then the arguments a call passes in parentheses -- so that nowhere else has to.
+     *
+     * @param list<Type> $argumentTypes
+     */
+    public function instantiateForCall(Type $receiver, array $argumentTypes): self
+    {
+        return $this->instantiate([$receiver, ...$argumentTypes]);
+    }
+
+    /**
+     * Every parameter of this function, receiver included, in the order the PHP callable receives them. Two function
+     * types are compared parameter by parameter, so this is the list that matters for subtyping; the split into a
+     * receiver and the arguments only matters at a call site.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     *
+     * @return list<Type>
+     */
+    public function parameterTypes(): array
+    {
+        return array_slice($this->type->args, 1);
+    }
+
+    /**
      * This signature with its type variables resolved against the receiver and argument types a call applies it to:
      * the signature the call is actually checked against, with no variables left in it.
      *
@@ -78,7 +105,7 @@ final class Signature
      * @param list<Type> $arguments The types the call applies, receiver first, in the order {@see self::parameterTypes()}
      *     lists the parameters.
      */
-    public function instantiate(array $arguments): self
+    private function instantiate(array $arguments): self
     {
         $bindings = [];
         // Only the parameters an argument faces have anything to say. A call with the wrong number of arguments is
@@ -88,28 +115,5 @@ final class Signature
             $bindings = $parameter->bind($arguments[$index], $bindings);
         }
         return new self($this->type->substitute($bindings));
-    }
-
-    /**
-     * {@see self::instantiate()}, spelling out the one layout convention it depends on -- receiver first, then the
-     * arguments a call passes in parentheses -- so that nowhere else has to.
-     *
-     * @param list<Type> $argumentTypes
-     */
-    public function instantiateForCall(Type $receiver, array $argumentTypes): self
-    {
-        return $this->instantiate([$receiver, ...$argumentTypes]);
-    }
-
-    /**
-     * Every parameter of this function, receiver included, in the order the PHP callable receives them. Two function
-     * types are compared parameter by parameter, so this is the list that matters for subtyping; the split into a
-     * receiver and the arguments only matters at a call site.
-     *
-     * @return list<Type>
-     */
-    private function parameterTypes(): array
-    {
-        return array_slice(self::canonicalize($this->type)->args, 1);
     }
 }

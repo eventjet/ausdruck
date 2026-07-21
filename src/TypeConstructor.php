@@ -2,20 +2,24 @@
 
 declare(strict_types=1);
 
-namespace Eventjet\Ausdruck\Parser;
+namespace Eventjet\Ausdruck;
 
-use Eventjet\Ausdruck\Type;
+use function sprintf;
 
 /**
  * Every type the language spells itself, as opposed to the ones a consumer adds as aliases. This is the only list of
  * them, and how many type arguments each one takes is stated once, in {@see self::typeArgumentCount()}. Both of the
- * questions the parser asks about a constructor are answers to that one number: {@see Types::resolve()} checks the
- * count it was given against it, and {@see TypeParser::parse()} asks whether it is greater than zero before committing
- * a `<` to being a type argument list. Deriving them means a constructor can't be given an arity in one place and
- * checked against a different one in another—the exhaustive match forces a new case to be given a count, and there is
- * no second count for it to disagree with.
+ * questions the parser asks about a constructor are answers to that one number: {@see Parser\Types::resolve()} checks
+ * the count it was given against it, and {@see Parser\TypeParser::parse()} asks whether it is greater than zero before
+ * committing a `<` to being a type argument list. Deriving them means a constructor can't be given an arity in one
+ * place and checked against a different one in another—the exhaustive match forces a new case to be given a count,
+ * and there is no second count for it to disagree with.
  *
  * The case names are the names as written, which is why some of them are PHP keywords.
+ *
+ * This lives in {@see Type}'s own namespace, not the parser's: {@see Type::var()} rejects a name the language spells
+ * itself the same way {@see Parser\TypeResolution} does, and a type is a thing the parser depends on, not the other
+ * way around.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -38,6 +42,15 @@ enum TypeConstructor: string
      * stands in for the one it doesn't have.
      */
     case Struct = '';
+
+    /**
+     * The message both {@see Type::var()} and {@see Parser\TypeResolution}'s binder check reject a reserved name
+     * with, worded once here so the two can't drift apart.
+     */
+    public static function reservedNameMessage(string $name): string
+    {
+        return sprintf('%s can\'t be a type variable: it is a type of its own', $name);
+    }
 
     /**
      * How many type arguments this constructor is written with in angle brackets. Null means it is not written with

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Parser;
 
 use Eventjet\Ausdruck\Type;
+use Eventjet\Ausdruck\TypeConstructor;
 
 /**
  * The public entry point for resolving a {@see TypeNode} against a set of aliases. Resolution itself is

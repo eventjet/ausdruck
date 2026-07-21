@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Eventjet\Ausdruck\TypeConstructor;
+
 use function assert;
 use function is_string;
 use function sprintf;

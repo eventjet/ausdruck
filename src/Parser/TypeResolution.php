@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Parser;
 
 use Eventjet\Ausdruck\Type;
+use Eventjet\Ausdruck\TypeConstructor;
+use LogicException;
 
 use function array_key_exists;
 use function array_key_last;
@@ -96,11 +98,19 @@ final class TypeResolution
     }
 
     /**
-     * A name the language spells itself is one of the {@see TypeConstructor}s; the name a `fn<...>` binder enclosing
-     * this node introduced is a type variable; anything else is a consumer's alias, or nothing at all.
+     * A function type is its own node class, so it's told apart and dispatched before anything else here asks what
+     * $node is named: {@see FunctionTypeNode} is the only shape {@see TypeConstructor::Fn} is ever the name of, so
+     * there is nothing left for that case to do below.
+     *
+     * Otherwise: a name the language spells itself is one of the other {@see TypeConstructor}s; the name a `fn<...>`
+     * binder enclosing this node introduced is a type variable; anything else is a consumer's alias, or nothing at
+     * all.
      */
     public function resolve(TypeNode $node): Type|TypeError
     {
+        if ($node instanceof FunctionTypeNode) {
+            return $this->resolveFunction($node);
+        }
         if (array_key_exists($node->name, $this->typeVariables)) {
             // A variable stands for one complete type, so like an alias it takes no arguments of its own.
             return self::checkArity($node, 0) ?? Type::var($node->name);
@@ -118,7 +128,9 @@ final class TypeResolution
             return $arityError;
         }
         return match ($constructor) {
-            TypeConstructor::Fn => $this->resolveFunction($node),
+            // Unreachable: a node named fn is always a FunctionTypeNode, handled above before $constructor is even
+            // looked at. The arm still has to be here for the match over TypeConstructor to be exhaustive.
+            TypeConstructor::Fn => throw new LogicException('A node named fn must be a FunctionTypeNode'),
             TypeConstructor::String => Type::string(),
             TypeConstructor::Int => Type::int(),
             TypeConstructor::Float => Type::float(),
@@ -197,7 +209,7 @@ final class TypeResolution
      * of the names inside it the call site decides rather than the declaration. The binder is in scope for the
      * parameters and the return type alike, so a fresh resolution with the binder's names added is what resolves both.
      */
-    private function resolveFunction(TypeNode $node): Type|TypeError
+    private function resolveFunction(FunctionTypeNode $node): Type|TypeError
     {
         $typeVariables = $this->typeVariables;
         foreach ($node->typeParameters as $parameter) {
@@ -216,7 +228,6 @@ final class TypeResolution
             }
             $argTypes[] = $argType;
         }
-        assert($node->returnType !== null);
         $returnType = $inner->resolve($node->returnType);
         if ($returnType instanceof TypeError) {
             return $returnType;
@@ -252,10 +263,7 @@ final class TypeResolution
     private function checkTypeVariable(TypeNode $parameter, array $typeVariables): TypeError|null
     {
         if (TypeConstructor::tryFrom($parameter->name) !== null) {
-            return TypeError::create(
-                sprintf('%s can\'t be a type variable: it is a type of its own', $parameter->name),
-                $parameter->location,
-            );
+            return TypeError::create(TypeConstructor::reservedNameMessage($parameter->name), $parameter->location);
         }
         if (array_key_exists($parameter->name, $typeVariables)) {
             return TypeError::create(

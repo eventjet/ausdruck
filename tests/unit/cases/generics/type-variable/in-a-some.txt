@@ -1,5 +1,5 @@
 foo:fn<T>(Some<T>) -> T
 -- Expression type --
-func(T): T
+fn(T) -> T
 -- Note --
 Some<T> is T that happens to be there, so it resolves to T itself.

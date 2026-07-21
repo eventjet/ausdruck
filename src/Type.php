@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use Eventjet\Ausdruck\Parser\TypeConstructor;
 use InvalidArgumentException;
 use Override;
 use Stringable;
@@ -92,7 +91,7 @@ final class Type implements Stringable
     /**
      * A type variable: the placeholder a generic function's signature writes where the concrete type is decided by the
      * call site rather than by the declaration. `head` is declared as `func(Option<T>, [list<T>])`, and a call on a
-     * `list<string>` is checked against `func(Option<string>, [list<string>])`; see {@see Signature::instantiate()}.
+     * `list<string>` is checked against `func(Option<string>, [list<string>])`; see {@see Signature::instantiateForCall()}.
      *
      * Variables are quantified at the top of the signature they appear in, so there is no binder to build here and two
      * variables of the same name in one signature are the same variable. A name a type constructor already spells,
@@ -105,7 +104,7 @@ final class Type implements Stringable
     public static function var(string $name): self
     {
         if (TypeConstructor::tryFrom($name) !== null) {
-            throw new InvalidArgumentException(sprintf('%s can\'t be a type variable: it is a type of its own', $name));
+            throw new InvalidArgumentException(TypeConstructor::reservedNameMessage($name));
         }
         return new self($name, isVariable: true);
     }
@@ -228,7 +227,7 @@ final class Type implements Stringable
             assert(count($this->args) > 0);
             $args = $this->args;
             $returnType = array_shift($args);
-            return sprintf('func(%s): %s', implode(', ', $args), $returnType);
+            return sprintf('fn(%s) -> %s', implode(', ', $args), $returnType);
         }
         return $this->name . ($this->args === [] ? '' : sprintf('<%s>', implode(', ', $this->args)));
     }
@@ -283,14 +282,16 @@ final class Type implements Stringable
             return $self->args[0]->isSubtypeOf($other->args[0]);
         }
         if ($self->name === 'Func') {
-            if (!$self->args[0]->isSubtypeOf($other->args[0])) {
+            // $self and $other are already known to both be Func here, so both are already the canonical type
+            // Signature accepts -- see {@see Signature::tryFrom()}.
+            $signature = Signature::tryFrom($self);
+            $otherSignature = Signature::tryFrom($other);
+            assert($signature !== null && $otherSignature !== null);
+            if (!$signature->returnType()->isSubtypeOf($otherSignature->returnType())) {
                 return false;
             }
-            // args[0] is the return type and the rest are parameters -- see {@see self::func()}. $self and $other are
-            // already known to both be Func here, so this is the one place besides Signature that is allowed to know
-            // it.
-            $params = array_slice($self->args, 1);
-            $otherParams = array_slice($other->args, 1);
+            $params = $signature->parameterTypes();
+            $otherParams = $otherSignature->parameterTypes();
             foreach ($params as $i => $param) {
                 $otherParam = $otherParams[$i] ?? null;
                 if ($otherParam === null) {
@@ -318,11 +319,12 @@ final class Type implements Stringable
      * This type as a function's signature, or null if it isn't one: only {@see self::func()} builds a type
      * {@see Signature} accepts. Everything that reads a function type -- its return type, its receiver, the arguments
      * a call passes, generic instantiation -- goes through the {@see Signature} this returns rather than this type's
-     * args directly.
+     * args directly. This is the one place that sees through an alias for {@see Signature}, which is why it, and not
+     * {@see Signature::tryFrom()}, is the way to get one.
      */
     public function asFunction(): Signature|null
     {
-        return Signature::tryFrom($this);
+        return Signature::tryFrom($this->canonical());
     }
 
     public function isStruct(): bool
@@ -342,7 +344,7 @@ final class Type implements Stringable
      * through their aliases first, so a `Numbers` standing for `list<int>` still binds `T` in a `list<T>` regardless
      * of which side names the alias and which spells the type out.
      *
-     * The first binding for a variable is the one that's kept. See {@see Signature::instantiate()} for why that is the
+     * The first binding for a variable is the one that's kept. See {@see Signature::instantiateForCall()} for why that is the
      * useful half of the two.
      *
      * This is the recursive walk that applies to any type, not just a function's parameters, which is why it lives
@@ -393,7 +395,7 @@ final class Type implements Stringable
         return new self(
             $this->name,
             array_map(static fn(self $arg): self => $arg->substitute($bindings), $this->args),
-            $this->aliasFor,
+            $this->aliasFor?->substitute($bindings),
             array_map(static fn(self $field): self => $field->substitute($bindings), $this->fields),
         );
     }

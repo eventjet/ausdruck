@@ -18,7 +18,7 @@ use function substr;
  * Every built-in has an implementation, exposed to evaluation ({@see Scope}) via {@see self::implementations()}, and a
  * declared {@see Type}, exposed to parsing ({@see Parser\Declarations}) via {@see self::types()}. Most of them are
  * generic: they say what they do to the elements of the list they're given without saying what those elements are, so
- * their signatures are written with {@see Type::var()} and are resolved per call site by {@see Type::instantiate()}.
+ * their signatures are written with {@see Type::var()} and are resolved per call site by {@see Signature::instantiateForCall()}.
  * That's what lets `count` accept any list while `contains` still insists that the needle is of the list's own element
  * type, and what makes `map` return a list of whatever its lambda returns.
  *
@@ -54,7 +54,7 @@ final class BuiltinFunctions
      * The list functions are written against one element type, `T`, so that the element type a call is given decides
      * what else that call accepts and what it returns: `contains` takes a needle of the list's own element type,
      * `head` answers an `Option` of it, and `map` answers a list of whatever its lambda returns, `U`. See
-     * {@see Type::instantiate()} for how a call site decides them.
+     * {@see Signature::instantiateForCall()} for how a call site decides them.
      *
      * @return array<string, array{impl: callable, type: Type}>
      */
@@ -66,8 +66,9 @@ final class BuiltinFunctions
         $mapped = Type::var('U');
         return [
             'contains' => ['impl' => self::contains(...), 'type' => Type::func(Type::bool(), [$items, $item])],
-            // Not generic: count and isSome answer the same thing whatever the list or Option holds, so neither reads
-            // an element type and declaring one would only be a variable no parameter ever decides.
+            // Not generic: count and isSome answer the same thing whatever the list or Option holds, so the element
+            // type their receiver could have named would go unused. list<any> and Option<any> say that directly,
+            // rather than naming a T that nothing but the receiver would ever read.
             'count' => ['impl' => self::count(...), 'type' => Type::func(Type::int(), [Type::listOf(Type::any())])],
             'filter' => ['impl' => self::filter(...), 'type' => Type::func($items, [$items, $predicate])],
             'head' => ['impl' => self::head(...), 'type' => Type::func(Type::option($item), [$items])],

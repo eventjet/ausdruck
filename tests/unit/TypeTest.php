@@ -37,7 +37,7 @@ final class TypeTest extends TestCase
         yield 'Function is not callable' => [
             Type::func(Type::string()),
             'not a function',
-            'Expected func(): string, got string',
+            'Expected fn() -> string, got string',
         ];
         yield 'Struct: not an object' => [
             Type::struct(['name' => Type::string()]),
@@ -211,9 +211,10 @@ final class TypeTest extends TestCase
         $signature = Type::func(Type::var('T'), [Type::alias('Bag', Type::listOf(Type::var('T')))])->asFunction();
         self::assertNotNull($signature);
 
-        $instantiated = $signature->instantiate([Type::listOf(Type::int())]);
+        $instantiated = $signature->instantiateForCall(Type::listOf(Type::int()), []);
 
         self::assertTrue($instantiated->returnType()->equals(Type::int()));
+        self::assertTrue($instantiated->receiverType()?->isSubtypeOf(Type::listOf(Type::int())) ?? false);
     }
 
     public function testAliasTypeEqualsAliasTarget(): void
