@@ -1,0 +1,9 @@
+a:int + b:int * c:int
+-- Input --
+{
+  a: 2,
+  b: 3,
+  c: 4,
+}
+-- Output --
+14

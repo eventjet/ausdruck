@@ -68,6 +68,7 @@ Both operands must be of the same type.
 | `!==`    | Inequality            | `foo:string !== "bar"`   |                                           |
 | `-`      | Subtraction           | `foo:int - bar:int`      | Operands must be of type `int` or `float` |
 | `+`      | Addition              | `foo:int + bar:int`      | Operands must be of type `int` or `float` |
+| `*`      | Multiplication        | `foo:int * bar:int`      | Operands must be of type `int` or `float` |
 | `>`      | Greater than          | `foo:int > bar:int`      | Operands must be of type `int` or `float` |
 | `>=`     | Greater than or equal | `foo:int >= bar:int`     | Operands must be of type `int` or `float` |
 | `<`      | Less than             | `foo:int < bar:int`      | Operands must be of type `int` or `float` |
@@ -81,16 +82,16 @@ Where's the rest? We're implementing more as we need them.
 
 #### Int overflow
 
-PHP's `int` arithmetic isn't closed: a sum or difference past the `int` range evaluates to a `float` rather than
-wrapping. An `int`-typed expression that answered one would be handing back a value of a type it doesn't have, so each
+PHP's `int` arithmetic isn't closed: a sum, difference or product past the `int` range evaluates to a `float` rather
+than wrapping. An `int`-typed expression that answered one would be handing back a value of a type it doesn't have, so each
 operator decides up front whether its result exists and fails evaluation when it doesn't:
 
 ```
 a:int + b:int
 ```
 
-with `a` at `PHP_INT_MAX` and `b` at `1` is an evaluation error, not `9.2233720368548E+18`. `-` and unary `-` work the
-same way. Evaluating an `int`-typed expression therefore gives you an `int` or nothing at all — the widened value is
+with `a` at `PHP_INT_MAX` and `b` at `1` is an evaluation error, not `9.2233720368548E+18`. `-`, `*` and unary `-` work
+the same way. Evaluating an `int`-typed expression therefore gives you an `int` or nothing at all — the widened value is
 never computed, so it can't reach a caller or quietly widen the operator above it either. `float` arithmetic has no
 such wall: it goes to `INF`, as it does in PHP.
 
@@ -102,14 +103,16 @@ Operators bind from tightest to loosest in this order:
 |-------------------------------------|-----------------|
 | `.` (field, method)                 | Left            |
 | `-` (negation)                      | Right           |
+| `*`                                 | Left            |
 | `-` (subtraction), `+`              | Left            |
 | `===`, `!==`, `>`, `>=`, `<`, `<=`  | Non-associative |
 | `&&`                                | Left            |
 | `\|\|`                              | Left            |
 
 As in most languages, `&&` binds tighter than `||`, so `a:bool && b:bool || c:bool` means
-`(a:bool && b:bool) || c:bool`. Operators that share a level are left-associative across it:
-`a:int - b:int + c:int` means `(a:int - b:int) + c:int`.
+`(a:bool && b:bool) || c:bool`; `*` binds tighter than `+` and binary `-`, so `a:int + b:int * c:int` means
+`a:int + (b:int * c:int)`. Operators that share a level are left-associative across it: `a:int - b:int + c:int` means
+`(a:int - b:int) + c:int`.
 
 The comparison operators are non-associative: `a:int > b:int > c:int` is a syntax error rather than a comparison
 against the `bool` that the first comparison produces. Chain with `&&` instead.
@@ -121,13 +124,14 @@ Wrap a sub-expression in parentheses to override the precedence:
 ```
 a:bool && (b:bool || c:bool)
 (a:int - b:int) - c:int
+(a:int + b:int) * c:int
 (a:int > b:int) === c:bool
 (a:int - b:int).abs:int()
 ```
 
 Parentheses only group; they add no node of their own. Redundant ones — a group the precedence would have produced
-anyway, like `(a:int - b:int) - c:int` — parse fine and simply disappear, so printing an expression back out adds a
-pair of parentheses exactly where one is needed to parse it back into the same expression, and nowhere else.
+anyway, like `(a:int - b:int) - c:int` — parse fine and simply disappear, so printing an expression back out puts a
+pair of parentheses exactly where the precedence would otherwise regroup the tree, and nowhere else.
 
 Anywhere an expression is expected, it can be a whole one, not only at the top level. List items, struct field values,
 function arguments, and lambda bodies are all full expressions, so operators, calls, and field access are available in

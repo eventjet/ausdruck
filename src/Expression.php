@@ -33,6 +33,11 @@ abstract class Expression implements Stringable
         return Expr::add($this, $addend);
     }
 
+    public function multiply(self $multiplier): Multiply
+    {
+        return Expr::multiply($this, $multiplier);
+    }
+
     public function gt(self $right): Gt
     {
         return Expr::gt($this, $right);

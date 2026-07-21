@@ -150,6 +150,16 @@ final class Expr
         return new Add($augend, $addend);
     }
 
+    public static function multiply(Expression $multiplicand, Expression $multiplier): Multiply
+    {
+        self::assertSameNumberType($multiplicand, $multiplier, static fn(): string => sprintf(
+            'Can\'t multiply %s by %s',
+            $multiplicand->getType(),
+            $multiplier->getType(),
+        ));
+        return new Multiply($multiplicand, $multiplier);
+    }
+
     public static function gt(Expression $left, Expression $right): Gt
     {
         self::checkComparison(ComparisonOperator::GreaterThan, $left, $right);
