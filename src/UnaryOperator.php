@@ -64,7 +64,7 @@ abstract class UnaryOperator extends Expression
     /**
      * The token the parser reads this operator as, which is what gives the operator its spelling.
      *
-     * @return Token::Minus
+     * @return Token::Minus|Token::Not
      */
     abstract protected function token(): Token;
 }

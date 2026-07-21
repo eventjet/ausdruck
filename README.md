@@ -60,7 +60,7 @@ See [Types](#types)
 
 ### Operators
 
-Both operands must be of the same type.
+Most operators go between two operands of the same type:
 
 | Operator | Description           | Example                  | Note                                            |
 |----------|-----------------------|--------------------------|-------------------------------------------------|
@@ -76,9 +76,24 @@ Both operands must be of the same type.
 | `<`      | Less than             | `foo:int < bar:int`      | Operands must be of type `int` or `float`       |
 | `<=`     | Less than or equal    | `foo:int <= bar:int`     | Operands must be of type `int` or `float`       |
 | `\|\|`   | Logical OR            | `foo:bool \|\| bar:bool` | Operands must be of type `bool`                 |
-| &&       | Logical AND           | `foo:bool && bar:bool`   | Operands must be of type `bool`                 |
+| `&&`     | Logical AND           | `foo:bool && bar:bool`   | Operands must be of type `bool`                 |
 
 Equality is spelled `===`, so inequality is `!==`; there is no `==` or `!=`.
+
+Two operators take a single operand, written in front of it:
+
+| Operator | Description | Example     | Note                                         |
+|----------|-------------|-------------|----------------------------------------------|
+| `-`      | Negation    | `-foo:int`  | The operand must be of type `int` or `float` |
+| `!`      | Logical NOT | `!foo:bool` | The operand must be of type `bool`           |
+
+Both prefix operators bind tighter than every binary operator, so each applies only to the expression right next to it
+and nothing more: `!foo:bool && bar:bool` is `(!foo:bool) && bar:bool`, and `-foo:int + bar:int` is
+`(-foo:int) + bar:int`. That includes calls and field access, which bind tighter still, so a call is negated whole:
+
+```
+!names:list<string>.contains:bool(needle:string)
+```
 
 Where's the rest? We're implementing more as we need them.
 
@@ -128,7 +143,7 @@ Operators bind from tightest to loosest in this order:
 | Operator                           | Associativity   |
 |------------------------------------|-----------------|
 | `.` (field, method)                | Left            |
-| `-` (negation)                     | Right           |
+| `-` (negation), `!`                | Right           |
 | `*`, `/`, `%`                      | Left            |
 | `-` (subtraction), `+`             | Left            |
 | `===`, `!==`, `>`, `>=`, `<`, `<=` | Non-associative |
@@ -153,6 +168,7 @@ a:bool && (b:bool || c:bool)
 (a:int + b:int) * c:int
 (a:int > b:int) === c:bool
 (a:int / b:int).unwrap:int()
+!(a:bool || b:bool)
 ```
 
 Parentheses only group; they add no node of their own. Redundant ones — a group the precedence would have produced

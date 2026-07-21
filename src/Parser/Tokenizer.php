@@ -71,7 +71,11 @@ final class Tokenizer
                 '{' => Token::OpenBrace,
                 '}' => Token::CloseBrace,
                 '=' => self::exact($chars, $line, $column, Token::TripleEquals),
-                '!' => self::exact($chars, $line, $column, Token::NotEquals),
+                // `!` on its own is Token::Not; followed by `=` it commits to its pair, `!==`, after the same one
+                // character of lookahead as {@see self::pair()}'s callers below—but that pair is two characters long,
+                // more than a lookahead can settle, so it reads {@see self::exact()} for the rest instead of
+                // returning a token bare.
+                '!' => $chars->peek(1) === '=' ? self::exact($chars, $line, $column, Token::NotEquals) : Token::Not,
                 '&' => self::exact($chars, $line, $column, Token::And),
                 '<' => self::angle($chars, Token::OpenAngle, Token::LessThanEquals),
                 '>' => self::angle($chars, Token::CloseAngle, Token::GreaterThanEquals),
@@ -152,11 +156,12 @@ final class Tokenizer
     }
 
     /**
-     * Answers the operator that is the only token starting with its first character: `===`, `!==`, and `&&`. Once that
-     * first character is there, the whole sequence is required; anything short of it is an error naming the operator
-     * that was expected and underlining the characters that were actually read. The sequence is the token's own
-     * spelling, so the operator the error names is the one it was scanning for, and $ahead—how far into that spelling
-     * the reading got—is at once how far to peek, how much was read, and where the underline ends.
+     * Answers the operator that is the only token the reading can still be: `===` and `&&` from their first character,
+     * `!==` from the peek at its second that the `!` arm has already committed to. Once that much is there, the whole
+     * sequence is required; anything short of it is an error naming the operator that was expected and underlining the
+     * characters that were actually read. The sequence is the token's own spelling, so the operator the error names is
+     * the one it was scanning for, and $ahead—how far into that spelling the reading got—is at once how far to peek,
+     * how much was read, and where the underline ends.
      *
      * @param Peekable<string> $chars
      * @param positive-int $line
@@ -168,7 +173,9 @@ final class Tokenizer
         foreach (str_split($token->value) as $ahead => $char) {
             if ($chars->peek($ahead) !== $char) {
                 $endColumn = $column + $ahead - 1;
-                // The main loop only dispatches here after peeking the token's first character, so that one matched.
+                // Every caller has peeked before dispatching here: the main loop the token's first character, and the
+                // `!` arm its second as well. So the mismatch is never on the first character, and $ahead is at
+                // least 1.
                 assert($endColumn >= 1);
                 throw SyntaxError::create(
                     sprintf('Expected %s, got %s', $token->value, $read),

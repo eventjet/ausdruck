@@ -10,6 +10,7 @@ use Eventjet\Ausdruck\Expression;
 use Eventjet\Ausdruck\FieldAccess;
 use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\ListLiteral;
+use Eventjet\Ausdruck\Precedence;
 use Eventjet\Ausdruck\StructLiteral;
 use Eventjet\Ausdruck\Type;
 
@@ -152,8 +153,8 @@ final class ExpressionParser
      *
      * The loop is what makes this level left-associative: each operator folds what came before into its left operand.
      * {@see self::parseComparison()} is otherwise the same shape with an if in place of the loop, which is what makes
-     * the six comparison operators non-associative; {@see \Eventjet\Ausdruck\Precedence::leftSlot()} reads that one
-     * difference back out when an expression is printed.
+     * the six comparison operators non-associative; {@see Precedence::leftSlot()} reads that one difference back out
+     * when an expression is printed.
      */
     private function parseAdditive(): Expression
     {
@@ -195,22 +196,36 @@ final class ExpressionParser
     }
 
     /**
-     * -foo:int
-     * ========
+     * -foo:int   !foo:bool
+     * ========   =========
+     *
+     * The only level that reads its operand at its own level rather than at the next one down, which it does by calling
+     * itself: a prefix operator applies to whatever follows it, including another prefix operator, so `!!a:bool` and
+     * `- -1` are expressions rather than syntax errors.
      *
      * Negating a number literal produces a negative literal rather than a negation of a positive one, but that's
      * {@see Expr::negative()}'s job, not ours: folding it here would mean returning a primary without going through
      * parsePostfix(), and `-2 .abs:int()` would stop parsing.
+     *
+     * It is the only level whose node needs a location of its own: a prefix operator's span starts where the operator
+     * is, which is nowhere in the operand below it. That start is read off {@see self::nextSpan()} before the operator
+     * is consumed—{@see Span::to()} takes only the start from its receiver, so a multi-character operator loses
+     * nothing by being measured at its first character.
      */
     private function parseUnary(): Expression
     {
-        $minus = $this->tokens->peek();
-        if ($minus === null || $minus->token !== Token::Minus) {
+        $build = match ($this->nextToken()) {
+            Token::Minus => Expr::negative(...),
+            Token::Not => Expr::not(...),
+            default => null,
+        };
+        if ($build === null) {
             return $this->parsePostfix();
         }
+        $start = $this->nextSpan();
         $this->tokens->next();
         $operand = $this->parseUnary();
-        return Expr::negative($operand, $minus->location()->to($operand->location()));
+        return $build($operand, $start->to($operand->location()));
     }
 
     /**
@@ -488,6 +503,12 @@ final class ExpressionParser
         return $this->tokens->peek()?->token;
     }
 
+    /**
+     * Where the parser is looking: the next token's own position, or one column past the previous token if there is
+     * no next one. That is where an error about a missing token points—every other caller uses it for exactly that—
+     * and it is also where a prefix operator's span begins, since the operator's own token is where the parser is
+     * looking right before {@see self::parseUnary()} consumes it.
+     */
     private function nextSpan(): Span
     {
         $token = $this->tokens->peek();

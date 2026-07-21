@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Parser\Span;
+use Eventjet\Ausdruck\Parser\Token;
 use Eventjet\Ausdruck\Parser\TypeAnnotation;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeHint;
@@ -110,12 +111,25 @@ final class Expr
 
     public static function or_(Expression $left, Expression $right): Or_
     {
-        return new Or_(self::assertBoolean($left, '||', 'left'), self::assertBoolean($right, '||', 'right'));
+        self::assertBooleanOperands($left, $right, Token::Or);
+        return new Or_($left, $right);
     }
 
     public static function and_(Expression $left, Expression $right): And_
     {
-        return new And_(self::assertBoolean($left, '&&', 'left'), self::assertBoolean($right, '&&', 'right'));
+        self::assertBooleanOperands($left, $right, Token::And);
+        return new And_($left, $right);
+    }
+
+    /**
+     * Nothing is folded here, unlike in {@see self::negative()}: `!true` stays a negation of the literal `true`. The
+     * language spells negative numbers, so a negated number literal has a literal to fold into; it spells no negative
+     * booleans, and `false` is not another spelling of `!true` but a different expression that evaluates the same.
+     */
+    public static function not(Expression $expression, Span|null $location = null): Not
+    {
+        self::assertBooleanOperand($expression, Token::Not);
+        return new Not($expression, $location ?? self::dummySpan());
     }
 
     /**
@@ -441,20 +455,40 @@ final class Expr
     }
 
     /**
-     * @param 'left' | 'right' $side
+     * The rule both binary logical operators (`&&`, `||`) follow. They name their operands the same way, so they share
+     * one wording, and can't drift into blaming the two sides of the same mistake differently. The left side is
+     * checked first, so an expression with both operands bad is blamed on its leftmost one; that is the other half of
+     * not drifting, and is pinned by a test with two bad operands.
      */
-    private static function assertBoolean(Expression $expr, string $operator, string $side): Expression
+    private static function assertBooleanOperands(Expression $left, Expression $right, Token $operator): void
+    {
+        self::assertBoolean($left, sprintf('The expression on the left side of %s', $operator->value));
+        self::assertBoolean($right, sprintf('The expression on the right side of %s', $operator->value));
+    }
+
+    /**
+     * The rule the one unary logical operator, `!`, follows: unlike `&&` and `||` it has a single operand, so there is
+     * no side to name.
+     */
+    private static function assertBooleanOperand(Expression $expr, Token $operator): void
+    {
+        self::assertBoolean($expr, sprintf('The operand of %s', $operator->value));
+    }
+
+    /**
+     * The rule the logical operators share: an operand of `&&`, `||` or `!` has to be boolean. Only how the offending
+     * operand is named differs between them—`!` has a single one, so it names no side—which is what $subject says.
+     *
+     * @param string $subject How the operand is named in the error, e.g. `The operand of !`. It opens the sentence,
+     *     so it has to read as a noun phrase in front of ` must be boolean, got <type>`.
+     */
+    private static function assertBoolean(Expression $expr, string $subject): void
     {
         if ($expr->matchesType(Type::bool())) {
-            return $expr;
+            return;
         }
         throw TypeError::create(
-            sprintf(
-                'The expression on the %s side of %s must be boolean, got %s',
-                $side,
-                $operator,
-                $expr->getType(),
-            ),
+            sprintf('%s must be boolean, got %s', $subject, $expr->getType()),
             $expr->location(),
         );
     }
