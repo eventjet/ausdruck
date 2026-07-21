@@ -1,0 +1,5 @@
+-(a:int + b:int)
+-- Input --
+{ a: 2, b: 5 }
+-- Output --
+-7
