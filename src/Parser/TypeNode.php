@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
-use Eventjet\Ausdruck\Type;
 use Override;
 use Stringable;
 
-use function array_pop;
-use function assert;
 use function implode;
 use function sprintf;
 
@@ -20,11 +17,14 @@ use function sprintf;
 final class TypeNode implements Stringable
 {
     /**
-     * @param list<self> $args
-     * @param Delimiters | 'kv' | 'fn' $delimiters
+     * @param list<self> $args The type's arguments. For a function type, these are its parameters -- see
+     *     {@see self::function()} -- and its return type is $returnType instead, not one of them.
+     * @param Delimiters | 'kv' $delimiters
      * @param list<self> $typeParameters The type variables a function type binds, which are only ever the names
      *     themselves. They are nodes rather than strings so that each one carries the span an error about it points
-     *     at; see {@see Types::resolve()}.
+     *     at; see {@see Types::resolve()}. Meaningless where $returnType is null.
+     * @param self|null $returnType The return type of a function type, and what marks this node as one: every other
+     *     shape leaves it null. See {@see self::function()} and {@see TypeResolution::resolveFunction()}.
      */
     public function __construct(
         public readonly string $name,
@@ -32,6 +32,7 @@ final class TypeNode implements Stringable
         public readonly Span $location,
         public readonly Delimiters|string $delimiters = Delimiters::AngleBrackets,
         public readonly array $typeParameters = [],
+        public readonly self|null $returnType = null,
     ) {
     }
 
@@ -49,15 +50,12 @@ final class TypeNode implements Stringable
     }
 
     /**
-     * A function type keeps its return type as the last of its args, the way {@see Type::func()} does, so that
-     * {@see Types::resolve()} has one list to walk.
-     *
      * @param list<self> $parameters
      * @param list<self> $typeParameters
      */
     public static function function(array $parameters, self $returnType, array $typeParameters, Span $location): self
     {
-        return new self('fn', [...$parameters, $returnType], $location, 'fn', $typeParameters);
+        return new self('fn', $parameters, $location, typeParameters: $typeParameters, returnType: $returnType);
     }
 
     #[Override]
@@ -66,17 +64,12 @@ final class TypeNode implements Stringable
         if ($this->delimiters === 'kv') {
             return sprintf('%s: %s', $this->args[0], $this->args[1]);
         }
-        if ($this->delimiters === 'fn') {
-            $parameters = $this->args;
-            // A function type is written as its parameters and its return type, and the return type is the last of the
-            // args: {@see self::function()} puts it there, so there is always one to take back off.
-            $returnType = array_pop($parameters);
-            assert($returnType !== null);
+        if ($this->returnType !== null) {
             return sprintf(
                 'fn%s(%s) -> %s',
                 $this->typeParameters === [] ? '' : sprintf('<%s>', implode(', ', $this->typeParameters)),
-                implode(', ', $parameters),
-                $returnType,
+                implode(', ', $this->args),
+                $this->returnType,
             );
         }
         return $this->args === []

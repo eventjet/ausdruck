@@ -89,7 +89,7 @@ final class Expr
      *     nothing to check its operands against. That's the case for functions that are used with nothing but an
      *     inline return type, and for every call built through {@see Expression::call()}, which has no declarations to
      *     consult. A declaration may be generic, in which case it says what this call accepts only once
-     *     {@see Type::instantiate()} has resolved its type variables against the types at hand.
+     *     {@see Signature::instantiate()} has resolved its type variables against the types at hand.
      * @param Span|null $nameLocation Where the function is named, which is what an error about the function itself
      *     rather than about one of its operands points at.
      */
@@ -103,14 +103,14 @@ final class Expr
         Span|null $location = null,
     ): Call {
         $location ??= self::dummySpan();
-        $signature = $signature?->instantiate([
+        $instantiated = $signature?->asFunction()?->instantiateForCall(
             $target->getType(),
-            ...array_map(static fn(Expression $argument): Type => $argument->getType(), $arguments),
-        ]);
-        $type = self::returnType($name, $returnType, $signature, $nameLocation ?? self::dummySpan());
-        if ($signature !== null) {
-            self::checkReceiver($target, $name, $signature);
-            self::checkArguments($arguments, $name, $signature, $location);
+            array_map(static fn(Expression $argument): Type => $argument->getType(), $arguments),
+        );
+        $type = self::returnType($name, $returnType, $instantiated, $nameLocation ?? self::dummySpan());
+        if ($instantiated !== null) {
+            self::checkReceiver($target, $name, $instantiated);
+            self::checkArguments($arguments, $name, $instantiated, $location);
         }
         return new Call($target, $name, $type, $arguments, $location);
     }
@@ -374,7 +374,7 @@ final class Expr
     private static function returnType(
         string $name,
         TypeAnnotation|null $annotation,
-        Type|null $signature,
+        Signature|null $signature,
         Span $nameLocation,
     ): Type {
         if ($annotation === null) {
@@ -401,7 +401,7 @@ final class Expr
      * A receiver function takes the expression it's called on as its first argument: `substr` is declared as
      * func(string, [string, int, int]) and called as `foo:string.substr:string(0, 3)`, so `foo` has to be a string.
      */
-    private static function checkReceiver(Expression $target, string $name, Type $signature): void
+    private static function checkReceiver(Expression $target, string $name, Signature $signature): void
     {
         $receiverType = $signature->receiverType();
         if ($receiverType === null) {
@@ -430,7 +430,7 @@ final class Expr
      * @param Span $location The location of the whole call, which is the best we can do to point at an argument that
      *     isn't there.
      */
-    private static function checkArguments(array $arguments, string $name, Type $signature, Span $location): void
+    private static function checkArguments(array $arguments, string $name, Signature $signature, Span $location): void
     {
         $argumentTypes = $signature->argumentTypes();
         if (count($arguments) !== count($argumentTypes)) {

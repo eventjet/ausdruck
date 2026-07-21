@@ -9,6 +9,7 @@ use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Type;
+use InvalidArgumentException;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -187,6 +188,34 @@ final class TypeTest extends TestCase
         Type::fromValue($value);
     }
 
+    /**
+     * A name a type constructor already spells is a type, not a placeholder for one—the same rule {@see Types}
+     * enforces where a signature is written as a type string, enforced here too so a signature built directly through
+     * this API can't spell one the parser would reject.
+     */
+    public function testVariableNamedAfterATypeConstructorIsRejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('int can\'t be a type variable: it is a type of its own');
+
+        Type::var('int');
+    }
+
+    /**
+     * bind() only sees through an alias on the actual side, so a variable under an alias on the signature side has to
+     * be reachable too, or instantiating a signature built directly through this API silently drops it to `any`
+     * instead of what the call actually decided.
+     */
+    public function testVariableUnderAnAliasOnTheSignatureSideIsBound(): void
+    {
+        $signature = Type::func(Type::var('T'), [Type::alias('Bag', Type::listOf(Type::var('T')))])->asFunction();
+        self::assertNotNull($signature);
+
+        $instantiated = $signature->instantiate([Type::listOf(Type::int())]);
+
+        self::assertTrue($instantiated->returnType()->equals(Type::int()));
+    }
+
     public function testAliasTypeEqualsAliasTarget(): void
     {
         $concrete = Type::listOf(Type::string());
@@ -226,9 +255,12 @@ final class TypeTest extends TestCase
     {
         $alias = Type::alias('Callback', Type::func(Type::string(), [Type::int(), Type::bool()]));
 
-        self::assertTrue($alias->returnType()->equals(Type::string()));
-        self::assertTrue($alias->receiverType()?->equals(Type::int()) ?? false);
-        self::assertEquals([Type::bool()], $alias->argumentTypes());
+        $signature = $alias->asFunction();
+
+        self::assertNotNull($signature);
+        self::assertTrue($signature->returnType()->equals(Type::string()));
+        self::assertTrue($signature->receiverType()?->equals(Type::int()) ?? false);
+        self::assertEquals([Type::bool()], $signature->argumentTypes());
     }
 
     /**

@@ -18,7 +18,7 @@ use Eventjet\Ausdruck\Type;
  * The case names are the names as written, which is why some of them are PHP keywords.
  *
  * @internal
- * @psalm-internal Eventjet\Ausdruck\Parser
+ * @psalm-internal Eventjet\Ausdruck
  */
 enum TypeConstructor: string
 {

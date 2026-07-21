@@ -66,10 +66,12 @@ final class BuiltinFunctions
         $mapped = Type::var('U');
         return [
             'contains' => ['impl' => self::contains(...), 'type' => Type::func(Type::bool(), [$items, $item])],
-            'count' => ['impl' => self::count(...), 'type' => Type::func(Type::int(), [$items])],
+            // Not generic: count and isSome answer the same thing whatever the list or Option holds, so neither reads
+            // an element type and declaring one would only be a variable no parameter ever decides.
+            'count' => ['impl' => self::count(...), 'type' => Type::func(Type::int(), [Type::listOf(Type::any())])],
             'filter' => ['impl' => self::filter(...), 'type' => Type::func($items, [$items, $predicate])],
             'head' => ['impl' => self::head(...), 'type' => Type::func(Type::option($item), [$items])],
-            'isSome' => ['impl' => self::isSome(...), 'type' => Type::func(Type::bool(), [Type::option($item)])],
+            'isSome' => ['impl' => self::isSome(...), 'type' => Type::func(Type::bool(), [Type::option(Type::any())])],
             'map' => ['impl' => self::map(...), 'type' => Type::func(Type::listOf($mapped), [$items, Type::func($mapped, [$item])])],
             'some' => ['impl' => self::some(...), 'type' => Type::func(Type::bool(), [$items, $predicate])],
             'substr' => ['impl' => substr(...), 'type' => Type::func(Type::string(), [Type::string(), Type::int(), Type::int()])],

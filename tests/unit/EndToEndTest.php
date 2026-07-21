@@ -6,10 +6,14 @@ namespace Eventjet\Ausdruck\Test\Unit;
 
 use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
+use Eventjet\Ausdruck\Parser\SyntaxError;
+use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Scope;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+
+use function sprintf;
 
 final class EndToEndTest extends TestCase
 {
@@ -28,13 +32,24 @@ final class EndToEndTest extends TestCase
     /**
      * A case says what it expects by which sections it writes, so this runs the source as far as those sections reach:
      * a case that expects an error stops at the parse, and one that expects a type never has to be evaluated.
+     *
+     * A case that expects an error is asserted by catching it and comparing the message with assertSame rather than
+     * PHPUnit's expectExceptionMessage, which only asserts a substring: a case that pins `Unknown type T` would still
+     * pass against a message that merely contains `Unknown type`, and every fixture here exists to pin an exact
+     * message.
      */
     #[DataProvider('cases')]
     public function testRun(E2eCase $case): void
     {
         if ($case->error !== null) {
-            $this->expectException($case->error->class);
-            $this->expectExceptionMessage($case->error->message);
+            try {
+                ExpressionParser::parse($case->source, $case->declarations);
+            } catch (SyntaxError|TypeError $e) {
+                self::assertInstanceOf($case->error->class, $e);
+                self::assertSame($case->error->message, $e->getMessage());
+                return;
+            }
+            self::fail(sprintf('Expected %s, but the source was accepted', $case->error->class));
         }
 
         $expression = ExpressionParser::parse($case->source, $case->declarations);

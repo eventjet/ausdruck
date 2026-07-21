@@ -1,0 +1,9 @@
+foo:fn<Numbers>(Numbers) -> Numbers
+-- Types --
+Numbers: list<int>
+-- Type error --
+Numbers can't be a type variable: it already names a type
+-- Note --
+A binder introduces a name, so the name has to be free to introduce, and an alias occupies a name as much as a type
+constructor does: a variable named Numbers would print exactly like the alias and nothing downstream could tell them
+apart.

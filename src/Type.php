@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Parser\TypeConstructor;
 use InvalidArgumentException;
 use Override;
 use Stringable;
@@ -91,26 +92,32 @@ final class Type implements Stringable
     /**
      * A type variable: the placeholder a generic function's signature writes where the concrete type is decided by the
      * call site rather than by the declaration. `head` is declared as `func(Option<T>, [list<T>])`, and a call on a
-     * `list<string>` is checked against `func(Option<string>, [list<string>])`; see {@see self::instantiate()}.
+     * `list<string>` is checked against `func(Option<string>, [list<string>])`; see {@see Signature::instantiate()}.
      *
      * Variables are quantified at the top of the signature they appear in, so there is no binder to build here and two
      * variables of the same name in one signature are the same variable. A name a type constructor already spells,
-     * like `int` or `list`, is not a variable name; nothing checks that here, but {@see Parser\Types} rejects it where
-     * a signature is written as a type string.
+     * like `int` or `list`, is not a variable name: {@see Parser\Types} rejects it where a signature is written as a
+     * type string, and this rejects it here too, so the same rule holds for a signature built directly through this
+     * API.
+     *
+     * @throws InvalidArgumentException if $name is a type the language spells itself.
      */
     public static function var(string $name): self
     {
+        if (TypeConstructor::tryFrom($name) !== null) {
+            throw new InvalidArgumentException(sprintf('%s can\'t be a type variable: it is a type of its own', $name));
+        }
         return new self($name, isVariable: true);
     }
 
     /**
      * A function type keeps its return type and its parameters in one list of args: args[0] is the return type, and
-     * everything after it is a parameter. Only returnType() and parameterTypes() know that layout, and everything else,
-     * in this class and outside it, goes through them.
+     * everything after it is a parameter. {@see Signature} is the only thing that knows that layout; call
+     * {@see self::asFunction()} to read a function type instead of reaching into its args.
      *
      * @param list<Type> $parameters The types the PHP callable receives, in order. A function that is called as a
      *     receiver function -- `foo:string.substr:string(0, 3)` -- receives the expression it's called on as the first
-     *     of them; see receiverType() and argumentTypes().
+     *     of them; see {@see Signature::receiverType()} and {@see Signature::argumentTypes()}.
      */
     public static function func(self $return, array $parameters = []): self
     {
@@ -276,11 +283,14 @@ final class Type implements Stringable
             return $self->args[0]->isSubtypeOf($other->args[0]);
         }
         if ($self->name === 'Func') {
-            if (!$self->returnType()->isSubtypeOf($other->returnType())) {
+            if (!$self->args[0]->isSubtypeOf($other->args[0])) {
                 return false;
             }
-            $params = $self->parameterTypes();
-            $otherParams = $other->parameterTypes();
+            // args[0] is the return type and the rest are parameters -- see {@see self::func()}. $self and $other are
+            // already known to both be Func here, so this is the one place besides Signature that is allowed to know
+            // it.
+            $params = array_slice($self->args, 1);
+            $otherParams = array_slice($other->args, 1);
             foreach ($params as $i => $param) {
                 $otherParam = $otherParams[$i] ?? null;
                 if ($otherParam === null) {
@@ -305,68 +315,14 @@ final class Type implements Stringable
     }
 
     /**
-     * Returns the return type of a function type.
-     *
-     * This should only be called on function types. The behavior is undefined for other types.
+     * This type as a function's signature, or null if it isn't one: only {@see self::func()} builds a type
+     * {@see Signature} accepts. Everything that reads a function type -- its return type, its receiver, the arguments
+     * a call passes, generic instantiation -- goes through the {@see Signature} this returns rather than this type's
+     * args directly.
      */
-    public function returnType(): self
+    public function asFunction(): Signature|null
     {
-        return $this->canonical()->args[0];
-    }
-
-    /**
-     * The type a receiver function is called on: `substr` is declared as func(string, [string, int, int]) and called as
-     * `foo:string.substr:string(0, 3)`, so its receiver type is string. Null if the function declares no parameters at
-     * all, which is what makes it unusable as a receiver function.
-     *
-     * This should only be called on function types. The behavior is undefined for other types.
-     */
-    public function receiverType(): self|null
-    {
-        return $this->parameterTypes()[0] ?? null;
-    }
-
-    /**
-     * The types of the arguments a call passes in parentheses, which are the parameters the receiver doesn't take up.
-     *
-     * This should only be called on function types. The behavior is undefined for other types.
-     *
-     * @return list<self>
-     */
-    public function argumentTypes(): array
-    {
-        return array_slice($this->parameterTypes(), 1);
-    }
-
-    /**
-     * This function type with its type variables resolved against the types a call applies it to: the signature the
-     * call is actually checked against, with no variables left in it.
-     *
-     * The parameters are walked in order and a variable keeps the first type that lands on it, so the receiver decides
-     * `T` for `func(bool, [list<T>, T])` before the argument is looked at. That order is what makes a lambda argument
-     * harmless: a lambda's parameters are typed `any` and would decide nothing useful, but by then the receiver has
-     * already decided. A variable no parameter reaches becomes `any`—nothing constrained it, so nothing about the call
-     * should be rejected on its account, and an argument that isn't there is reported as the missing argument it is.
-     *
-     * Nothing here is an error. Where a variable's binding and a later parameter disagree, the substituted signature
-     * says what was expected and {@see Expr::call()}'s receiver and argument checks report it, pointing at the
-     * expression that's wrong.
-     *
-     * This should only be called on function types. The behavior is undefined for other types.
-     *
-     * @param list<self> $arguments The types the call applies, receiver first, in the order {@see self::parameterTypes()}
-     *     lists the parameters.
-     */
-    public function instantiate(array $arguments): self
-    {
-        $bindings = [];
-        // Only the parameters an argument faces have anything to say. A call with the wrong number of arguments is
-        // still instantiated, from the ones it does have, so that Expr::call() can report the count against a
-        // signature that reads the way the rest of the call decided it should.
-        foreach (array_slice($this->parameterTypes(), 0, count($arguments)) as $index => $parameter) {
-            $bindings = $parameter->bind($arguments[$index], $bindings);
-        }
-        return $this->substitute($bindings);
+        return Signature::tryFrom($this);
     }
 
     public function isStruct(): bool
@@ -380,46 +336,41 @@ final class Type implements Stringable
     }
 
     /**
-     * Every parameter of a function type, receiver included, in the order the PHP callable receives them. Two function
-     * types are compared parameter by parameter, so this is the list that matters for subtyping; the split into a
-     * receiver and the arguments only matters at a call site.
-     *
-     * @return list<self>
-     */
-    private function parameterTypes(): array
-    {
-        return array_slice($this->canonical()->args, 1);
-    }
-
-    /**
      * What $actual tells us about the variables in this type, added to what is already known. Matching is structural
      * and one-way: where the two types have the same shape, the variables on this side take the types facing them,
-     * and where they don't, there is nothing to learn and the bindings come back unchanged. $actual is seen through
-     * its aliases so that a `Numbers` standing for `list<int>` still binds `T` in a `list<T>`; this side doesn't need
-     * the same treatment, because an alias names a complete type and so has no variables under it.
+     * and where they don't, there is nothing to learn and the bindings come back unchanged. Both sides are seen
+     * through their aliases first, so a `Numbers` standing for `list<int>` still binds `T` in a `list<T>` regardless
+     * of which side names the alias and which spells the type out.
      *
-     * The first binding for a variable is the one that's kept. See {@see self::instantiate()} for why that is the
+     * The first binding for a variable is the one that's kept. See {@see Signature::instantiate()} for why that is the
      * useful half of the two.
+     *
+     * This is the recursive walk that applies to any type, not just a function's parameters, which is why it lives
+     * here rather than on {@see Signature}; nothing outside the type system should call it directly.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
      *
      * @param array<string, self> $bindings
      * @return array<string, self>
      */
-    private function bind(self $actual, array $bindings): array
+    public function bind(self $actual, array $bindings): array
     {
         if ($this->isVariable) {
             return array_key_exists($this->name, $bindings) ? $bindings : [...$bindings, $this->name => $actual];
         }
+        $self = $this->canonical();
         $actual = $actual->canonical();
-        if ($this->name !== $actual->name) {
+        if ($self->name !== $actual->name) {
             return $bindings;
         }
         // Two types of the same shape can still be of different sizes: a lambda declares fewer parameters than the
         // signature asks for, and a struct is written with fewer fields than one reaches into. What the two have in
         // common is what there is to learn from.
-        foreach (array_slice($this->args, 0, count($actual->args)) as $index => $arg) {
+        foreach (array_slice($self->args, 0, count($actual->args)) as $index => $arg) {
             $bindings = $arg->bind($actual->args[$index], $bindings);
         }
-        foreach (array_intersect_key($this->fields, $actual->fields) as $name => $field) {
+        foreach (array_intersect_key($self->fields, $actual->fields) as $name => $field) {
             $bindings = $field->bind($actual->fields[$name], $bindings);
         }
         return $bindings;
@@ -429,9 +380,12 @@ final class Type implements Stringable
      * This type with every variable replaced by what it was bound to, and every variable nothing bound replaced by
      * `any`.
      *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     *
      * @param array<string, self> $bindings
      */
-    private function substitute(array $bindings): self
+    public function substitute(array $bindings): self
     {
         if ($this->isVariable) {
             return $bindings[$this->name] ?? self::any();
