@@ -205,14 +205,15 @@ final class ExpressionParser
      * Negating a number literal produces a negative literal rather than a negation of a positive one, but that's
      * {@see Expr::negative()}'s job, not ours: folding it here would mean returning a primary without going through
      * parsePostfix(), and `-2 .abs:int()` would stop parsing.
+     *
+     * The consumed token is picked back up after the match rather than peeked before it, so this level decides whether
+     * to descend the same way its siblings do—one match on {@see self::nextToken()}, one exit. It is the only level
+     * that needs the operator itself and not just its kind, because a prefix operator's span is where the expression
+     * begins; having matched on it, we know it is there.
      */
     private function parseUnary(): Expression
     {
-        $operator = $this->tokens->peek();
-        if ($operator === null) {
-            return $this->parsePostfix();
-        }
-        $build = match ($operator->token) {
+        $build = match ($this->nextToken()) {
             Token::Minus => Expr::negative(...),
             Token::Not => Expr::not(...),
             default => null,
@@ -220,7 +221,8 @@ final class ExpressionParser
         if ($build === null) {
             return $this->parsePostfix();
         }
-        $this->tokens->next();
+        $operator = $this->tokens->next();
+        assert($operator !== null);
         $operand = $this->parseUnary();
         return $build($operand, $operator->location()->to($operand->location()));
     }

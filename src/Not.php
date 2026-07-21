@@ -17,12 +17,6 @@ use Override;
 final class Not extends UnaryOperator
 {
     #[Override]
-    public function token(): Token
-    {
-        return Token::Not;
-    }
-
-    #[Override]
     public function evaluate(Scope $scope): bool
     {
         return !Operand::bool($this->expression->evaluate($scope));
@@ -36,5 +30,11 @@ final class Not extends UnaryOperator
     public function getType(): Type
     {
         return Type::bool();
+    }
+
+    #[Override]
+    protected function token(): Token
+    {
+        return Token::Not;
     }
 }

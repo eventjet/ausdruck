@@ -60,9 +60,11 @@ abstract class UnaryOperator extends Expression
     }
 
     /**
-     * The token the parser reads this operator as, which is what gives the operator its spelling. Unlike a binary
-     * operator's, it doesn't fix a precedence level: the cascade has a single unary level, and everything spelled at it
-     * binds equally tight.
+     * The token the parser reads this operator as, which is what gives the operator its spelling. Protected, unlike
+     * {@see BinaryOperator::token()}, because nothing outside the hierarchy has anything to ask it: a binary operator's
+     * token fixes its precedence level, so {@see Precedence} reads it, while the cascade has a single unary level and
+     * everything spelled at it binds equally tight—{@see self::symbol()} is the only caller. That also keeps the
+     * internal {@see Token} off the public surface of {@see Negative}, which is not itself internal.
      */
-    abstract public function token(): Token;
+    abstract protected function token(): Token;
 }

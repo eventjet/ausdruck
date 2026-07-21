@@ -30,9 +30,9 @@ final class Tokenizer
      * Every character that begins an operator is listed once, in the match below, and its arm answers which operator it
      * begins: the token itself for a character that is a whole operator on its own, {@see self::pair()} for one that
      * may be completed by a second, {@see self::angle()} for the two that may be and mean something else when they
-     * aren't, {@see self::bang()} for the one whose longer reading is longer than that, and {@see self::exact()} for
-     * one that begins a token and nothing else. Giving `+` a longer reading later means changing what its arm answers,
-     * not moving the arm somewhere a different rule applies.
+     * aren't, {@see self::bang()} for `!`, which is a whole operator on its own and also begins `!==`, and
+     * {@see self::exact()} for one that begins a token and nothing else. Giving `+` a longer reading later means
+     * changing what its arm answers, not moving the arm somewhere a different rule applies.
      *
      * The arms only look ahead; naming the token is all they do. Scanning past it is the loop's job below, and it needs
      * nothing but the answer: every {@see Token}'s value is the source text that spells it, so the operator is as many

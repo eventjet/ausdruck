@@ -60,7 +60,7 @@ See [Types](#types)
 
 ### Operators
 
-Both operands must be of the same type. `!` is the one that takes a single operand, and it goes in front of it.
+Operators take two operands of the same type, except `!`, which takes a single boolean and goes in front of it.
 
 | Operator | Description           | Example                  | Note                                            |
 |----------|-----------------------|--------------------------|-------------------------------------------------|

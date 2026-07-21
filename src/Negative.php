@@ -12,12 +12,6 @@ use Override;
  */
 final class Negative extends UnaryOperator
 {
-    #[Override]
-    public function token(): Token
-    {
-        return Token::Minus;
-    }
-
     /**
      * Negation is arithmetic too, and follows the rule {@see Arithmetic} sets: the operand is narrowed to the type it
      * claims, and an int result that doesn't exist is reported rather than widened. Which int result that is, and why,
@@ -37,5 +31,11 @@ final class Negative extends UnaryOperator
     public function getType(): Type
     {
         return $this->expression->getType();
+    }
+
+    #[Override]
+    protected function token(): Token
+    {
+        return Token::Minus;
     }
 }
