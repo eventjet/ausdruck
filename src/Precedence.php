@@ -26,7 +26,7 @@ use function sprintf;
  * have grouped that way anyway — are dropped.
  *
  * A binary operator's level comes from the token it is spelled with, so an operator can't exist without one. That token
- * is also what the printer here spells the operator with, which makes this the only place in the library where an
+ * is also what both printers here spell the operator with, which makes this the only place in the library where an
  * operator node is spelled back into an expression: an operator can only be printed the way the lexer reads it back.
  *
  * Grouping, on the other hand, is not stored anywhere: parentheses leave no trace in the tree, so the same tree always
@@ -57,23 +57,15 @@ enum Precedence: int
     case Primary = 7;
 
     /**
-     * Prints $operand as it appears in an operand slot that the parser reads at $slot, wrapping it in parentheses when
-     * it binds looser than $slot and would otherwise be re-parsed into a different tree.
-     */
-    public static function parenthesize(Expression $operand, self $slot): string
-    {
-        return self::of($operand)->bindsLooserThan($slot) ? sprintf('(%s)', $operand) : (string)$operand;
-    }
-
-    /**
      * Prints a binary operator from the token it is spelled with and its two operands. Its level comes from
      * {@see self::ofToken()}, and both operand slots follow from the level alone: the right slot is one level
      * tighter, because every level of the cascade reads its right operand by calling the next one down, and the left
      * slot is the level's {@see self::leftSlot()}. `a:int - (b:int - c:int)` keeps its parentheses because the right
      * slot is the tighter one; `(a:int - b:int) - c:int` loses them because the additive left slot isn't;
      * `(a:int === b:int) === c:bool` keeps them on either side because the comparison level's left slot is tighter
-     * too. It is a {@see Token} rather than a string because a spelling the lexer has no token for is not something a
-     * caller may ask for, and taking the token is what makes that unsayable.
+     * too. It is a {@see Token} rather than a string for the same reason {@see self::unary()} takes one: a spelling
+     * the lexer has no token for is not something a caller may ask for, and taking the token is what makes that
+     * unsayable.
      */
     public static function binary(Token $token, Expression $left, Expression $right): string
     {
@@ -84,6 +76,20 @@ enum Precedence: int
             $token->value,
             self::parenthesize($right, $level->tighter()),
         );
+    }
+
+    /**
+     * Prints a unary operator from the token it is spelled with and its operand, the same family as
+     * {@see self::binary()}: neither printer picks anything by hand beyond looking the token's level up. The operand
+     * sits at {@see self::Unary}, the level itself rather than the tighter one a binary operator's right slot gets:
+     * {@see ExpressionParser::parseUnary()} reads its operand by calling itself, so a unary operator's operand may be
+     * another one—`--a:int`—with nothing between them.
+     *
+     * @param Token::Minus $token
+     */
+    public static function unary(Token $token, Expression $operand): string
+    {
+        return sprintf('%s%s', $token->value, self::parenthesize($operand, self::Unary));
     }
 
     /**
@@ -103,12 +109,22 @@ enum Precedence: int
     }
 
     /**
+     * Prints $operand as it appears in an operand slot that the parser reads at $slot, wrapping it in parentheses when
+     * it binds looser than $slot and would otherwise be re-parsed into a different tree.
+     */
+    private static function parenthesize(Expression $operand, self $slot): string
+    {
+        return self::of($operand)->bindsLooserThan($slot) ? sprintf('(%s)', $operand) : (string)$operand;
+    }
+
+    /**
      * Only the nodes that bind loosely enough to ever need wrapping are named; everything else is primary-tight. The
      * default is deliberately forgiving rather than a hard error: {@see Expression} is public API, so a consumer can
      * add nodes this enum has never heard of, and an unknown node is almost always atomic—the safe reading is to
      * treat it as {@see self::Primary} rather than reject it. It is never reached by an operator of this library's
      * own, though: a {@see BinaryOperator} carries the token it is spelled with, which fixes its level in
-     * {@see self::ofToken()}, so one can't be added without being placed in the cascade. (A number literal is the one
+     * {@see self::ofToken()}, and a {@see UnaryOperator} is named by its base class, the cascade having a single level
+     * for all of them, so neither can be added without being placed in the cascade. (A number literal is the one
      * primary-tight node that still needs wrapping in a slot; that's a lexical quirk of the postfix `.`, handled in
      * {@see self::parenthesizeTarget()} rather than by a level of its own.)
      */
@@ -117,7 +133,7 @@ enum Precedence: int
         return match (true) {
             $expr instanceof BinaryOperator => self::ofToken($expr->token()),
             $expr instanceof Lambda => self::Lambda,
-            $expr instanceof Negative => self::Unary,
+            $expr instanceof UnaryOperator => self::Unary,
             default => self::Primary,
         };
     }
