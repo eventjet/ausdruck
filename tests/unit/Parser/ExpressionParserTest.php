@@ -85,7 +85,8 @@ final class ExpressionParserTest extends TestCase
                     Expr::get('c', Type::int()),
                 ),
             ],
-            // + and - share the additive level, so a chain mixing the two is still left-associative across it.
+            // + and - share the additive level, * the multiplicative one, so a chain mixing operators of one level
+            // is still left-associative across them.
             [
                 'a:int + b:int + c:int',
                 Expr::add(Expr::add(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
@@ -97,6 +98,10 @@ final class ExpressionParserTest extends TestCase
             [
                 'a:int - b:int + c:int',
                 Expr::add(Expr::subtract(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
+            ],
+            [
+                'a:int * b:int * c:int',
+                Expr::multiply(Expr::multiply(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
             ],
             ['"💩"', Expr::literal('💩')],
             ['foo:map<string, int>', Expr::get('foo', Type::mapOf(Type::string(), Type::int()))],
@@ -169,6 +174,20 @@ final class ExpressionParserTest extends TestCase
                 'a:bool === (b:int > c:int)',
                 Expr::eq(Expr::get('a', $b), Expr::gt(Expr::get('b', $i), Expr::get('c', $i))),
             ],
+            // Multiplicative binds tighter than additive.
+            [
+                'a:int + b:int * c:int',
+                Expr::add(Expr::get('a', $i), Expr::multiply(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            [
+                'a:int * b:int - c:int',
+                Expr::subtract(Expr::multiply(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
+            ],
+            // ...and on the right of - just like on the right of +: a multiplicative subtrahend prints bare.
+            [
+                'a:int - b:int * c:int',
+                Expr::subtract(Expr::get('a', $i), Expr::multiply(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
             // Unary binds tighter than additive, so this subtracts a negation rather than negating a subtraction.
             [
                 'a:int - -b:int',
@@ -177,6 +196,11 @@ final class ExpressionParserTest extends TestCase
             [
                 'a:int + -b:int',
                 Expr::add(Expr::get('a', $i), Expr::negative(Expr::get('b', $i))),
+            ],
+            // ...and tighter than multiplicative, so this multiplies by a negation.
+            [
+                'a:int * -b:int',
+                Expr::multiply(Expr::get('a', $i), Expr::negative(Expr::get('b', $i))),
             ],
             // Operators are allowed wherever an expression is expected, not just at the top level.
             [
@@ -243,12 +267,28 @@ final class ExpressionParserTest extends TestCase
                 Expr::add(Expr::get('a', $i), Expr::add(Expr::get('b', $i), Expr::get('c', $i))),
             ],
             [
+                'a:int * (b:int * c:int)',
+                Expr::multiply(Expr::get('a', $i), Expr::multiply(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            [
+                '(a:int + b:int) * c:int',
+                Expr::multiply(Expr::add(Expr::get('a', $i), Expr::get('b', $i)), Expr::get('c', $i)),
+            ],
+            [
+                'a:int * (b:int + c:int)',
+                Expr::multiply(Expr::get('a', $i), Expr::add(Expr::get('b', $i), Expr::get('c', $i))),
+            ],
+            [
                 'a:int - (b:int + c:int)',
                 Expr::subtract(Expr::get('a', $i), Expr::add(Expr::get('b', $i), Expr::get('c', $i))),
             ],
             [
                 '-(a:int - b:int)',
                 Expr::negative(Expr::subtract(Expr::get('a', $i), Expr::get('b', $i))),
+            ],
+            [
+                '-(a:int * b:int)',
+                Expr::negative(Expr::multiply(Expr::get('a', $i), Expr::get('b', $i))),
             ],
             // === and > are non-associative, so a parenthesized comparison is the only way one ends up inside another.
             [
@@ -264,6 +304,10 @@ final class ExpressionParserTest extends TestCase
             [
                 '(a:int - b:int).abs:int()',
                 Expr::subtract(Expr::get('a', $i), Expr::get('b', $i))->call('abs', $i, []),
+            ],
+            [
+                '(a:int * b:int).abs:int()',
+                Expr::multiply(Expr::get('a', $i), Expr::get('b', $i))->call('abs', $i, []),
             ],
             [
                 '(-a:int).abs:int()',
@@ -310,10 +354,11 @@ final class ExpressionParserTest extends TestCase
             ['foo:int-2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
             ['foo:int -2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
             ['foo:int- 2', Expr::subtract(Expr::get('foo', Type::int()), Expr::literal(2))],
-            // The plus doesn't double as a literal's sign the way the minus does, so whitespace has nothing to
-            // decide; it just must not matter.
+            // The other arithmetic operators don't double as a literal's sign, so whitespace has nothing to decide;
+            // it just must not matter.
             ['foo:int+2', Expr::add(Expr::get('foo', Type::int()), Expr::literal(2))],
             ['foo:int +2', Expr::add(Expr::get('foo', Type::int()), Expr::literal(2))],
+            ['foo:int*2', Expr::multiply(Expr::get('foo', Type::int()), Expr::literal(2))],
             // Trailing commas are allowed in argument and list literal element lists.
             [
                 'foo:string.substr:string(0, 3,)',
@@ -371,6 +416,13 @@ final class ExpressionParserTest extends TestCase
                 '(a:int + b:int) + c:int',
                 Expr::add(
                     Expr::add(Expr::get('a', Type::int()), Expr::get('b', Type::int())),
+                    Expr::get('c', Type::int()),
+                ),
+            ],
+            [
+                '(a:int * b:int) * c:int',
+                Expr::multiply(
+                    Expr::multiply(Expr::get('a', Type::int()), Expr::get('b', Type::int())),
                     Expr::get('c', Type::int()),
                 ),
             ],

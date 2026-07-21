@@ -15,6 +15,7 @@ use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Lambda;
 use Eventjet\Ausdruck\ListLiteral;
 use Eventjet\Ausdruck\Literal;
+use Eventjet\Ausdruck\Multiply;
 use Eventjet\Ausdruck\Negative;
 use Eventjet\Ausdruck\Or_;
 use Eventjet\Ausdruck\Parser\Span;
@@ -54,6 +55,10 @@ final class ExpressionComparisonTest extends TestCase
         yield [
             Expr::add(Expr::literal(1), Expr::literal(2)),
             Expr::add(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield [
+            Expr::multiply(Expr::literal(1), Expr::literal(2)),
+            Expr::multiply(Expr::literal(1), Expr::literal(2)),
         ];
         yield [
             Expr::gt(Expr::literal(1), Expr::literal(2)),
@@ -227,6 +232,14 @@ final class ExpressionComparisonTest extends TestCase
         yield Add::class . ' and ' . Subtract::class => [
             Expr::add(Expr::literal(1), Expr::literal(2)),
             Expr::subtract(Expr::literal(1), Expr::literal(2)),
+        ];
+        yield Multiply::class . ': multiplicand is different' => [
+            Expr::multiply(Expr::literal(1), Expr::literal(2)),
+            Expr::multiply(Expr::literal(2), Expr::literal(2)),
+        ];
+        yield Multiply::class . ': multiplier is different' => [
+            Expr::multiply(Expr::literal(1), Expr::literal(2)),
+            Expr::multiply(Expr::literal(1), Expr::literal(1)),
         ];
         yield Call::class . ': target is different' => [
             Expr::literal(1)->call('foo', Type::int(), []),

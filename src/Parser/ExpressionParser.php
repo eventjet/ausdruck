@@ -21,7 +21,7 @@ use function str_split;
 /**
  * Expressions are parsed as a cascade of precedence levels, from loosest to tightest binding:
  *
- *     expression → or → and → comparison → additive → unary → postfix → primary
+ *     expression → or → and → comparison → additive → multiplicative → unary → postfix → primary
  *
  * Each level consumes only its own operators and delegates to the next tighter level for its operands. Precedence and
  * associativity are therefore expressed by the call graph, and a level never needs to know which operators sit above
@@ -157,11 +157,31 @@ final class ExpressionParser
      */
     private function parseAdditive(): Expression
     {
-        $left = $this->parseUnary();
+        $left = $this->parseMultiplicative();
         while (true) {
             $build = match ($this->nextToken()) {
                 Token::Plus => $left->add(...),
                 Token::Minus => $left->subtract(...),
+                default => null,
+            };
+            if ($build === null) {
+                return $left;
+            }
+            $this->tokens->next();
+            $left = $build($this->parseMultiplicative());
+        }
+    }
+
+    /**
+     * a:int * b:int * c:int
+     * =====================
+     */
+    private function parseMultiplicative(): Expression
+    {
+        $left = $this->parseUnary();
+        while (true) {
+            $build = match ($this->nextToken()) {
+                Token::Asterisk => $left->multiply(...),
                 default => null,
             };
             if ($build === null) {

@@ -1,0 +1,8 @@
+{total: a:int * b:int}
+-- Input --
+{
+  a: 6,
+  b: 7,
+}
+-- Output --
+{total: 42}
