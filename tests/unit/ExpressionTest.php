@@ -27,6 +27,8 @@ use const PHP_INT_MIN;
 
 final class ExpressionTest extends TestCase
 {
+    use AssertsEvaluatedValues;
+
     /**
      * @return iterable<string, array{
      *     string | Expression | callable(): Expression,
@@ -535,7 +537,7 @@ final class ExpressionTest extends TestCase
         };
 
         /** @psalm-suppress MixedMethodCall False positive */
-        self::assertEquals($expected, $expression->evaluate($scope));
+        self::assertEvaluatesTo($expected, $expression->evaluate($scope));
     }
 
     #[DataProvider('toStringCases')]

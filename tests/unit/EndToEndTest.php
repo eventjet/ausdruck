@@ -13,6 +13,8 @@ use PHPUnit\Framework\TestCase;
 
 final class EndToEndTest extends TestCase
 {
+    use AssertsEvaluatedValues;
+
     /**
      * @return iterable<string, array{E2eCase}>
      */
@@ -31,7 +33,7 @@ final class EndToEndTest extends TestCase
         /** @var mixed $actual */
         $actual = $expression->evaluate(new Scope($case->input));
 
-        self::assertEquals($case->expected, $actual);
+        self::assertEvaluatesTo($case->expected, $actual);
     }
 
     /**
