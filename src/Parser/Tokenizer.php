@@ -30,8 +30,9 @@ final class Tokenizer
      * Every character that begins an operator is listed once, in the match below, and its arm answers which operator it
      * begins: the token itself for a character that is a whole operator on its own, {@see self::pair()} for one that
      * may be completed by a second, {@see self::angle()} for the two that may be and mean something else when they
-     * aren't, and {@see self::exact()} for one that begins a token and nothing else. Giving `+` a longer reading later
-     * means changing what its arm answers, not moving the arm somewhere a different rule applies.
+     * aren't, {@see self::bang()} for the one whose longer reading is longer than that, and {@see self::exact()} for
+     * one that begins a token and nothing else. Giving `+` a longer reading later means changing what its arm answers,
+     * not moving the arm somewhere a different rule applies.
      *
      * The arms only look ahead; naming the token is all they do. Scanning past it is the loop's job below, and it needs
      * nothing but the answer: every {@see Token}'s value is the source text that spells it, so the operator is as many
@@ -71,7 +72,7 @@ final class Tokenizer
                 '{' => Token::OpenBrace,
                 '}' => Token::CloseBrace,
                 '=' => self::exact($chars, $line, $column, Token::TripleEquals),
-                '!' => self::exact($chars, $line, $column, Token::NotEquals),
+                '!' => self::bang($chars, $line, $column),
                 '&' => self::exact($chars, $line, $column, Token::And),
                 '<' => self::angle($chars, Token::OpenAngle, Token::LessThanEquals),
                 '>' => self::angle($chars, Token::CloseAngle, Token::GreaterThanEquals),
@@ -152,11 +153,12 @@ final class Tokenizer
     }
 
     /**
-     * Answers the operator that is the only token starting with its first character: `===`, `!==`, and `&&`. Once that
-     * first character is there, the whole sequence is required; anything short of it is an error naming the operator
-     * that was expected and underlining the characters that were actually read. The sequence is the token's own
-     * spelling, so the operator the error names is the one it was scanning for, and $ahead—how far into that spelling
-     * the reading got—is at once how far to peek, how much was read, and where the underline ends.
+     * Answers the operator that is the only token the reading can still be: `===` and `&&` from their first character,
+     * `!==` from the `!=` that {@see self::bang()} has committed to. Once that much is there, the whole sequence is
+     * required; anything short of it is an error naming the operator that was expected and underlining the characters
+     * that were actually read. The sequence is the token's own spelling, so the operator the error names is the one it
+     * was scanning for, and $ahead—how far into that spelling the reading got—is at once how far to peek, how much was
+     * read, and where the underline ends.
      *
      * @param Peekable<string> $chars
      * @param positive-int $line
@@ -194,6 +196,21 @@ final class Tokenizer
         return $chars->peek(1) === '=' && $chars->peek(2) === '='
             ? $bare
             : self::pair($chars, '=', $bare, $pair);
+    }
+
+    /**
+     * `!` is the negation operator on its own and the start of the inequality `!==`—{@see self::pair()}'s choice, with
+     * a partner too long for one character of lookahead to settle. A single `=` after the bang is enough to commit to
+     * it, because nothing that can follow a negation starts with one, and {@see self::exact()} then requires the rest.
+     * That is what keeps `a != b` reported as the `!==` it was reaching for, rather than as a negation of a stray `=`.
+     *
+     * @param Peekable<string> $chars
+     * @param positive-int $line
+     * @param positive-int $column
+     */
+    private static function bang(Peekable $chars, int $line, int $column): Token
+    {
+        return $chars->peek(1) === '=' ? self::exact($chars, $line, $column, Token::NotEquals) : Token::Not;
     }
 
     /**

@@ -13,6 +13,7 @@ enum Token: string
     case Dot = '.';
     case TripleEquals = '===';
     case NotEquals = '!==';
+    case Not = '!';
     case Quote = '"';
     case OpenParen = '(';
     case CloseParen = ')';

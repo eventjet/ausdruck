@@ -84,6 +84,11 @@ abstract class Expression implements Stringable
         return Expr::and_($this, $other);
     }
 
+    public function not(): self
+    {
+        return Expr::not($this);
+    }
+
     /**
      * Unlike the other builders, this one can't check its operands: there are no declarations here to look the
      * function's signature up in, so there is nothing to check the receiver and the arguments against. The call is

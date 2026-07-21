@@ -195,8 +195,12 @@ final class ExpressionParser
     }
 
     /**
-     * -foo:int
-     * ========
+     * -foo:int   !foo:bool
+     * ========   =========
+     *
+     * The only level that reads its operand at its own level rather than at the next one down, which it does by calling
+     * itself: a prefix operator applies to whatever follows it, including another prefix operator, so `!!a:bool` and
+     * `- -1` are expressions rather than syntax errors.
      *
      * Negating a number literal produces a negative literal rather than a negation of a positive one, but that's
      * {@see Expr::negative()}'s job, not ours: folding it here would mean returning a primary without going through
@@ -204,13 +208,21 @@ final class ExpressionParser
      */
     private function parseUnary(): Expression
     {
-        $minus = $this->tokens->peek();
-        if ($minus === null || $minus->token !== Token::Minus) {
+        $operator = $this->tokens->peek();
+        if ($operator === null) {
+            return $this->parsePostfix();
+        }
+        $build = match ($operator->token) {
+            Token::Minus => Expr::negative(...),
+            Token::Not => Expr::not(...),
+            default => null,
+        };
+        if ($build === null) {
             return $this->parsePostfix();
         }
         $this->tokens->next();
         $operand = $this->parseUnary();
-        return Expr::negative($operand, $minus->location()->to($operand->location()));
+        return $build($operand, $operator->location()->to($operand->location()));
     }
 
     /**

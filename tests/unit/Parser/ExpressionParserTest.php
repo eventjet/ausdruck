@@ -210,6 +210,43 @@ final class ExpressionParserTest extends TestCase
                 'a:int * -b:int',
                 Expr::multiply(Expr::get('a', $i), Expr::negative(Expr::get('b', $i))),
             ],
+            // `!` sits at the same level as unary `-`, so it binds tighter than every binary operator its operand
+            // could be part of: this negates a, not the conjunction, and not the comparison below.
+            ['!a:bool', Expr::get('a', $b)->not()],
+            // A negated number literal is a literal, but a negated boolean one isn't: nothing is folded here, because
+            // `false` isn't another spelling of `!true`, it's a different expression that evaluates the same.
+            ['!true', Expr::not(Expr::literal(true))],
+            [
+                '!a:bool && b:bool',
+                Expr::and_(Expr::get('a', $b)->not(), Expr::get('b', $b)),
+            ],
+            [
+                '!a:bool === b:bool',
+                Expr::eq(Expr::get('a', $b)->not(), Expr::get('b', $b)),
+            ],
+            // A unary operator reads its operand at its own level, so another one may follow it bare.
+            ['!!a:bool', Expr::get('a', $b)->not()->not()],
+            // ...and anything looser has to be wrapped to stay the operand: without the parentheses the `!` would
+            // take only a, and the rest of the expression would be built around the negation instead of under it.
+            [
+                '!(a:bool || b:bool)',
+                Expr::not(Expr::or_(Expr::get('a', $b), Expr::get('b', $b))),
+            ],
+            [
+                '!(a:int > b:int)',
+                Expr::not(Expr::gt(Expr::get('a', $i), Expr::get('b', $i))),
+            ],
+            // Postfix binds tighter still, so a bare `!` in front of a call negates what the call returns. That is the
+            // composition `x === false` couldn't express: a call is not allowed in every operand slot of a comparison.
+            [
+                '!xs:list<bool>.contains:bool(true)',
+                Expr::not(Expr::get('xs', Type::listOf($b))->call('contains', $b, [Expr::literal(true)])),
+            ],
+            // ...which is also why calling a method on a negation needs the parentheses, exactly as it does for `-`.
+            [
+                '(!a:bool).foo:bool()',
+                Expr::get('a', $b)->not()->call('foo', $b, []),
+            ],
             // Operators are allowed wherever an expression is expected, not just at the top level.
             [
                 '[1 - 2]',
@@ -431,6 +468,9 @@ final class ExpressionParserTest extends TestCase
             // Negating a number literal folds into a negative literal, so the fold survives being nested.
             ['[-2]', Expr::listLiteral([Expr::literal(-2)], Span::char(1, 1))],
             ['- -1', Expr::literal(1)],
+            // Parentheses around the operand of a `!` are as redundant as any other pair the precedence would have
+            // produced anyway: the unary level reads its operand at its own level, so the group changes nothing.
+            ['!(!a:bool)', Expr::get('a', Type::bool())->not()->not()],
             // Parentheses that only restate the default grouping leave no trace: the tree is the one the operators
             // would have built anyway, so it prints back without them. A single atom in parentheses is the same atom.
             ['(a:bool)', Expr::get('a', Type::bool())],

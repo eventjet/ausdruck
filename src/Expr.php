@@ -110,12 +110,31 @@ final class Expr
 
     public static function or_(Expression $left, Expression $right): Or_
     {
-        return new Or_(self::assertBoolean($left, '||', 'left'), self::assertBoolean($right, '||', 'right'));
+        return new Or_(
+            self::assertBoolean($left, 'The expression on the left side of ||'),
+            self::assertBoolean($right, 'The expression on the right side of ||'),
+        );
     }
 
     public static function and_(Expression $left, Expression $right): And_
     {
-        return new And_(self::assertBoolean($left, '&&', 'left'), self::assertBoolean($right, '&&', 'right'));
+        return new And_(
+            self::assertBoolean($left, 'The expression on the left side of &&'),
+            self::assertBoolean($right, 'The expression on the right side of &&'),
+        );
+    }
+
+    /**
+     * Nothing is folded here, unlike in {@see self::negative()}: `!true` stays a negation of the literal `true`. The
+     * language spells negative numbers, so a negated number literal has a literal to fold into; it spells no negative
+     * booleans, and `false` is not another spelling of `!true` but a different expression that evaluates the same.
+     */
+    public static function not(Expression $expression, Span|null $location = null): Not
+    {
+        return new Not(
+            self::assertBoolean($expression, 'The operand of !'),
+            $location ?? self::dummySpan(),
+        );
     }
 
     /**
@@ -441,20 +460,19 @@ final class Expr
     }
 
     /**
-     * @param 'left' | 'right' $side
+     * The rule the logical operators share: an operand of `&&`, `||` or `!` has to be boolean. Only how the offending
+     * operand is named differs between them—`!` has a single one, so it names no side—which is what $operand says, in
+     * the same division of labor {@see self::assertSameNumberType()} follows.
+     *
+     * @param string $operand How the operand is named in the error, e.g. `The operand of !`.
      */
-    private static function assertBoolean(Expression $expr, string $operator, string $side): Expression
+    private static function assertBoolean(Expression $expr, string $operand): Expression
     {
         if ($expr->matchesType(Type::bool())) {
             return $expr;
         }
         throw TypeError::create(
-            sprintf(
-                'The expression on the %s side of %s must be boolean, got %s',
-                $side,
-                $operator,
-                $expr->getType(),
-            ),
+            sprintf('%s must be boolean, got %s', $operand, $expr->getType()),
             $expr->location(),
         );
     }

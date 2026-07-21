@@ -54,15 +54,6 @@ enum Precedence: int
     case Primary = 7;
 
     /**
-     * Prints $operand as it appears in an operand slot that the parser reads at $slot, wrapping it in parentheses when
-     * it binds looser than $slot and would otherwise be re-parsed into a different tree.
-     */
-    public static function parenthesize(Expression $operand, self $slot): string
-    {
-        return self::of($operand)->bindsLooserThan($slot) ? sprintf('(%s)', $operand) : (string)$operand;
-    }
-
-    /**
      * Prints a binary operator node. Its level comes from {@see self::of()}, and both operand slots follow from the
      * level alone: the right slot is one level tighter, because every level of the cascade reads its right operand by
      * calling the next one down, and the left slot is the level's {@see self::leftSlot()}. `a:int - (b:int - c:int)`
@@ -82,6 +73,16 @@ enum Precedence: int
     }
 
     /**
+     * Prints a unary operator node. Its operand sits at {@see self::Unary}, the level itself rather than the tighter
+     * one a binary operator's right slot gets: {@see ExpressionParser::parseUnary()} reads its operand by calling
+     * itself, so a unary operator's operand may be another one—`!!a:bool`, `- -a:int`—with nothing between them.
+     */
+    public static function unary(UnaryOperator $operator): string
+    {
+        return sprintf('%s%s', $operator->symbol(), self::parenthesize($operator->expression, self::Unary));
+    }
+
+    /**
      * Prints $target as it appears before a postfix `.`—the receiver of a call or field access. This is the
      * {@see self::Primary} slot, so precedence alone would never wrap anything; a bare number literal is the one
      * exception, and needs parentheses for a reason the precedence cascade doesn't model. `2.abs:int()` re-tokenizes
@@ -98,12 +99,22 @@ enum Precedence: int
     }
 
     /**
+     * Prints $operand as it appears in an operand slot that the parser reads at $slot, wrapping it in parentheses when
+     * it binds looser than $slot and would otherwise be re-parsed into a different tree.
+     */
+    private static function parenthesize(Expression $operand, self $slot): string
+    {
+        return self::of($operand)->bindsLooserThan($slot) ? sprintf('(%s)', $operand) : (string)$operand;
+    }
+
+    /**
      * Only the nodes that bind loosely enough to ever need wrapping are named; everything else is primary-tight. The
      * default is deliberately forgiving rather than a hard error: {@see Expression} is public API, so a consumer can
      * add nodes this enum has never heard of, and an unknown node is almost always atomic—the safe reading is to
      * treat it as {@see self::Primary} rather than reject it. It is never reached by an operator of this library's
      * own, though: a {@see BinaryOperator} carries the token it is spelled with, which fixes its level in
-     * {@see self::ofToken()}, so one can't be added without being placed in the cascade. (A number literal is the one
+     * {@see self::ofToken()}, and a {@see UnaryOperator} is named by its base class, the cascade having a single level
+     * for all of them, so neither can be added without being placed in the cascade. (A number literal is the one
      * primary-tight node that still needs wrapping in a slot; that's a lexical quirk of the postfix `.`, handled in
      * {@see self::parenthesizeTarget()} rather than by a level of its own.)
      */
@@ -112,7 +123,7 @@ enum Precedence: int
         return match (true) {
             $expr instanceof BinaryOperator => self::ofToken($expr->token()),
             $expr instanceof Lambda => self::Lambda,
-            $expr instanceof Negative => self::Unary,
+            $expr instanceof UnaryOperator => self::Unary,
             default => self::Primary,
         };
     }

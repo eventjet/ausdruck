@@ -19,6 +19,7 @@ use Eventjet\Ausdruck\Literal;
 use Eventjet\Ausdruck\Modulo;
 use Eventjet\Ausdruck\Multiply;
 use Eventjet\Ausdruck\Negative;
+use Eventjet\Ausdruck\Not;
 use Eventjet\Ausdruck\Or_;
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\StructLiteral;
@@ -98,6 +99,10 @@ final class ExpressionComparisonTest extends TestCase
         yield [
             Expr::negative(Expr::literal(1)),
             Expr::literal(-1),
+        ];
+        yield [
+            Expr::not(Expr::get('a', Type::bool())),
+            Expr::not(Expr::get('a', Type::bool())),
         ];
         yield [
             Expr::listLiteral([Expr::literal(1), Expr::literal(2), Expr::literal(3)], Span::char(1, 1)),
@@ -370,6 +375,14 @@ final class ExpressionComparisonTest extends TestCase
         yield Negative::class . ': different expression' => [
             Expr::negative(Expr::get('a', Type::int())),
             Expr::negative(Expr::get('b', Type::int())),
+        ];
+        yield Not::class . ': different type' => [
+            Expr::not(Expr::literal(true)),
+            Expr::literal(true),
+        ];
+        yield Not::class . ': different expression' => [
+            Expr::not(Expr::literal(true)),
+            Expr::not(Expr::literal(false)),
         ];
         yield ListLiteral::class . ': different elements' => [
             Expr::listLiteral([Expr::literal(1), Expr::literal(2), Expr::literal(3)], Span::char(1, 1)),

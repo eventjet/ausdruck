@@ -60,7 +60,7 @@ See [Types](#types)
 
 ### Operators
 
-Both operands must be of the same type.
+Both operands must be of the same type. `!` is the one that takes a single operand, and it goes in front of it.
 
 | Operator | Description           | Example                  | Note                                            |
 |----------|-----------------------|--------------------------|-------------------------------------------------|
@@ -77,8 +77,18 @@ Both operands must be of the same type.
 | `<=`     | Less than or equal    | `foo:int <= bar:int`     | Operands must be of type `int` or `float`       |
 | `\|\|`   | Logical OR            | `foo:bool \|\| bar:bool` | Operands must be of type `bool`                 |
 | &&       | Logical AND           | `foo:bool && bar:bool`   | Operands must be of type `bool`                 |
+| `!`      | Logical NOT           | `!foo:bool`              | The operand must be of type `bool`              |
 
 Equality is spelled `===`, so inequality is `!==`; there is no `==` or `!=`.
+
+`!` binds tighter than every binary operator, so it negates the expression right next to it and nothing more:
+`!foo:bool && bar:bool` is `(!foo:bool) && bar:bool`. That includes calls and field access, which bind tighter still,
+so a call is negated whole:
+
+```
+!names:list<string>.contains:bool(needle:string)
+!(a:bool || b:bool)
+```
 
 Where's the rest? We're implementing more as we need them.
 
@@ -128,7 +138,7 @@ Operators bind from tightest to loosest in this order:
 | Operator                           | Associativity   |
 |------------------------------------|-----------------|
 | `.` (field, method)                | Left            |
-| `-` (negation)                     | Right           |
+| `-` (negation), `!`                | Right           |
 | `*`, `/`, `%`                      | Left            |
 | `-` (subtraction), `+`             | Left            |
 | `===`, `!==`, `>`, `>=`, `<`, `<=` | Non-associative |
@@ -153,6 +163,7 @@ a:bool && (b:bool || c:bool)
 (a:int + b:int) * c:int
 (a:int > b:int) === c:bool
 (a:int / b:int).unwrap:int()
+!(a:bool || b:bool)
 ```
 
 Parentheses only group; they add no node of their own. Redundant ones — a group the precedence would have produced

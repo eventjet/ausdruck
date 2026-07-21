@@ -84,11 +84,13 @@ final class ExpressionParserErrorTest extends TestCase
         yield 'missing right hand side of >=' => ['foo:int >='];
         yield 'missing right hand side of <=' => ['foo:int <='];
         yield 'missing right hand side of !==' => ['foo:int !=='];
-        // Equality is `===`, so inequality is `!==`; a bare `!` or `!=` is read as the beginning of one, and the
-        // error says how far it got.
+        yield 'missing operand of !' => ['!', 'Expected expression, got end of input'];
+        // Equality is `===`, so inequality is `!==`; one `=` after a bang is therefore the beginning of one, and the
+        // error says how far it got. A bang with no `=` after it is the negation operator, which is simply in the
+        // wrong place here — there is nothing for it to negate to the right, and nothing joining it to the left.
         yield 'not equals with one equals' => ['a:int != 1', 'Expected !==, got !='];
-        yield 'lone bang' => ['a:int ! 1', 'Expected !==, got !'];
-        yield 'bang at end of input' => ['a:int !', 'Expected !==, got !'];
+        yield 'lone bang' => ['a:int ! 1', 'Unexpected !'];
+        yield 'bang at end of input' => ['a:int !', 'Unexpected !'];
         // Two `=` after a `>` keep the angle bare, whatever comes next (see the `foo:list<int>===bar` parse case), so
         // the `==` here is blamed as its own broken `===` rather than a `>=` eating its first `=`.
         yield 'greater-equals with an extra equals' => ['a:int >== 1', 'Expected ===, got =='];
@@ -163,6 +165,14 @@ final class ExpressionParserErrorTest extends TestCase
         yield 'and with string on the right' => [
             'foo:bool && bar:string',
             'The expression on the right side of && must be boolean, got string',
+        ];
+        // `!` follows the same rule with only one operand to point at, so it names no side.
+        yield 'not with a string operand' => ['!foo:string', 'The operand of ! must be boolean, got string'];
+        yield 'not with an int operand' => ['!foo:int', 'The operand of ! must be boolean, got int'];
+        // An Option of a bool is not a bool, so a `/` under a `!` needs its unwrap like it does anywhere else.
+        yield 'not of a quotient' => [
+            '!(a:int / b:int)',
+            'The operand of ! must be boolean, got Option<int>',
         ];
         yield 'equals: different operand types' => ['foo:string === bar:int'];
         yield 'subtract int from float' => ['foo:float - bar:int', 'Can\'t subtract int from float'];
@@ -419,12 +429,13 @@ final class ExpressionParserErrorTest extends TestCase
                 'foo:bool & bar:bool',
                 '         =         ',
             ],
-            // A `!` or `=` that isn't the start of `!==`/`===` is blamed with everything read after it: the operator
+            // A `!=` or `=` that isn't the start of `!==`/`===` is blamed with everything read after it: the operator
             // that is actually there is underlined whole.
             [
                 'a:int != 1',
                 '      ==  ',
             ],
+            // A bare `!` is a token of its own, so what's wrong with it isn't how far it was read but where it sits.
             [
                 'a:int ! 1',
                 '      =  ',
@@ -540,6 +551,12 @@ final class ExpressionParserErrorTest extends TestCase
             [
                 'a:bool && b:int || c:bool',
                 '          =====          ',
+            ],
+            // The operand of a `!` is blamed on its own, without the operator: the mistake is the expression that
+            // isn't a bool, and the `!` in front of it is the only thing that's right about it.
+            [
+                '!a:int',
+                ' =====',
             ],
             [
                 'a:bool || b:bool && c:int',
