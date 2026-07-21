@@ -1,0 +1,6 @@
+foo:Option<fn<T>(T) -> T>
+-- Expression type --
+Option<fn<T>(T) -> T>
+-- Note --
+Same as the list case next to this one: an Option is not a function type's parameters or return type, so the fn<T>
+inside it keeps its own binder rather than losing it to whatever, if anything, encloses the whole Option.

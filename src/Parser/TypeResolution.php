@@ -138,6 +138,14 @@ final class TypeResolution
             // Unreachable: a node named fn is always a FunctionTypeNode, handled above before $constructor is even
             // looked at. The arm still has to be here for the match over TypeConstructor to be exhaustive.
             TypeConstructor::Fn => throw new LogicException('A node named fn must be a FunctionTypeNode'),
+            // Struct and never are reserved so nothing written by name can ever collide with the two markers
+            // {@see Type} uses internally, but neither is a name anything resolves to: a struct has no name of its
+            // own to be written with, and never is only ever inferred, not spelled. Written here, either is exactly
+            // as unknown as a name the language never reserved at all.
+            TypeConstructor::Struct, TypeConstructor::Never => TypeError::create(
+                sprintf('Unknown type %s', $node->name),
+                $node->location,
+            ),
             TypeConstructor::String => Type::string(),
             TypeConstructor::Int => Type::int(),
             TypeConstructor::Float => Type::float(),
@@ -217,8 +225,10 @@ final class TypeResolution
      *
      * A binder only makes sense at the top of the signature it quantifies—see {@see Type::var()}—so $node is rejected
      * outright if it has one of its own while already nested inside another function type's parameters or return
-     * type. Without that rule, a nested `fn<...>` would parse into a {@see Type} with nowhere to record where the
-     * binder was written, and whichever signature encloses the whole type would silently inherit it instead.
+     * type: rank-1 polymorphism, not a limitation of what {@see Type} can record. A nested `fn<...>` binder would be
+     * perfectly representable—{@see Type::func()} takes one for exactly this node—it just isn't a signature this
+     * language lets you write, the same way `list<list<T>>` is representable but `T` still has to be quantified
+     * somewhere outside both `list`s.
      */
     private function resolveFunction(FunctionTypeNode $node): Type|TypeError
     {
@@ -232,12 +242,14 @@ final class TypeResolution
             );
         }
         $typeVariables = $this->typeVariables;
+        $typeVariableNames = [];
         foreach ($node->typeParameters as $parameter) {
             $error = $this->checkTypeVariable($parameter, $typeVariables);
             if ($error !== null) {
                 return $error;
             }
             $typeVariables[$parameter->name] = true;
+            $typeVariableNames[] = $parameter->name;
         }
         $inner = new self($this->aliases, $typeVariables, nestedInFunction: true);
         $argTypes = [];
@@ -252,7 +264,7 @@ final class TypeResolution
         if ($returnType instanceof TypeError) {
             return $returnType;
         }
-        return Type::func($returnType, $argTypes);
+        return Type::func($returnType, $argTypes, $typeVariableNames);
     }
 
     private function resolveStruct(StructTypeNode $node): Type|TypeError

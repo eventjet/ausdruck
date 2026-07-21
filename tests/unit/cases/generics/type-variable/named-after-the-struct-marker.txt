@@ -1,0 +1,7 @@
+foo:fn<Struct>(Struct) -> Struct
+-- Type error --
+Struct can't be a type variable: it is a type of its own
+-- Note --
+Struct is the name Type::struct() gives a struct internally, even though a struct is never written that way -- it's
+always written as its fields. A variable named Struct would print exactly like one and nothing downstream could tell
+them apart, so it's reserved the same as any name the language does spell.

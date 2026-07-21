@@ -1,0 +1,6 @@
+foo:fn<Func>(Func) -> Func
+-- Expression type --
+fn<Func>(Func) -> Func
+-- Note --
+Func isn't reserved: the language's own function constructor is spelled fn, lowercase, and Func doesn't collide with
+anything Type uses internally either. A variable can be named Func like any other name the language doesn't spell.

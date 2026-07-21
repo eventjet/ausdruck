@@ -233,15 +233,15 @@ no binder declares is not a variable: it is an alias, or an error.
 
 That's enforced for a signature written as a type string, where only a `fn<...>` binder can introduce a name that
 resolves to a variable. `Type::var()` itself does not enforce it: nothing stops you from building one directly and
-using it outside of any `fn()` you build alongside it. Doing that produces a variable no binder ever quantifies, which
-is still a variable everywhere else — it type-checks like any other type until it has to be printed. There, it breaks:
-printing it gives back a name (`list<T>`, say) that parsing rejects, because nothing declared `T`. Keep every
-`Type::var()` inside the `fn()` whose binder is meant to quantify it.
+using it inside a `Type::func()` that doesn't also declare it. Doing that produces a variable no binder ever
+quantifies, which is still a variable everywhere else — it type-checks like any other type until it has to be printed.
+There, it breaks: printing it gives back a name (`list<T>`, say) that parsing rejects, because nothing declared `T`.
+Pass every name a `Type::var()` uses to the `Type::func()` whose binder is meant to quantify it.
 
 Because the call site decides them, the inline return type is rarely worth writing: `foo:list<string>.head()` is
 already an `Option<string>`. Writing one anyway is still allowed, and is then checked against the inferred one.
 
-In PHP, a type variable is `Type::var()`:
+In PHP, a type variable is `Type::var()`, and the names its binder declares are `Type::func()`'s third argument:
 
 ```php
 use Eventjet\Ausdruck\Parser\Declarations;
@@ -251,6 +251,7 @@ use Eventjet\Ausdruck\Type;
 $zip = Type::func(
     Type::listOf(Type::struct(['a' => Type::var('T'), 'b' => Type::var('U')])),
     [Type::listOf(Type::var('T')), Type::listOf(Type::var('U'))],
+    ['T', 'U'],
 );
 $declarations = new Declarations(functions: ['zip' => $zip]);
 ```

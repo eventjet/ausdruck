@@ -208,7 +208,7 @@ final class TypeTest extends TestCase
      */
     public function testVariableUnderAnAliasOnTheSignatureSideIsBound(): void
     {
-        $signature = Type::func(Type::var('T'), [Type::alias('Bag', Type::listOf(Type::var('T')))])->asFunction();
+        $signature = Type::func(Type::var('T'), [Type::alias('Bag', Type::listOf(Type::var('T')))], ['T'])->asFunction();
         self::assertNotNull($signature);
 
         $instantiated = $signature->instantiateForCall(Type::listOf(Type::int()), []);

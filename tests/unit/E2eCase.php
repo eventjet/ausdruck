@@ -84,7 +84,7 @@ final readonly class E2eCase
     /**
      * @param array<string, mixed> $input
      */
-    public function __construct(
+    private function __construct(
         public string $source,
         public Declarations $declarations = new Declarations(),
         public AbstractLiteral|null $output = null,

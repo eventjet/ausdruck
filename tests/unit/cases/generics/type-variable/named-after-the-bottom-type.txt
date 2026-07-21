@@ -1,0 +1,7 @@
+foo:fn<never>(never) -> never
+-- Type error --
+never can't be a type variable: it is a type of its own
+-- Note --
+never is the type Type::fromValue() infers for an empty list or map, even though nothing ever writes it directly. A
+variable named never would print exactly like that inferred type and nothing downstream could tell them apart, so
+it's reserved the same as any name the language does spell.

@@ -1,0 +1,6 @@
+foo:{ a: fn<T>(T) -> T }
+-- Expression type --
+{ a: fn<T>(T) -> T }
+-- Note --
+Same rule again: a struct field is neither a function type's parameters nor its return type, so the fn<T> written
+there keeps its own binder when it's printed back.

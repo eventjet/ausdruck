@@ -31,7 +31,7 @@ final class Signature
      */
     public static function tryFrom(Type $type): self|null
     {
-        return $type->name === 'Func' ? new self($type) : null;
+        return $type->name === 'fn' ? new self($type) : null;
     }
 
     /**
@@ -96,10 +96,18 @@ final class Signature
      * says what was expected and {@see Expr::call()}'s receiver and argument checks report it, pointing at the
      * expression that's wrong.
      *
+     * A signature that names no variable at all -- {@see Type::hasTypeVariables()} -- is returned unchanged rather
+     * than substituted for nothing: there is nothing {@see Type::substitute()} could bind on such a signature, and
+     * skipping it outright is what guarantees it can't damage one, an alias's own arguments included, rather than
+     * relying on {@see Type::substitute()} happening to be harmless when there are no bindings.
+     *
      * @param list<Type> $argumentTypes
      */
     public function instantiateForCall(Type $receiver, array $argumentTypes): self
     {
+        if (!$this->type->hasTypeVariables()) {
+            return $this;
+        }
         $arguments = [$receiver, ...$argumentTypes];
         $bindings = [];
         // Only the parameters an argument faces have anything to say. A call with the wrong number of arguments is

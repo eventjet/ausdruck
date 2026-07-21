@@ -65,21 +65,24 @@ final class BuiltinFunctions
         $predicate = Type::func(Type::bool(), [$item]);
         $mapped = Type::var('U');
         return [
-            'contains' => ['impl' => self::contains(...), 'type' => Type::func(Type::bool(), [$items, $item])],
+            'contains' => ['impl' => self::contains(...), 'type' => Type::func(Type::bool(), [$items, $item], ['T'])],
             // Not generic: count and isSome answer the same thing whatever the list or Option holds, so the element
             // type their receiver could have named would go unused. list<any> and Option<any> say that directly,
             // rather than naming a T that nothing but the receiver would ever read.
             'count' => ['impl' => self::count(...), 'type' => Type::func(Type::int(), [Type::listOf(Type::any())])],
-            'filter' => ['impl' => self::filter(...), 'type' => Type::func($items, [$items, $predicate])],
-            'head' => ['impl' => self::head(...), 'type' => Type::func(Type::option($item), [$items])],
+            'filter' => ['impl' => self::filter(...), 'type' => Type::func($items, [$items, $predicate], ['T'])],
+            'head' => ['impl' => self::head(...), 'type' => Type::func(Type::option($item), [$items], ['T'])],
             'isSome' => ['impl' => self::isSome(...), 'type' => Type::func(Type::bool(), [Type::option(Type::any())])],
-            'map' => ['impl' => self::map(...), 'type' => Type::func(Type::listOf($mapped), [$items, Type::func($mapped, [$item])])],
-            'some' => ['impl' => self::some(...), 'type' => Type::func(Type::bool(), [$items, $predicate])],
+            'map' => [
+                'impl' => self::map(...),
+                'type' => Type::func(Type::listOf($mapped), [$items, Type::func($mapped, [$item])], ['T', 'U']),
+            ],
+            'some' => ['impl' => self::some(...), 'type' => Type::func(Type::bool(), [$items, $predicate], ['T'])],
             'substr' => ['impl' => substr(...), 'type' => Type::func(Type::string(), [Type::string(), Type::int(), Type::int()])],
-            'tail' => ['impl' => self::tail(...), 'type' => Type::func($items, [$items])],
-            'take' => ['impl' => self::take(...), 'type' => Type::func($items, [$items, Type::int()])],
-            'unique' => ['impl' => self::unique(...), 'type' => Type::func($items, [$items])],
-            'unwrap' => ['impl' => self::identity(...), 'type' => Type::func($item, [Type::option($item)])],
+            'tail' => ['impl' => self::tail(...), 'type' => Type::func($items, [$items], ['T'])],
+            'take' => ['impl' => self::take(...), 'type' => Type::func($items, [$items, Type::int()], ['T'])],
+            'unique' => ['impl' => self::unique(...), 'type' => Type::func($items, [$items], ['T'])],
+            'unwrap' => ['impl' => self::identity(...), 'type' => Type::func($item, [Type::option($item)], ['T'])],
         ];
     }
 
