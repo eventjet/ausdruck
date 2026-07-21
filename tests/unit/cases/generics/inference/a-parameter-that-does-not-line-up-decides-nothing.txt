@@ -1,0 +1,9 @@
+names:list<string>.withFallback(2, 7)
+-- Functions --
+withFallback: fn<T, U>(list<T>, U, Option<U>) -> { item: T, fallback: U }
+-- Expression type --
+{ item: string, fallback: int }
+-- Note --
+A value is a subtype of an Option of it, so the third argument is accepted although the parameter and the argument
+aren't the same shape. There is nothing to learn from a parameter that doesn't line up with its argument—and nothing to
+unlearn either: T and U are still what the first two decided.

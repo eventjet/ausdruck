@@ -1,0 +1,10 @@
+names:list<string>.tail()
+-- Input --
+{ names: ["a", "b", "c"] }
+-- Expression type --
+list<string>
+-- Output --
+["b", "c"]
+-- Note --
+A function that answers the same list it was given hands the element type back with it, rather than losing it to
+list<any>.

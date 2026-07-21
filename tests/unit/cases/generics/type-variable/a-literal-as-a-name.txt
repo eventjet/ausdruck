@@ -1,0 +1,3 @@
+foo:fn<1>(int) -> int
+-- Syntax error --
+Expected type variable name, got 1

@@ -25,15 +25,29 @@ final class EndToEndTest extends TestCase
         }
     }
 
+    /**
+     * A case says what it expects by which sections it writes, so this runs the source as far as those sections reach:
+     * a case that expects an error stops at the parse, and one that expects a type never has to be evaluated.
+     */
     #[DataProvider('cases')]
     public function testRun(E2eCase $case): void
     {
-        $expression = ExpressionParser::parse($case->source, new Declarations(types: $case->types));
+        if ($case->error !== null) {
+            $this->expectException($case->error->class);
+            $this->expectExceptionMessage($case->error->message);
+        }
 
+        $expression = ExpressionParser::parse($case->source, $case->declarations);
+
+        if ($case->expressionType !== null) {
+            self::assertSame($case->expressionType, (string)$expression->getType());
+        }
+        if ($case->output === null) {
+            return;
+        }
         /** @var mixed $actual */
         $actual = $expression->evaluate(new Scope($case->input));
-
-        self::assertEvaluatesTo($case->expected, $actual);
+        self::assertEvaluatesTo($case->output->value(), $actual);
     }
 
     /**

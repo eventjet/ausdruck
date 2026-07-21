@@ -1,0 +1,8 @@
+nums:Numbers.contains("foo")
+-- Types --
+Numbers: list<int>
+-- Type error --
+Argument 1 of contains must be of type int, got string
+-- Note --
+The receiver decides the variable first, so a later argument that disagrees is the mistake rather than a second opinion
+about what T is.

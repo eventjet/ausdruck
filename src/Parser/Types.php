@@ -6,6 +6,7 @@ namespace Eventjet\Ausdruck\Parser;
 
 use Eventjet\Ausdruck\Type;
 
+use function array_key_exists;
 use function array_key_last;
 use function array_pop;
 use function assert;
@@ -82,11 +83,51 @@ final class Types
     }
 
     /**
+     * A binder introduces a name, so the name has to be free to introduce: one the language already spells is a type
+     * rather than a placeholder for one, and one an enclosing binder already introduced would make two different
+     * variables answer to the same name.
+     *
+     * @param array<string, true> $typeVariables
+     */
+    private static function checkTypeVariable(TypeNode $parameter, array $typeVariables): TypeError|null
+    {
+        if (TypeConstructor::tryFrom($parameter->name) !== null) {
+            return TypeError::create(
+                sprintf('%s can\'t be a type variable: it is a type of its own', $parameter->name),
+                $parameter->location,
+            );
+        }
+        if (array_key_exists($parameter->name, $typeVariables)) {
+            return TypeError::create(
+                sprintf('Type variable %s is already declared', $parameter->name),
+                $parameter->location,
+            );
+        }
+        return null;
+    }
+
+    /**
      * A name the language spells itself is one of the {@see TypeConstructor}s; anything else is a consumer's alias, or
      * nothing at all.
      */
     public function resolve(TypeNode $node): Type|TypeError
     {
+        return $this->resolveIn($node, []);
+    }
+
+    /**
+     * The one name that resolves to neither a constructor nor an alias is a type variable, and it is a type variable
+     * only where a `fn<...>` above it binds it—which is what $typeVariables carries down. A binder is the whole of a
+     * variable's scope, so a name outside every binder that mentions it is as unknown as it ever was.
+     *
+     * @param array<string, true> $typeVariables
+     */
+    private function resolveIn(TypeNode $node, array $typeVariables): Type|TypeError
+    {
+        if (array_key_exists($node->name, $typeVariables)) {
+            // A variable stands for one complete type, so like an alias it takes no arguments of its own.
+            return self::checkArity($node, 0) ?? Type::var($node->name);
+        }
         $constructor = TypeConstructor::tryFrom($node->name);
         if ($constructor === null) {
             return $this->resolveAlias($node) ?? TypeError::create(
@@ -100,33 +141,39 @@ final class Types
             return $arityError;
         }
         return match ($constructor) {
-            TypeConstructor::Fn => $this->resolveFunction($node),
+            TypeConstructor::Fn => $this->resolveFunction($node, $typeVariables),
             TypeConstructor::String => Type::string(),
             TypeConstructor::Int => Type::int(),
             TypeConstructor::Float => Type::float(),
             TypeConstructor::Bool => Type::bool(),
             TypeConstructor::Any => Type::any(),
-            TypeConstructor::Map => $this->resolveMap($node),
-            TypeConstructor::List => $this->resolveList($node),
-            TypeConstructor::Option => $this->resolveOption($node),
-            TypeConstructor::Some => $this->resolveSome($node),
+            TypeConstructor::Map => $this->resolveMap($node, $typeVariables),
+            TypeConstructor::List => $this->resolveList($node, $typeVariables),
+            TypeConstructor::Option => $this->resolveOption($node, $typeVariables),
+            TypeConstructor::Some => $this->resolveSome($node, $typeVariables),
             TypeConstructor::None => Type::none(),
-            TypeConstructor::Struct => $this->resolveStruct($node),
+            TypeConstructor::Struct => $this->resolveStruct($node, $typeVariables),
         };
     }
 
-    private function resolveList(TypeNode $node): Type|TypeError
+    /**
+     * @param array<string, true> $typeVariables
+     */
+    private function resolveList(TypeNode $node, array $typeVariables): Type|TypeError
     {
         assert(count($node->args) === 1);
-        $valueType = $this->resolve($node->args[0]);
+        $valueType = $this->resolveIn($node->args[0], $typeVariables);
         return $valueType instanceof TypeError ? $valueType : Type::listOf($valueType);
     }
 
-    private function resolveMap(TypeNode $node): Type|TypeError
+    /**
+     * @param array<string, true> $typeVariables
+     */
+    private function resolveMap(TypeNode $node, array $typeVariables): Type|TypeError
     {
         assert(count($node->args) === 2);
         $args = $node->args;
-        $keyType = $this->resolve($args[0]);
+        $keyType = $this->resolveIn($args[0], $typeVariables);
         if ($keyType instanceof TypeError) {
             return $keyType;
         }
@@ -140,7 +187,7 @@ final class Types
                 $args[0]->location,
             );
         }
-        $valueType = $this->resolve($args[1]);
+        $valueType = $this->resolveIn($args[1], $typeVariables);
         return $valueType instanceof TypeError ? $valueType : Type::mapOf($keyType, $valueType);
     }
 
@@ -161,21 +208,40 @@ final class Types
     /**
      * An Option is a Some that may be absent, so it is the type of its argument and nothing more—which is what
      * {@see self::resolveSome()} already resolves.
+     *
+     * @param array<string, true> $typeVariables
      */
-    private function resolveOption(TypeNode $node): Type|TypeError
+    private function resolveOption(TypeNode $node, array $typeVariables): Type|TypeError
     {
-        $some = $this->resolveSome($node);
+        $some = $this->resolveSome($node, $typeVariables);
         return $some instanceof TypeError ? $some : Type::option($some);
     }
 
-    private function resolveSome(TypeNode $node): Type|TypeError
+    /**
+     * @param array<string, true> $typeVariables
+     */
+    private function resolveSome(TypeNode $node, array $typeVariables): Type|TypeError
     {
         assert(count($node->args) === 1);
-        return $this->resolve($node->args[0]);
+        return $this->resolveIn($node->args[0], $typeVariables);
     }
 
-    private function resolveFunction(TypeNode $node): Type|TypeError
+    /**
+     * A function type is the one type that binds names of its own: the `<T, U>` in front of its parameters says which
+     * of the names inside it the call site decides rather than the declaration. The binder is in scope for the
+     * parameters and the return type alike, so it is added before either is resolved.
+     *
+     * @param array<string, true> $typeVariables
+     */
+    private function resolveFunction(TypeNode $node, array $typeVariables): Type|TypeError
     {
+        foreach ($node->typeParameters as $parameter) {
+            $error = self::checkTypeVariable($parameter, $typeVariables);
+            if ($error !== null) {
+                return $error;
+            }
+            $typeVariables[$parameter->name] = true;
+        }
         $args = $node->args;
         if ($args === []) {
             return TypeError::create('The func type requires at least one argument, none given', $node->location);
@@ -183,26 +249,29 @@ final class Types
         $returnType = array_pop($args);
         $argTypes = [];
         foreach ($args as $arg) {
-            $argType = $this->resolve($arg);
+            $argType = $this->resolveIn($arg, $typeVariables);
             if ($argType instanceof TypeError) {
                 return $argType;
             }
             $argTypes[] = $argType;
         }
-        $returnType = $this->resolve($returnType);
+        $returnType = $this->resolveIn($returnType, $typeVariables);
         if ($returnType instanceof TypeError) {
             return $returnType;
         }
         return Type::func($returnType, $argTypes);
     }
 
-    private function resolveStruct(TypeNode $node): Type|TypeError
+    /**
+     * @param array<string, true> $typeVariables
+     */
+    private function resolveStruct(TypeNode $node, array $typeVariables): Type|TypeError
     {
         $fields = [];
         foreach ($node->args as $field) {
             assert(count($field->args) === 2);
             [$nameNode, $typeNode] = $field->args;
-            $type = $this->resolve($typeNode);
+            $type = $this->resolveIn($typeNode, $typeVariables);
             if ($type instanceof TypeError) {
                 return $type;
             }

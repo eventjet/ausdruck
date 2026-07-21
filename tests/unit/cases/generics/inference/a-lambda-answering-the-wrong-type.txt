@@ -1,0 +1,6 @@
+nums:list<int>.map:list<string>(|n| n:int > 2)
+-- Type error --
+Inline return type list<string> of function map does not match declared return type list<bool>
+-- Note --
+An inline return type says what the call is expected to answer, and the lambda has already decided that it answers a
+list of bools.

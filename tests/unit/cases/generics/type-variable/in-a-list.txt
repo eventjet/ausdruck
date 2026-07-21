@@ -1,0 +1,6 @@
+foo:fn<T>(list<T>) -> T
+-- Expression type --
+func(list<T>): T
+-- Note --
+A binder is in scope for everything below it, so a type variable is a type wherever a type can go. These cases put one
+in every place a type is written.

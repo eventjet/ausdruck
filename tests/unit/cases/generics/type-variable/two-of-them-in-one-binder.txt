@@ -1,0 +1,5 @@
+foo:fn<T, U>(list<T>, fn(T) -> U) -> list<U>
+-- Expression type --
+func(list<T>, func(T): U): list<U>
+-- Note --
+One binder declares as many variables as the signature needs, and each of them is a type of its own throughout.

@@ -1,0 +1,5 @@
+foo:fn<T>(T<int>) -> T
+-- Type error --
+Invalid type "T<int>": T does not accept arguments
+-- Note --
+A variable stands for one complete type, so like an alias it takes no arguments of its own.

@@ -1,0 +1,6 @@
+foo:fn<T>(fn<T>(T) -> T) -> T
+-- Type error --
+Type variable T is already declared
+-- Note --
+Substitution goes by name, so two variables can't answer to the same one—an inner binder that shadowed an outer would
+make T mean two things in one signature.

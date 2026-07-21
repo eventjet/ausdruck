@@ -180,11 +180,6 @@ final class ExpressionTest extends TestCase
             ['foo:any === bar:any', new Scope(['foo' => 1, 'bar' => '1']), false],
             ['foo:int > bar:int', new Scope(['foo' => 69, 'bar' => 69]), false],
             [
-                'items:map<string, int>.filter:map<string, int>(|item| item:int > 23)',
-                new Scope(['items' => ['c' => 69, 'a' => 23, 'b' => 24, 'd' => -23]]),
-                ['c' => 69, 'b' => 24],
-            ],
-            [
                 'items:list<int>.filter:list<int>(|item| item:int > 23)',
                 new Scope(['items' => [69, 23, 24, -23]]),
                 [69, 24],

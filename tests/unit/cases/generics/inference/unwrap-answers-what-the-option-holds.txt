@@ -1,0 +1,9 @@
+(a:int / b:int).unwrap()
+-- Input --
+{ a: 7, b: 2 }
+-- Expression type --
+int
+-- Output --
+3
+-- Note --
+Division answers an Option<int> and unwrap is fn<T>(Option<T>) -> T, so what comes back out is the int that went in.

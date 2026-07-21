@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use Override;
 use Stringable;
 
+use function array_intersect_key;
 use function array_is_list;
 use function array_key_exists;
 use function array_key_first;
@@ -37,6 +38,7 @@ final class Type implements Stringable
         public readonly array $args = [],
         public readonly self|null $aliasFor = null,
         public readonly array $fields = [],
+        private readonly bool $isVariable = false,
     ) {
     }
 
@@ -84,6 +86,21 @@ final class Type implements Stringable
     public static function any(): self
     {
         return new self('any');
+    }
+
+    /**
+     * A type variable: the placeholder a generic function's signature writes where the concrete type is decided by the
+     * call site rather than by the declaration. `head` is declared as `func(Option<T>, [list<T>])`, and a call on a
+     * `list<string>` is checked against `func(Option<string>, [list<string>])`; see {@see self::instantiate()}.
+     *
+     * Variables are quantified at the top of the signature they appear in, so there is no binder to build here and two
+     * variables of the same name in one signature are the same variable. A name a type constructor already spells,
+     * like `int` or `list`, is not a variable name; nothing checks that here, but {@see Parser\Types} rejects it where
+     * a signature is written as a type string.
+     */
+    public static function var(string $name): self
+    {
+        return new self($name, isVariable: true);
     }
 
     /**
@@ -321,6 +338,37 @@ final class Type implements Stringable
         return array_slice($this->parameterTypes(), 1);
     }
 
+    /**
+     * This function type with its type variables resolved against the types a call applies it to: the signature the
+     * call is actually checked against, with no variables left in it.
+     *
+     * The parameters are walked in order and a variable keeps the first type that lands on it, so the receiver decides
+     * `T` for `func(bool, [list<T>, T])` before the argument is looked at. That order is what makes a lambda argument
+     * harmless: a lambda's parameters are typed `any` and would decide nothing useful, but by then the receiver has
+     * already decided. A variable no parameter reaches becomes `any`—nothing constrained it, so nothing about the call
+     * should be rejected on its account, and an argument that isn't there is reported as the missing argument it is.
+     *
+     * Nothing here is an error. Where a variable's binding and a later parameter disagree, the substituted signature
+     * says what was expected and {@see Expr::call()}'s receiver and argument checks report it, pointing at the
+     * expression that's wrong.
+     *
+     * This should only be called on function types. The behavior is undefined for other types.
+     *
+     * @param list<self> $arguments The types the call applies, receiver first, in the order {@see self::parameterTypes()}
+     *     lists the parameters.
+     */
+    public function instantiate(array $arguments): self
+    {
+        $bindings = [];
+        // Only the parameters an argument faces have anything to say. A call with the wrong number of arguments is
+        // still instantiated, from the ones it does have, so that Expr::call() can report the count against a
+        // signature that reads the way the rest of the call decided it should.
+        foreach (array_slice($this->parameterTypes(), 0, count($arguments)) as $index => $parameter) {
+            $bindings = $parameter->bind($arguments[$index], $bindings);
+        }
+        return $this->substitute($bindings);
+    }
+
     public function isStruct(): bool
     {
         return $this->canonical()->name === 'Struct';
@@ -341,6 +389,59 @@ final class Type implements Stringable
     private function parameterTypes(): array
     {
         return array_slice($this->canonical()->args, 1);
+    }
+
+    /**
+     * What $actual tells us about the variables in this type, added to what is already known. Matching is structural
+     * and one-way: where the two types have the same shape, the variables on this side take the types facing them,
+     * and where they don't, there is nothing to learn and the bindings come back unchanged. $actual is seen through
+     * its aliases so that a `Numbers` standing for `list<int>` still binds `T` in a `list<T>`; this side doesn't need
+     * the same treatment, because an alias names a complete type and so has no variables under it.
+     *
+     * The first binding for a variable is the one that's kept. See {@see self::instantiate()} for why that is the
+     * useful half of the two.
+     *
+     * @param array<string, self> $bindings
+     * @return array<string, self>
+     */
+    private function bind(self $actual, array $bindings): array
+    {
+        if ($this->isVariable) {
+            return array_key_exists($this->name, $bindings) ? $bindings : [...$bindings, $this->name => $actual];
+        }
+        $actual = $actual->canonical();
+        if ($this->name !== $actual->name) {
+            return $bindings;
+        }
+        // Two types of the same shape can still be of different sizes: a lambda declares fewer parameters than the
+        // signature asks for, and a struct is written with fewer fields than one reaches into. What the two have in
+        // common is what there is to learn from.
+        foreach (array_slice($this->args, 0, count($actual->args)) as $index => $arg) {
+            $bindings = $arg->bind($actual->args[$index], $bindings);
+        }
+        foreach (array_intersect_key($this->fields, $actual->fields) as $name => $field) {
+            $bindings = $field->bind($actual->fields[$name], $bindings);
+        }
+        return $bindings;
+    }
+
+    /**
+     * This type with every variable replaced by what it was bound to, and every variable nothing bound replaced by
+     * `any`.
+     *
+     * @param array<string, self> $bindings
+     */
+    private function substitute(array $bindings): self
+    {
+        if ($this->isVariable) {
+            return $bindings[$this->name] ?? self::any();
+        }
+        return new self(
+            $this->name,
+            array_map(static fn(self $arg): self => $arg->substitute($bindings), $this->args),
+            $this->aliasFor,
+            array_map(static fn(self $field): self => $field->substitute($bindings), $this->fields),
+        );
     }
 
     private function canonical(): self

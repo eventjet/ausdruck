@@ -1,0 +1,7 @@
+nums:list<int>.box()
+-- Functions --
+box: fn<T>(list<T>) -> { value: T }
+-- Expression type --
+{ value: int }
+-- Note --
+Whatever decided the variable is put back wherever the return type writes it, inside a struct field included.

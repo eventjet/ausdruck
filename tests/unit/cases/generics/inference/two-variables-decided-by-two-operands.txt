@@ -1,0 +1,7 @@
+names:list<string>.zip([1, 2])
+-- Functions --
+zip: fn<T, U>(list<T>, list<U>) -> list<{ a: T, b: U }>
+-- Expression type --
+list<{ a: string, b: int }>
+-- Note --
+Two variables in one signature are decided independently, one by the receiver and one by the argument.

@@ -10,6 +10,7 @@ use Eventjet\Ausdruck\Parser\TypeAnnotation;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeHint;
 
+use function array_map;
 use function count;
 use function sprintf;
 
@@ -87,7 +88,8 @@ final class Expr
      *     declaration says which receiver and arguments a function accepts, so a call to an undeclared function has
      *     nothing to check its operands against. That's the case for functions that are used with nothing but an
      *     inline return type, and for every call built through {@see Expression::call()}, which has no declarations to
-     *     consult.
+     *     consult. A declaration may be generic, in which case it says what this call accepts only once
+     *     {@see Type::instantiate()} has resolved its type variables against the types at hand.
      * @param Span|null $nameLocation Where the function is named, which is what an error about the function itself
      *     rather than about one of its operands points at.
      */
@@ -101,6 +103,10 @@ final class Expr
         Span|null $location = null,
     ): Call {
         $location ??= self::dummySpan();
+        $signature = $signature?->instantiate([
+            $target->getType(),
+            ...array_map(static fn(Expression $argument): Type => $argument->getType(), $arguments),
+        ]);
         $type = self::returnType($name, $returnType, $signature, $nameLocation ?? self::dummySpan());
         if ($signature !== null) {
             self::checkReceiver($target, $name, $signature);

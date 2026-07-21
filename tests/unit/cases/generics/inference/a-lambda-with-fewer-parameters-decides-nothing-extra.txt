@@ -1,0 +1,8 @@
+nums:list<int>.pairwise(|a| a:int > 0)
+-- Functions --
+pairwise: fn<T>(list<T>, fn(T, T) -> bool) -> bool
+-- Expression type --
+bool
+-- Note --
+A lambda's parameters are typed any, so a signature that asks for more of them than the lambda declares is still
+satisfied—and the parameters that aren't there decide nothing, leaving T to the receiver.
