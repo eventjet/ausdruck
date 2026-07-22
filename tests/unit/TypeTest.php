@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Test\Unit;
 
 use Eventjet\Ausdruck\Get;
+use Eventjet\Ausdruck\Parser\Declarations;
+use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeParser;
@@ -279,6 +281,37 @@ final class TypeTest extends TestCase
         $signature = Type::func(Type::var('T'))->asFunction();
 
         self::assertSame(['T'], $signature?->binder());
+    }
+
+    /**
+     * A consumer's own generic higher-order function -- one whose parameter is itself a generic function type, the
+     * way {@see \Eventjet\Ausdruck\BuiltinFunctions}' own `map` is -- has to build that parameter through
+     * {@see Type::nestedFunc()}, not {@see Type::func()}: the inner function type's `T` and `U` are the outer
+     * signature's own, not a binder of its own that shadows them. Built this way, a call through the declaration
+     * type-checks the same way a call to the built-in `map` does, and the signature reads back the way it printed.
+     */
+    public function testConsumerDeclaredGenericHigherOrderFunctionTypeChecksAndRoundTrips(): void
+    {
+        $myMap = Type::func(
+            Type::listOf(Type::var('U')),
+            [Type::listOf(Type::var('T')), Type::nestedFunc(Type::var('U'), [Type::var('T')])],
+        );
+        self::assertSame('fn<T, U>(list<T>, fn(T) -> U) -> list<U>', (string)$myMap);
+
+        /**
+         * @psalm-suppress InternalMethod
+         * @psalm-suppress InternalClass
+         */
+        $node = TypeParser::parseString((string)$myMap);
+        self::assertNotInstanceOf(SyntaxError::class, $node);
+        $reParsed = (new Types())->resolve($node);
+        self::assertNotInstanceOf(TypeError::class, $reParsed);
+        self::assertTrue($myMap->equals($reParsed));
+
+        $declarations = new Declarations(functions: ['myMap' => $myMap]);
+        $expression = ExpressionParser::parse('nums:list<int>.myMap(|n| n:int > 2)', $declarations);
+
+        self::assertSame('list<bool>', (string)$expression->getType());
     }
 
     /**

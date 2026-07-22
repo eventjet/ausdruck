@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Override;
 use Stringable;
 
 /**
@@ -22,4 +23,7 @@ abstract class TypeNode implements Stringable
         public readonly Span $location,
     ) {
     }
+
+    #[Override]
+    abstract public function __toString(): string;
 }

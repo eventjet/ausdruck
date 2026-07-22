@@ -24,11 +24,12 @@ final class Signature implements Stringable
      *     declared as `fn(string, int, int) -> string` and called as `foo:string.substr:string(0, 3)`, so its
      *     parameters are `[string, int, int]` and `foo` is checked against the first of them; see
      *     {@see self::receiverType()} and {@see self::argumentTypes()}.
-     * @param list<string> $binder The names this signature quantifies for itself -- see {@see self::hasOwnBinder()}.
-     *     Empty for a signature nested inside another one's own parameters or return type, which defers every
-     *     variable it reaches to whichever signature does own one; {@see Type::func()} and {@see Type::genericFunc()}
-     *     are the two callers that ever pass one, the former deriving it from $return and $parameters themselves
-     *     ({@see self::freeVariables()}), the latter taking it as given and checked.
+     * @param list<string>|null $binder The names this signature quantifies for itself, or null if it owns none at
+     *     all and defers every variable it reaches to whichever signature does -- see {@see self::hasOwnBinder()}.
+     *     Null for a signature nested inside another one's own parameters or return type; {@see Type::func()} and
+     *     {@see Type::genericFunc()} are the two callers that ever pass a real one, even an empty array, the former
+     *     deriving it from $return and $parameters themselves ({@see self::freeVariables()}), the latter taking it
+     *     as given and checked.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -36,7 +37,7 @@ final class Signature implements Stringable
     public function __construct(
         public readonly Type $returnType,
         public readonly array $parameters = [],
-        private readonly array $binder = [],
+        private readonly array|null $binder = null,
     ) {
     }
 
@@ -46,6 +47,9 @@ final class Signature implements Stringable
      * a top-level signature's own binder from, {@see Type::genericFunc()} checks a written one against, and
      * {@see Parser\TypeResolution::resolveSignature()} checks a written one's unused names against, rather than each
      * repeating it on its own.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
      *
      * @param list<Type> $parameters
      * @return list<string>
@@ -80,7 +84,9 @@ final class Signature implements Stringable
      * {@see Type::genericFunc()} -- and, through either, one {@see Parser\TypeResolution::resolveSignature()}
      * resolves outside another one's own parameters or return type -- owns one, even an empty one; a signature built
      * through {@see Type::nestedFunc()}, for one nested inside another written signature, never does, and defers
-     * every variable it reaches to whichever signature does.
+     * every variable it reaches to whichever signature does. Owning an empty binder and owning none at all are
+     * different things -- the former is a function with no type variables, the latter has nothing to say about
+     * whether it has any -- so $binder is null for the latter rather than reusing `[]` for both.
      *
      * This is what lets {@see FuncShape::collectVariables()}, {@see FuncShape::substitute()} and {@see Type::bind()}
      * tell a self-contained generic function type -- one nested inside a list, an Option, a struct field, or
@@ -93,7 +99,7 @@ final class Signature implements Stringable
      */
     public function hasOwnBinder(): bool
     {
-        return $this->binder !== [];
+        return $this->binder !== null;
     }
 
     /**
@@ -106,7 +112,7 @@ final class Signature implements Stringable
      */
     public function binder(): array
     {
-        return $this->binder;
+        return $this->binder ?? [];
     }
 
     /**

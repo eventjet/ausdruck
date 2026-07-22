@@ -11,14 +11,11 @@ namespace Eventjet\Ausdruck;
  * a name a constructor happens to reuse ({@see Type::var('fn')}), or a set of nullable fields that would otherwise
  * have to be kept in sync with each other and with a separate marker by convention alone.
  *
- * The behavior that differs per shape lives here too, one method per operation, rather than as a five-way
- * `instanceof` chain repeated on {@see Type} for every operation that needs one -- {@see Type::collectVariables()},
- * {@see Type::substitute()} and {@see Type::__toString()} used to each carry their own copy, every one ending in its
- * own `throw new LogicException('Unhandled type shape ...')`. A sixth shape now has to implement this interface to
- * exist at all, which the compiler enforces, rather than being one more `instanceof` branch a chain could quietly go
- * without -- falling through to that same throw only at runtime, the first time the branch was actually reached.
- * {@see Type} keeps only the operations that genuinely need two shapes at once -- {@see Type::isSubtypeOf()} and
- * {@see Type::bind()} -- since neither one reduces to a method on a single side.
+ * The behavior that differs per shape lives here too, one method per operation, rather than as an `instanceof` chain
+ * repeated on {@see Type} for every operation that needs one: a new shape has to implement this interface to exist
+ * at all, which the compiler enforces. {@see Type} keeps only the operations that genuinely need two shapes at
+ * once -- {@see Type::isSubtypeOf()} and {@see Type::bind()} -- since neither one reduces to a method on a single
+ * side.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck

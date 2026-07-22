@@ -241,6 +241,14 @@ return type and the parameters -- the same rule a written `fn<...>` binder is ch
 is the PHP-API equivalent of writing a `fn<...>` binder explicitly: it takes the binder as an argument and validates
 it against the variables actually reachable, both ways, the same as a written signature is checked.
 
+`Type::func()` and `Type::genericFunc()` are only for the outermost signature of a declaration. A function type that
+appears *inside* another one's own parameters or return type -- a lambda parameter, the way `map`'s own is, or a
+generic callback taken by a custom function -- is built with `Type::nestedFunc()` instead, the PHP-API equivalent of
+writing a nested `fn(...)` with no binder of its own: its variables are shared with the signature that encloses it,
+not quantified separately, the same rule that makes a written `fn<T>(...)` nested inside another `fn<...>` a syntax
+error. Building a nested function type with `Type::func()` instead gives it a binder of its own, which shadows the
+enclosing one rather than sharing variables with it.
+
 Because the call site decides them, the inline return type is rarely worth writing: `foo:list<string>.head()` is
 already an `Option<string>`. Writing one anyway is still allowed, and is then checked against the inferred one.
 
@@ -254,6 +262,18 @@ $zip = Type::func(
     [Type::listOf(Type::var('T')), Type::listOf(Type::var('U'))],
 );
 $declarations = new Declarations(functions: ['zip' => $zip]);
+```
+
+A generic higher-order function -- one that itself takes a generic function as a parameter, the way `map` does --
+nests a `Type::var()` from the outer signature inside a `Type::nestedFunc()` for the inner one:
+
+```php
+// myMap: fn<T, U>(list<T>, fn(T) -> U) -> list<U>
+$myMap = Type::func(
+    Type::listOf(Type::var('U')),
+    [Type::listOf(Type::var('T')), Type::nestedFunc(Type::var('U'), [Type::var('T')])],
+);
+$declarations = new Declarations(functions: ['myMap' => $myMap]);
 ```
 
 #### Built-In Functions

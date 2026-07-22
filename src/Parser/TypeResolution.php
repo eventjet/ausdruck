@@ -243,28 +243,17 @@ final class TypeResolution
      * of the names inside it the call site decides rather than the declaration. The binder is in scope for the
      * parameters and the return type alike, so a fresh resolution with the binder's names added is what resolves both.
      *
-     * A binder only makes sense at the top of the signature it quantifies—see {@see Type::var()}—so $node is rejected
-     * outright if it has one of its own while already nested anywhere below another function type's parameters or
-     * return type—however many lists, Options, or struct fields deep: rank-1 polymorphism, a rule about the
-     * signatures this language lets you write rather than a limitation of what {@see Type} can record, the same way
-     * `list<list<T>>` is representable but `T` still has to be quantified somewhere outside both `list`s.
+     * $node is rejected outright if it writes a binder of its own while $this->nestedInSignature is already true --
+     * see this class's own docblock for why a nested function type can never legally have one. The same flag is also
+     * the signal for which of {@see Type::nestedFunc()} and {@see Type::genericFunc()} builds the result: nested, it's
+     * built through {@see Type::nestedFunc()}, deferring every variable it reaches to whichever signature encloses
+     * it; not nested, it owns whatever it declared -- even nothing, if it wrote no binder at all -- built through
+     * {@see Type::genericFunc()}, with that binder stored on it directly.
      *
      * $node->typeParameters is what's written, not what {@see Signature::freeVariables()} would find from how the
      * result is actually used, so the two are checked against each other once the signature is built: a name written
      * here that doesn't appear in a parameter or the return type is declared for nothing, and rejected rather than
      * quietly accepted -- see {@see self::firstUnused()}.
-     *
-     * $node sits outside every enclosing signature's own parameters and return type exactly when
-     * $this->nestedInSignature is false -- the two are set together, in the branch below, for everything resolved
-     * beneath an enclosing `fn` -- which is also exactly when it's legal for $node to have written a binder of its
-     * own. That's the signal for which of {@see Type::nestedFunc()} and {@see Type::genericFunc()} builds the
-     * result: a nested $node, however many lists, Options or struct fields deep, is built through
-     * {@see Type::nestedFunc()}, which always defers its variables to whichever signature encloses it; one that
-     * isn't nested owns whatever it declared -- even nothing, if it wrote no binder at all -- so it's built through
-     * {@see Type::genericFunc()}, with that binder stored on it directly, rather than left to be derived later from
-     * wherever it happens to end up nested inside something else, which is what let a generic function type used as
-     * a fixed parameter type -- an alias, a list element -- have its own variables mistaken for its enclosing
-     * signature's own.
      */
     private function resolveSignature(FunctionTypeNode $node): Type|TypeError
     {
@@ -300,8 +289,11 @@ final class TypeResolution
         }
         // Which variables $returnType and $argTypes reach, not what a Signature's own binder is -- the question
         // this asks either way, so it goes straight to the walk both Type::func() and Type::genericFunc() derive
-        // and check the same thing from, rather than building a Signature just to read it back off one.
-        $unused = self::firstUnused($node->typeParameters, Signature::freeVariables($returnType, $argTypes));
+        // and check the same thing from, rather than building a Signature just to read it back off one. Computed
+        // once and handed to Type::genericFuncChecked() below, rather than left for it to walk again: that walk is
+        // the same one this method has just finished.
+        $free = Signature::freeVariables($returnType, $argTypes);
+        $unused = self::firstUnused($node->typeParameters, $free);
         if ($unused !== null) {
             return TypeError::create(
                 sprintf(
@@ -315,7 +307,7 @@ final class TypeResolution
             return Type::nestedFunc($returnType, $argTypes);
         }
         $binder = array_map(static fn(Identifier $parameter): string => $parameter->name, $node->typeParameters);
-        return Type::genericFunc($binder, $returnType, $argTypes);
+        return Type::genericFuncChecked($binder, $returnType, $argTypes, $free);
     }
 
     private function resolveStruct(StructTypeNode $node): Type|TypeError
