@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use LogicException;
 use Override;
 
 /**
@@ -45,15 +44,15 @@ final class VariableShape implements TypeShape
     }
 
     /**
-     * Never actually called: a variable substitutes to whatever its binding turned out to be, which can be any
-     * shape at all, not necessarily another variable, so {@see Type::substitute()} special-cases one before ever
-     * asking its shape -- see {@see TypeShape}'s own docblock. This exists only to satisfy the interface.
+     * Whatever this variable's own binding turned out to be, or `any` if nothing bound it -- unlike every other
+     * shape's {@see TypeShape::substitute()}, this doesn't rebuild its own kind: what a variable substitutes to can
+     * be any shape at all, not necessarily another variable.
      *
      * @param array<string, Type> $bindings
      */
     #[Override]
-    public function substitute(array $bindings): static
+    public function substitute(array $bindings): Type
     {
-        throw new LogicException('A variable substitutes through Type::substitute(), never through its own shape');
+        return $bindings[$this->name] ?? Type::any();
     }
 }

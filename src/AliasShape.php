@@ -48,8 +48,8 @@ final class AliasShape implements TypeShape
      * @param array<string, Type> $bindings
      */
     #[Override]
-    public function substitute(array $bindings): static
+    public function substitute(array $bindings): Type
     {
-        return new self($this->name, $this->target->substitute($bindings));
+        return Type::of(new self($this->name, $this->target->substitute($bindings)));
     }
 }

@@ -20,12 +20,6 @@ namespace Eventjet\Ausdruck;
  * {@see Type} keeps only the operations that genuinely need two shapes at once -- {@see Type::isSubtypeOf()} and
  * {@see Type::bind()} -- since neither one reduces to a method on a single side.
  *
- * {@see Type::substitute()} is the one exception: a {@see VariableShape} substitutes to whatever its binding turned
- * out to be, which can be any shape at all, not necessarily another variable -- so it can't honor this interface's
- * `substitute(): static` contract the way every other shape does, by rebuilding its own kind with its children
- * substituted. {@see Type::substitute()} special-cases a variable before ever asking its shape, and
- * {@see VariableShape::substitute()} exists only to satisfy this interface; it is never actually called.
- *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
@@ -56,11 +50,12 @@ interface TypeShape
     public function toString(): string;
 
     /**
-     * This shape with $bindings applied throughout -- see {@see Type::substitute()}. Every implementation but
-     * {@see VariableShape::substitute()} rebuilds its own kind of shape with its children substituted the same way;
-     * see this interface's own docblock for why that one is different.
+     * This shape with $bindings applied throughout, as a {@see Type} rather than another {@see self} -- see
+     * {@see Type::substitute()}. Every implementation but {@see VariableShape::substitute()} rebuilds its own kind
+     * of shape with its children substituted and hands it back through {@see Type::of()}; a variable is the one
+     * exception, since what it substitutes to can be any shape at all, not necessarily another variable.
      *
      * @param array<string, Type> $bindings
      */
-    public function substitute(array $bindings): static;
+    public function substitute(array $bindings): Type;
 }

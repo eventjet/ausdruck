@@ -235,18 +235,14 @@ against, not just declared: it has to be exactly the variables that turn out to 
 return type, so a written `fn<T, U>(int) -> int` where neither `T` nor `U` appears anywhere is rejected -- a name in
 the binder has to earn its place.
 
-In PHP, `Type::func()` follows a looser version of the same rule: a `Type::var()` used inside it is picked up
-automatically, wherever it's used, on the assumption that whatever reads the result back is treating it as a
-complete, top-level signature rather than one nested inside another. That assumption doesn't hold for a signature
-that is itself used as a fixed parameter type, a list's element type, or a struct field -- `Type::genericFunc()` is
-the PHP-API equivalent of writing a `fn<...>` binder explicitly: it takes the binder as an argument and validates it
-against the variables actually reachable, both ways, the same as a written signature is checked.
+In PHP, a type variable is `Type::var()`, and a signature's own binder needs no separate argument: `Type::func()` is
+the door for a complete, top-level signature, and derives its binder from wherever `Type::var()` is used in the
+return type and the parameters -- the same rule a written `fn<...>` binder is checked against. `Type::genericFunc()`
+is the PHP-API equivalent of writing a `fn<...>` binder explicitly: it takes the binder as an argument and validates
+it against the variables actually reachable, both ways, the same as a written signature is checked.
 
 Because the call site decides them, the inline return type is rarely worth writing: `foo:list<string>.head()` is
 already an `Option<string>`. Writing one anyway is still allowed, and is then checked against the inferred one.
-
-In PHP, a type variable is `Type::var()`, and a signature's own binder needs no separate argument -- `Type::func()`
-derives it from `Type::var()`, wherever it's used in the return type and the parameters:
 
 ```php
 use Eventjet\Ausdruck\Parser\Declarations;

@@ -9,10 +9,10 @@ use Override;
 use function array_map;
 
 /**
- * A function type -- see {@see Type::func()} and {@see Type::genericFunc()}. Whether the {@see Signature} held here
- * owns a binder of its own is {@see Signature::hasOwnBinder()}'s own answer, decided once when the signature was
- * built rather than guessed from where this shape ends up sitting in a {@see Type} tree: a signature without one
- * defers every variable it reaches to whichever signature does, wherever that turns out to be.
+ * A function type -- see {@see Type::func()}, {@see Type::genericFunc()} and {@see Type::nestedFunc()}. Whether the
+ * {@see Signature} held here owns a binder of its own is {@see Signature::hasOwnBinder()}'s own answer, decided once
+ * when the signature was built rather than guessed from where this shape ends up sitting in a {@see Type} tree: a
+ * signature without one defers every variable it reaches to whichever signature does, wherever that turns out to be.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -54,9 +54,8 @@ final class FuncShape implements TypeShape
     public function toString(): string
     {
         $signature = $this->signature;
-        $binder = $signature->hasOwnBinder() ? $signature->binder() : [];
         $params = array_map(static fn(Type $arg): string => (string)$arg, $signature->parameters);
-        return TypeSyntax::func($binder, $params, (string)$signature->returnType);
+        return TypeSyntax::func($signature->binder(), $params, (string)$signature->returnType);
     }
 
     /**
@@ -67,15 +66,15 @@ final class FuncShape implements TypeShape
      * @param array<string, Type> $bindings
      */
     #[Override]
-    public function substitute(array $bindings): static
+    public function substitute(array $bindings): Type
     {
         $signature = $this->signature;
         if ($signature->hasOwnBinder()) {
-            return $this;
+            return Type::of($this);
         }
-        return new self(new Signature(
+        return Type::of(new self(new Signature(
             $signature->returnType->substitute($bindings),
             array_map(static fn(Type $parameter): Type => $parameter->substitute($bindings), $signature->parameters),
-        ));
+        )));
     }
 }

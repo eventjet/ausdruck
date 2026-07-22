@@ -57,8 +57,8 @@ final class StructShape implements TypeShape
      * @param array<string, Type> $bindings
      */
     #[Override]
-    public function substitute(array $bindings): static
+    public function substitute(array $bindings): Type
     {
-        return new self(array_map(static fn(Type $field): Type => $field->substitute($bindings), $this->fields));
+        return Type::of(new self(array_map(static fn(Type $field): Type => $field->substitute($bindings), $this->fields)));
     }
 }

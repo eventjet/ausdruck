@@ -24,16 +24,40 @@ final class Signature implements Stringable
      *     declared as `fn(string, int, int) -> string` and called as `foo:string.substr:string(0, 3)`, so its
      *     parameters are `[string, int, int]` and `foo` is checked against the first of them; see
      *     {@see self::receiverType()} and {@see self::argumentTypes()}.
-     * @param list<string>|null $ownBinder The names this signature quantifies for itself, or null if it doesn't own
-     *     one at all -- see {@see self::hasOwnBinder()}. Only {@see Type::genericFunc()} ever passes a non-null
-     *     value here; every other caller leaves it null, deferring every variable this signature reaches to
-     *     whichever signature does own one.
+     * @param list<string> $binder The names this signature quantifies for itself -- see {@see self::hasOwnBinder()}.
+     *     Empty for a signature nested inside another one's own parameters or return type, which defers every
+     *     variable it reaches to whichever signature does own one; {@see Type::func()} and {@see Type::genericFunc()}
+     *     are the two callers that ever pass one, the former deriving it from $return and $parameters themselves
+     *     ({@see self::freeVariables()}), the latter taking it as given and checked.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
      */
     public function __construct(
         public readonly Type $returnType,
         public readonly array $parameters = [],
-        private readonly array|null $ownBinder = null,
+        private readonly array $binder = [],
     ) {
+    }
+
+    /**
+     * Every {@see Type::var()} $return and $parameters reach, in the order first seen -- receiver first, then the
+     * rest of the parameters, then the return type -- without a duplicate. The one walk {@see Type::func()} derives
+     * a top-level signature's own binder from, {@see Type::genericFunc()} checks a written one against, and
+     * {@see Parser\TypeResolution::resolveSignature()} checks a written one's unused names against, rather than each
+     * repeating it on its own.
+     *
+     * @param list<Type> $parameters
+     * @return list<string>
+     */
+    public static function freeVariables(Type $return, array $parameters): array
+    {
+        $found = [];
+        foreach ($parameters as $parameter) {
+            $found = $parameter->collectVariables($found);
+        }
+        $found = $return->collectVariables($found);
+        return array_keys($found);
     }
 
     /**
@@ -52,11 +76,11 @@ final class Signature implements Stringable
 
     /**
      * Whether this signature owns a binder of its own, decided once at construction rather than guessed from where
-     * this signature sits in a {@see Type} tree. A signature built through {@see Type::genericFunc()} -- and,
-     * through it, one {@see Parser\TypeResolution::resolveSignature()} resolves outside another one's own
-     * parameters or return type -- owns one, even an empty one; a signature built through {@see Type::func()}, or
-     * nested inside another written signature, never does, and defers every variable it reaches to whichever
-     * signature does.
+     * this signature sits in a {@see Type} tree. A signature built through {@see Type::func()} or
+     * {@see Type::genericFunc()} -- and, through either, one {@see Parser\TypeResolution::resolveSignature()}
+     * resolves outside another one's own parameters or return type -- owns one, even an empty one; a signature built
+     * through {@see Type::nestedFunc()}, for one nested inside another written signature, never does, and defers
+     * every variable it reaches to whichever signature does.
      *
      * This is what lets {@see FuncShape::collectVariables()}, {@see FuncShape::substitute()} and {@see Type::bind()}
      * tell a self-contained generic function type -- one nested inside a list, an Option, a struct field, or
@@ -69,32 +93,20 @@ final class Signature implements Stringable
      */
     public function hasOwnBinder(): bool
     {
-        return $this->ownBinder !== null;
+        return $this->binder !== [];
     }
 
     /**
-     * The names this signature binds: what it was declared with, if {@see self::hasOwnBinder()} says there is one,
-     * or else the names first found walking $parameters then $returnType -- receiver first, then the rest of the
-     * parameters, then the return type, the same order {@see self::instantiateForCall()} decides them in -- without
-     * a duplicate, since one variable used twice is still one name.
-     *
-     * The derived fallback is what a signature built through {@see Type::func()} relies on: it never owns a binder
-     * of its own, so reading one back through {@see Type::asFunction()} derives it fresh from wherever the
-     * variables it reaches turned out to be.
+     * The names this signature binds, in the order first seen walking $parameters then $returnType -- receiver
+     * first, then the rest of the parameters, then the return type, the same order {@see self::instantiateForCall()}
+     * decides them in -- without a duplicate, since one variable used twice is still one name. Empty for a signature
+     * that defers every variable it reaches to whichever signature does own one; see {@see self::hasOwnBinder()}.
      *
      * @return list<string>
      */
     public function binder(): array
     {
-        if ($this->ownBinder !== null) {
-            return $this->ownBinder;
-        }
-        $found = [];
-        foreach ($this->parameters as $parameter) {
-            $found = $parameter->collectVariables($found);
-        }
-        $found = $this->returnType->collectVariables($found);
-        return array_keys($found);
+        return $this->binder;
     }
 
     /**

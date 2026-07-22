@@ -59,8 +59,10 @@ final class ApplicationShape implements TypeShape
      * @param array<string, Type> $bindings
      */
     #[Override]
-    public function substitute(array $bindings): static
+    public function substitute(array $bindings): Type
     {
-        return new self($this->name, array_map(static fn(Type $arg): Type => $arg->substitute($bindings), $this->args));
+        return Type::of(
+            new self($this->name, array_map(static fn(Type $arg): Type => $arg->substitute($bindings), $this->args)),
+        );
     }
 }

@@ -8,6 +8,7 @@ use Countable;
 
 use function array_map;
 use function array_slice;
+use function assert;
 use function count;
 use function in_array;
 use function substr;
@@ -62,34 +63,55 @@ final class BuiltinFunctions
     {
         $item = Type::var('T');
         $items = Type::listOf($item);
-        $predicate = Type::func(Type::bool(), [$item]);
+        // A lambda parameter's own binder belongs to the built-in that takes it, not to the lambda type itself --
+        // Type::nestedFunc() is the door that leaves it that way, the same one a parsed `fn<T>(..., fn(T) -> bool, ...)`
+        // resolves its own lambda parameter through.
+        $predicate = Type::nestedFunc(Type::bool(), [$item]);
         $mapped = Type::var('U');
         return [
-            'contains' => ['impl' => self::contains(...), 'signature' => new Signature(Type::bool(), [$items, $item])],
+            'contains' => ['impl' => self::contains(...), 'signature' => self::signature(Type::bool(), [$items, $item])],
             // Not generic: count and isSome answer the same thing whatever the list or Option holds, so the element
             // type their receiver could have named would go unused. list<any> and Option<any> say that directly,
             // rather than naming a T that nothing but the receiver would ever read.
-            'count' => ['impl' => self::count(...), 'signature' => new Signature(Type::int(), [Type::listOf(Type::any())])],
-            'filter' => ['impl' => self::filter(...), 'signature' => new Signature($items, [$items, $predicate])],
-            'head' => ['impl' => self::head(...), 'signature' => new Signature(Type::option($item), [$items])],
+            'count' => [
+                'impl' => self::count(...),
+                'signature' => self::signature(Type::int(), [Type::listOf(Type::any())]),
+            ],
+            'filter' => ['impl' => self::filter(...), 'signature' => self::signature($items, [$items, $predicate])],
+            'head' => ['impl' => self::head(...), 'signature' => self::signature(Type::option($item), [$items])],
             'isSome' => [
                 'impl' => self::isSome(...),
-                'signature' => new Signature(Type::bool(), [Type::option(Type::any())]),
+                'signature' => self::signature(Type::bool(), [Type::option(Type::any())]),
             ],
             'map' => [
                 'impl' => self::map(...),
-                'signature' => new Signature(Type::listOf($mapped), [$items, Type::func($mapped, [$item])]),
+                'signature' => self::signature(Type::listOf($mapped), [$items, Type::nestedFunc($mapped, [$item])]),
             ],
-            'some' => ['impl' => self::some(...), 'signature' => new Signature(Type::bool(), [$items, $predicate])],
+            'some' => ['impl' => self::some(...), 'signature' => self::signature(Type::bool(), [$items, $predicate])],
             'substr' => [
                 'impl' => substr(...),
-                'signature' => new Signature(Type::string(), [Type::string(), Type::int(), Type::int()]),
+                'signature' => self::signature(Type::string(), [Type::string(), Type::int(), Type::int()]),
             ],
-            'tail' => ['impl' => self::tail(...), 'signature' => new Signature($items, [$items])],
-            'take' => ['impl' => self::take(...), 'signature' => new Signature($items, [$items, Type::int()])],
-            'unique' => ['impl' => self::unique(...), 'signature' => new Signature($items, [$items])],
-            'unwrap' => ['impl' => self::identity(...), 'signature' => new Signature($item, [Type::option($item)])],
+            'tail' => ['impl' => self::tail(...), 'signature' => self::signature($items, [$items])],
+            'take' => ['impl' => self::take(...), 'signature' => self::signature($items, [$items, Type::int()])],
+            'unique' => ['impl' => self::unique(...), 'signature' => self::signature($items, [$items])],
+            'unwrap' => ['impl' => self::identity(...), 'signature' => self::signature($item, [Type::option($item)])],
         ];
+    }
+
+    /**
+     * A built-in's own, top-level {@see Signature} -- through {@see Type::func()}, the same door every other
+     * top-level signature is declared through, rather than {@see Signature}'s own constructor directly, so that
+     * whether a built-in's binder ends up stored the way a call site or {@see Type::__toString()} expects is decided
+     * in one place, not once per built-in.
+     *
+     * @param list<Type> $parameters
+     */
+    private static function signature(Type $return, array $parameters = []): Signature
+    {
+        $signature = Type::func($return, $parameters)->asFunction();
+        assert($signature !== null);
+        return $signature;
     }
 
     /**

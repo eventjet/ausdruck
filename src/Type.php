@@ -28,35 +28,32 @@ use function sprintf;
  */
 final class Type implements Stringable
 {
+    /**
+     * The name a {@see Type} built from $shape carries -- e.g. `list` in `list<T>`, or `T` for a variable. The one
+     * field {@see self::$shape} still surfaces directly, since every caller that reads it already needs
+     * {@see self::isNamed()}, {@see self::optionArg()} or {@see self::listArg()} to know what the name is a name
+     * *of* -- unlike $args, $fields and $aliasFor, which used to sit here the same way before nothing left read them
+     * off {@see self} instead of off the shape that actually carries them.
+     */
     public readonly string $name;
-
-    /**
-     * The type arguments applied to {@see self::$name}, e.g. `T` and `U` in `map<T, U>` -- empty unless $shape is an
-     * {@see ApplicationShape}.
-     *
-     * @var list<self>
-     */
-    public readonly array $args;
-
-    /**
-     * A struct's fields, keyed by name -- empty unless $shape is a {@see StructShape}; see {@see self::struct()}.
-     *
-     * @var array<string, self>
-     */
-    public readonly array $fields;
-
-    /**
-     * The type this one is an alias for -- null unless $shape is an {@see AliasShape}; see {@see self::alias()}.
-     */
-    public readonly self|null $aliasFor;
 
     private function __construct(
         private readonly TypeShape $shape,
     ) {
         $this->name = $shape->name();
-        $this->args = $shape instanceof ApplicationShape ? $shape->args : [];
-        $this->fields = $shape instanceof StructShape ? $shape->fields : [];
-        $this->aliasFor = $shape instanceof AliasShape ? $shape->target : null;
+    }
+
+    /**
+     * Wraps an already-built {@see TypeShape} as a {@see self} -- the door {@see TypeShape::substitute()}
+     * implementations use to hand one back, since {@see self::__construct()} is private and no shape class can call
+     * it directly.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     */
+    public static function of(TypeShape $shape): self
+    {
+        return new self($shape);
     }
 
     public static function string(): self
@@ -117,8 +114,10 @@ final class Type implements Stringable
      *
      * Variables are quantified at the top of the signature they appear in, so there is no binder to build here and two
      * variables of the same name in one signature are the same variable -- {@see self::func()} and
-     * {@see self::genericFunc()} are the two ways that binder ends up recorded, the latter storing it directly and the
-     * former deriving one from where the variable turns out to be used, once the whole signature exists to look at.
+     * {@see self::genericFunc()} are the two doors that store a signature's own binder, the former deriving one from
+     * where the variable turns out to be used once the whole signature exists to look at, the latter taking one
+     * written by hand and checking it against the same thing; {@see self::nestedFunc()} is the third, for a function
+     * type that owns no binder of its own at all.
      *
      * A name a type constructor already spells, like `int` or `list`, is rejected as a type variable when a signature
      * is written as a type string -- see {@see Parser\TypeResolution::checkTypeVariable()} -- because within that
@@ -137,18 +136,15 @@ final class Type implements Stringable
      * is also the only thing {@see self::asFunction()} ever returns: nothing outside this class reads a function type
      * any other way.
      *
-     * This constructor never owns a binder of its own ({@see Signature::hasOwnBinder()} is always false on what it
-     * builds): it can't tell "the outermost signature of a complete declaration" from "a monomorphic function type
-     * nested inside another one's own parameters or return type, whose variables belong to whichever signature
-     * encloses it" -- both look the same from here, a return type and some parameters, and only the second is legal to
-     * build without a binder. {@see self::genericFunc()} is the other door, for a caller that IS declaring a complete,
-     * self-contained generic signature; {@see Parser\TypeResolution::resolveSignature()} picks between the two once it
-     * knows, from where in the source $node was written, which one this is.
-     *
-     * A signature built here still answers {@see Signature::binder()}: with nothing stored, it derives one by walking
-     * $return and $parameters for every {@see self::var()} they reach, on the assumption that whatever reads it back
-     * through {@see self::asFunction()} is treating it as the complete, outermost declaration -- which is exactly what
-     * the direct caller of this constructor, and only that caller, is in a position to know.
+     * This is the door for a caller that IS declaring a complete, self-contained signature -- the outermost one of a
+     * declaration, never one nested inside another's own parameters or return type: it commits to that by deriving
+     * $return and $parameters' own binder ({@see Signature::freeVariables()}) and storing it, rather than leaving it
+     * to be guessed later from wherever the result ends up sitting in a {@see Type} tree, which is what made a
+     * generic function type used as a fixed parameter type or a list's element type indistinguishable, on paper,
+     * from the top-level declaration it was nested inside. {@see self::nestedFunc()} is the other door, for a
+     * function type that is that nested position; {@see Parser\TypeResolution::resolveSignature()} picks between the
+     * two once it knows, from where in the source $node was written, which one this is. {@see self::genericFunc()}
+     * is a third, for a caller that wants the derived binder checked against one written by hand.
      *
      * @param list<Type> $parameters The types the PHP callable receives, in order. A function that is called as a
      *     receiver function -- `foo:string.substr:string(0, 3)` -- receives the expression it's called on as the first
@@ -156,43 +152,54 @@ final class Type implements Stringable
      */
     public static function func(self $return, array $parameters = []): self
     {
+        $binder = Signature::freeVariables($return, $parameters);
+        return new self(new FuncShape(new Signature($return, $parameters, $binder)));
+    }
+
+    /**
+     * A function type that defers every variable it reaches to whichever signature encloses it, because it IS that
+     * enclosed position: nested inside a list, an Option, a struct field, or standing behind an alias used as a
+     * parameter, rather than a complete declaration of its own -- the opposite commitment from {@see self::func()},
+     * for the other of the two positions that constructor's own docblock can't tell apart by itself.
+     * {@see Parser\TypeResolution::resolveSignature()}, for every signature it resolves inside another one's own
+     * parameters or return type, is the one caller that matters in practice; {@see BuiltinFunctions} is the other,
+     * for a lambda parameter like `filter`'s or `map`'s own, whose variables are the enclosing built-in's.
+     *
+     * @param list<Type> $parameters
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     */
+    public static function nestedFunc(self $return, array $parameters = []): self
+    {
         return new self(new FuncShape(new Signature($return, $parameters)));
     }
 
     /**
-     * A function type that owns its own binder, wherever it ends up sitting in a {@see Type} tree -- nested inside a
-     * list, an Option, a struct field, or standing behind an alias used as a parameter -- rather than deriving one
-     * only when read as the outermost signature the way {@see self::func()} does; see that method's own docblock for
-     * why it can't tell the two cases apart on its own. This is the door for a caller that IS declaring a complete,
-     * self-contained generic signature: {@see Parser\TypeResolution::resolveSignature()}, for every signature it
-     * resolves outside another one's own parameters or return type, is the one caller that matters in practice.
-     *
-     * $binder is checked against the variables $return and $parameters actually reach, both ways: a name declared here
-     * that isn't reachable is dead, and one reachable that isn't declared is the exact footgun a signature built by
-     * hand used to leave open before this constructor started validating -- silently turning the missing name into
-     * `any` at the call site instead of failing where the mistake was made. {@see Parser\TypeResolution} already
-     * checks both directions itself, with a message that points at the written source, so this validation is never
-     * expected to trigger through the parser; it exists for a caller building a signature directly.
+     * A function type that owns its own binder, the same commitment {@see self::func()} makes, but with the binder
+     * given rather than derived: this is the door for a caller that wants it checked against the variables $return
+     * and $parameters actually reach, both ways -- a name declared here that isn't reachable is dead, and one
+     * reachable that isn't declared is the exact footgun a signature built by hand used to leave open before this
+     * constructor started validating -- silently turning the missing name into `any` at the call site instead of
+     * failing where the mistake was made. {@see Parser\TypeResolution} already checks both directions itself, with a
+     * message that points at the written source, so this validation is never expected to trigger through the
+     * parser; it exists for a caller building a signature directly.
      *
      * @param list<string> $binder
      * @param list<Type> $parameters
      */
     public static function genericFunc(array $binder, self $return, array $parameters = []): self
     {
-        $found = [];
-        foreach ($parameters as $parameter) {
-            $found = $parameter->collectVariables($found);
-        }
-        $found = $return->collectVariables($found);
+        $free = array_fill_keys(Signature::freeVariables($return, $parameters), true);
         foreach ($binder as $name) {
-            if (!array_key_exists($name, $found)) {
+            if (!array_key_exists($name, $free)) {
                 throw new InvalidArgumentException(
                     sprintf('%s is declared but doesn\'t appear in the parameters or the return type', $name),
                 );
             }
         }
         $declared = array_fill_keys($binder, true);
-        foreach (array_keys($found) as $name) {
+        foreach (array_keys($free) as $name) {
             if (!array_key_exists($name, $declared)) {
                 throw new InvalidArgumentException(
                     sprintf('%s appears in the parameters or the return type but isn\'t declared', $name),
@@ -410,12 +417,11 @@ final class Type implements Stringable
     }
 
     /**
-     * This type as a function's signature, or null if it isn't one. The {@see Signature} returned here is always the
-     * right one to read {@see Signature::binder()} from, whether or not it owns one of its own
-     * ({@see Signature::hasOwnBinder()}): a signature nested inside another one's own return type or parameters can
-     * never carry a binder of its own -- rejected in written syntax by {@see Parser\TypeResolution::resolveSignature()},
-     * and unrepresentable through {@see self::func()} in the first place -- so this is always the signature that owns
-     * every variable it can find, never one nested inside another.
+     * This type as a function's signature, or null if it isn't one. The {@see Signature} returned here is always
+     * built through {@see self::func()} or {@see self::genericFunc()} -- a signature nested inside another one's own
+     * return type or parameters is only ever reached through {@see self::nestedFunc()}, never handed back on its
+     * own -- so {@see Signature::binder()} always reads the signature's own binder here, the same names it was
+     * declared with, never a deferral to something enclosing it.
      */
     public function asFunction(): Signature|null
     {
@@ -533,9 +539,10 @@ final class Type implements Stringable
 
     /**
      * This type with every variable replaced by what it was bound to, and every variable nothing bound replaced by
-     * `any`. A variable is the one shape that doesn't rebuild its own kind -- what it substitutes to can be any
-     * shape at all -- so it's handled directly here rather than through {@see TypeShape::substitute()}; every other
-     * shape delegates there, including {@see FuncShape}, whose own implementation leaves a nested signature with its
+     * `any` -- delegated straight to {@see TypeShape::substitute()}, which is where the rule differs per shape:
+     * {@see VariableShape::substitute()} answers its own binding directly, since what a variable substitutes to can
+     * be any shape at all, not necessarily another variable; every other shape rebuilds its own kind with its
+     * children substituted, including {@see FuncShape}, whose own implementation leaves a nested signature with its
      * own binder untouched rather than rewriting variables that belong to itself.
      *
      * @internal
@@ -545,11 +552,7 @@ final class Type implements Stringable
      */
     public function substitute(array $bindings): self
     {
-        $shape = $this->shape;
-        if ($shape instanceof VariableShape) {
-            return $bindings[$this->name] ?? self::any();
-        }
-        return new self($shape->substitute($bindings));
+        return $this->shape->substitute($bindings);
     }
 
     /**
