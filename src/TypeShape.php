@@ -39,20 +39,6 @@ interface TypeShape
     public function collectVariables(array $found): array;
 
     /**
-     * Whether $this is, or itself reaches -- however many lists, Options, or struct fields deep -- a function type
-     * with a binder of its own, without crossing into what an {@see AliasShape} stands for. This is
-     * {@see Type::rejectNestedBinder()}'s own walk, one method per shape rather than the `instanceof` chain repeated
-     * on {@see Type} for every operation that needs one: a new shape has to answer this to exist at all, the same
-     * reason this interface exists. {@see AliasShape} answers false unconditionally, a named alias being its own
-     * complete, separately quantified signature rather than a nested position; {@see FuncShape} answers true if its
-     * own {@see Signature::hasOwnBinder()} does, and otherwise recurses into its parameters and return type, since a
-     * binder-less function type can still carry one deeper inside it; the containers -- {@see ApplicationShape} and
-     * {@see StructShape} -- fold the same question over what they hold; {@see VariableShape}, holding nothing, is
-     * always false.
-     */
-    public function hasNestedBinder(): bool;
-
-    /**
      * This shape's own syntax, in the grammar {@see TypeSyntax} spells -- see {@see Type::__toString()}.
      */
     public function toString(): string;

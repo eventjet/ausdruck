@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Eventjet\Ausdruck\FuncShape;
 use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Type;
 use Eventjet\Ausdruck\TypeConstructor;
@@ -181,11 +182,11 @@ final class TypeResolution
      * parameters and the return type alike, so a fresh resolution with the binder's names added is what resolves both.
      *
      * $node is rejected outright if it writes a binder of its own while $this->nestedInSignature is already true --
-     * see this class's own docblock for why a nested function type can never legally have one. The same flag is also
-     * the signal for which of {@see Type::nestedFunc()} and {@see Type::genericFunc()} builds the result: nested, it's
-     * built through {@see Type::nestedFunc()}, deferring every variable it reaches to whichever signature encloses
-     * it; not nested, it owns whatever it declared -- even nothing, if it wrote no binder at all -- built through
-     * {@see Type::genericFunc()}, with that binder stored on it directly.
+     * see this class's own docblock for why a nested function type can never legally have one. The same flag also
+     * decides how the result is built: nested, {@see Type::func()} alone, since a nested function type never owns a
+     * binder of its own; not nested, the {@see Signature} is built directly with $node's own written binder stored
+     * on it -- even empty, if it wrote none at all -- rather than through {@see Type::func()}, which never stores
+     * one.
      *
      * $node->typeParameters is what's written, not what {@see Signature::freeVariables()} would find from how the
      * result is actually used, so the two are checked against each other once the signature is built: a name written
@@ -226,12 +227,9 @@ final class TypeResolution
         if ($returnType instanceof TypeError) {
             return $returnType;
         }
-        // Which variables $returnType and $argTypes reach, not what a Signature's own binder is -- the question
-        // this asks either way, so it goes straight to the walk Type::func() and Type::genericFunc() both derive
-        // and check the same thing from, rather than building a Signature just to read it back off one. This is
-        // purely for the error below, which needs a written parameter's own location to point at; Type::genericFunc()
-        // repeats the same walk once more once $binder is handed to it, rather than trusting this one, since it has
-        // no way to tell a caller who skipped straight to it from one who's already done this check.
+        // Which variables $returnType and $argTypes reach, not what a Signature's own binder is -- purely for the
+        // error below, which needs a written parameter's own location to point at. The binder the Signature below
+        // is built with is $node's own written one, not this walk's result.
         $free = Signature::freeVariables($returnType, $argTypes);
         $unused = self::firstUnused($node->typeParameters, $free);
         if ($unused !== null) {
@@ -244,10 +242,10 @@ final class TypeResolution
             );
         }
         if ($this->nestedInSignature) {
-            return Type::nestedFunc($returnType, $argTypes);
+            return Type::func($returnType, $argTypes);
         }
         $binder = array_map(static fn(Identifier $parameter): string => $parameter->name, $node->typeParameters);
-        return Type::genericFunc($binder, $returnType, $argTypes);
+        return Type::of(new FuncShape(new Signature($returnType, $argTypes, $binder)));
     }
 
     /**
@@ -299,6 +297,9 @@ final class TypeResolution
      * An alias is a name for one complete type, so like the argument-less built-ins, it rejects type arguments instead
      * of silently dropping them—`Foo<int>` is as invalid as `int<string>`. {@see TypeParser::parse()} counts on that:
      * it reads a closed argument list after any name and leaves rejecting it to this resolver.
+     *
+     * $this->aliases already holds every entry wrapped through {@see Type::alias()} -- {@see Types::__construct()}
+     * does that once, for each one -- so there is nothing left for a reference to wrap again on top of it.
      */
     private function resolveAlias(ApplicationTypeNode $node): Type|TypeError|null
     {
@@ -306,7 +307,7 @@ final class TypeResolution
         if ($type === null) {
             return null;
         }
-        return self::checkArity($node, 0) ?? Type::alias($node->name, $type);
+        return self::checkArity($node, 0) ?? $type;
     }
 
     /**

@@ -39,20 +39,6 @@ final class StructShape implements TypeShape
         return $found;
     }
 
-    /**
-     * Folds {@see TypeShape::hasNestedBinder()} over $fields -- see there for what this asks.
-     */
-    #[Override]
-    public function hasNestedBinder(): bool
-    {
-        foreach ($this->fields as $field) {
-            if ($field->hasNestedBinder()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     #[Override]
     public function toString(): string
     {

@@ -31,15 +31,6 @@ final class VariableShape implements TypeShape
         return $found;
     }
 
-    /**
-     * Always false: a variable has no children to reach anything through -- see {@see TypeShape::hasNestedBinder()}.
-     */
-    #[Override]
-    public function hasNestedBinder(): bool
-    {
-        return false;
-    }
-
     #[Override]
     public function toString(): string
     {

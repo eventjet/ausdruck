@@ -713,9 +713,10 @@ final class ExpressionTest extends TestCase
     {
         $lambda = Expr::lambda(Expr::get('x', Type::var('T')), ['i']);
 
-        // The shape a declared higher-order parameter like `fn(any) -> T` is built with: nested, deferring `T` to
-        // whichever signature encloses it, the same position a lambda argument is written for.
-        $declaredParameter = Type::nestedFunc(Type::var('T'), [Type::any()]);
+        // The shape a declared higher-order parameter like `fn(any) -> T` is built with: Type::func() never claims
+        // a binder of its own, so T is deferred to whichever signature encloses it, the same position a lambda
+        // argument is written for.
+        $declaredParameter = Type::func(Type::var('T'), [Type::any()]);
 
         self::assertTrue($lambda->getType()->isSubtypeOf($declaredParameter));
     }

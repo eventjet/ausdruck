@@ -9,10 +9,10 @@ use Override;
 use function array_map;
 
 /**
- * A function type -- see {@see Type::func()}, {@see Type::genericFunc()} and {@see Type::nestedFunc()}. Whether the
- * {@see Signature} held here owns a binder of its own is {@see Signature::hasOwnBinder()}'s own answer, decided once
- * when the signature was built rather than guessed from where this shape ends up sitting in a {@see Type} tree: a
- * signature without one defers every variable it reaches to whichever signature does, wherever that turns out to be.
+ * A function type -- see {@see Type::func()}. Whether the {@see Signature} held here owns a binder of its own is
+ * {@see Signature::hasOwnBinder()}'s own answer, decided once, by {@see Signature::quantified()}, rather than
+ * guessed from where this shape ends up sitting in a {@see Type} tree: a signature without one defers every
+ * variable it reaches to whichever signature does, wherever that turns out to be.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -42,27 +42,6 @@ final class FuncShape implements TypeShape
             $found = $parameter->collectVariables($found);
         }
         return $signature->returnType->collectVariables($found);
-    }
-
-    /**
-     * True outright if {@see Signature::hasOwnBinder()} does; otherwise folds {@see TypeShape::hasNestedBinder()}
-     * over the parameters and the return type, since a binder-less function type -- one built through
-     * {@see Type::nestedFunc()} -- can still carry one deeper inside it. See {@see TypeShape::hasNestedBinder()} for
-     * what this asks.
-     */
-    #[Override]
-    public function hasNestedBinder(): bool
-    {
-        $signature = $this->signature;
-        if ($signature->hasOwnBinder()) {
-            return true;
-        }
-        foreach ($signature->parameters as $parameter) {
-            if ($parameter->hasNestedBinder()) {
-                return true;
-            }
-        }
-        return $signature->returnType->hasNestedBinder();
     }
 
     #[Override]
@@ -99,6 +78,10 @@ final class FuncShape implements TypeShape
      * the same rule an ordinary function subtyping check follows -- has to accept what it's declared to. $other isn't
      * necessarily a function type at all, so a shape mismatch is rejected here, the same way a quantification
      * mismatch is.
+     *
+     * @todo Alpha-equivalence: `fn<T>(T) -> T` and `fn<U>(U) -> U` describe the same type but this doesn't say so,
+     *     since neither side's binder is renamed to line up with the other's before the parameters and return type
+     *     are compared -- both would need the same name for `isSubtypeOf()` to reach true here. Left open.
      */
     #[Override]
     public function isSubtypeOf(TypeShape $other): bool

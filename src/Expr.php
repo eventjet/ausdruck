@@ -105,14 +105,14 @@ final class Expr
         Span|null $location = null,
     ): Call {
         $location ??= self::dummySpan();
-        $signature = $signature?->instantiateForCall(
+        $instantiated = $signature?->instantiateForCall(
             $target->getType(),
             array_map(static fn(Expression $argument): Type => $argument->getType(), $arguments),
         );
-        $type = self::returnType($name, $returnType, $signature, $nameLocation ?? self::dummySpan());
-        if ($signature !== null) {
-            self::checkReceiver($target, $name, $signature);
-            self::checkArguments($arguments, $name, $signature, $location);
+        $type = self::returnType($name, $returnType, $instantiated, $nameLocation ?? self::dummySpan());
+        if ($instantiated !== null) {
+            self::checkReceiver($target, $name, $instantiated);
+            self::checkArguments($arguments, $name, $instantiated, $location);
         }
         return new Call($target, $name, $type, $arguments, $location);
     }

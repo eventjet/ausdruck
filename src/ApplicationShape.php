@@ -42,20 +42,6 @@ final class ApplicationShape implements TypeShape
         return $found;
     }
 
-    /**
-     * Folds {@see TypeShape::hasNestedBinder()} over $args -- see there for what this asks.
-     */
-    #[Override]
-    public function hasNestedBinder(): bool
-    {
-        foreach ($this->args as $arg) {
-            if ($arg->hasNestedBinder()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     #[Override]
     public function toString(): string
     {

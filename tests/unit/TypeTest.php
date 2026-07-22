@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
+use Eventjet\Ausdruck\AliasShape;
 use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
@@ -195,11 +196,15 @@ final class TypeTest extends TestCase
     /**
      * bind() only sees through an alias on the actual side, so a variable under an alias on the signature side has to
      * be reachable too, or instantiating a signature built directly through this API silently drops it to `any`
-     * instead of what the call actually decided.
+     * instead of what the call actually decided. Built through the internal {@see AliasShape} directly rather than
+     * the public {@see Type::alias()}: `Bag` standing for `list<T>` is exactly the target the public door now refuses,
+     * since nothing would capture `T` if `Bag` were ever used standalone -- {@see Type::bind()}'s own walk doesn't get
+     * to assume that was checked, though, so it still has to be correct for a shape like this one.
      */
     public function testVariableUnderAnAliasOnTheSignatureSideIsBound(): void
     {
-        $signature = Type::func(Type::var('T'), [Type::alias('Bag', Type::listOf(Type::var('T')))])->asFunction();
+        $bag = Type::of(new AliasShape('Bag', Type::listOf(Type::var('T'))));
+        $signature = Type::func(Type::var('T'), [$bag])->asFunction();
         self::assertNotNull($signature);
 
         $instantiated = $signature->instantiateForCall(Type::listOf(Type::int()), []);
@@ -213,11 +218,14 @@ final class TypeTest extends TestCase
      * names: an alias standing directly for a variable -- not merely for a container of one, see
      * {@see self::testVariableUnderAnAliasOnTheSignatureSideIsBound()} -- has to be seen through before that
      * question is asked, or the variable case is skipped on the raw, still-aliased type and the name comparison
-     * that follows compares the variable's own name against the actual type's, which never match.
+     * that follows compares the variable's own name against the actual type's, which never match. Built through the
+     * internal {@see AliasShape} directly, for the same reason
+     * {@see self::testVariableUnderAnAliasOnTheSignatureSideIsBound()} does.
      */
     public function testVariableDirectlyBehindAnAliasIsBound(): void
     {
-        $signature = Type::func(Type::var('T'), [Type::listOf(Type::alias('Elem', Type::var('T')))])->asFunction();
+        $elem = Type::of(new AliasShape('Elem', Type::var('T')));
+        $signature = Type::func(Type::var('T'), [Type::listOf($elem)])->asFunction();
         self::assertNotNull($signature);
 
         $instantiated = $signature->instantiateForCall(Type::listOf(Type::int()), []);
@@ -273,93 +281,80 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * A variable used only in the return type -- nothing in the parameters reaches it -- is still part of the
-     * derived binder: {@see Type::asFunction()} walks the return type too, not just the parameters. Nothing decides
-     * it from a call, so {@see Signature::instantiateForCall()} leaves it as `any`, but it isn't unbound.
+     * {@see Type::func()} never claims a binder of its own, so aliasing a function type that reaches a type
+     * variable is what quantifies it -- the same promotion {@see Parser\Declarations} makes for a declared function
+     * -- rather than leaving the variable free for nothing to capture.
      */
-    public function testAsFunctionDerivesAVariableUsedOnlyInTheReturnType(): void
+    public function testAliasingAFunctionTypeQuantifiesIt(): void
     {
-        $signature = Type::func(Type::var('T'))->asFunction();
+        $alias = Type::alias('Mapper', Type::func(Type::bool(), [Type::var('T')]));
+
+        self::assertSame(['T'], $alias->asFunction()?->binder());
+        self::assertSame('Mapper', (string)$alias);
+    }
+
+    /**
+     * The same free-variable check {@see Parser\Declarations::checkVariableIsSelfContained()} runs for a declared
+     * variable's type applies to an alias target too, for anything that isn't a function type: aliasing doesn't
+     * quantify a list, an `Option`, or a struct field, so a variable reaching through one of those is still nothing
+     * captures it.
+     */
+    public function testAliasOfANonFunctionTypeReachingAFreeVariableIsRejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'Numbers is declared as list<T>, which reaches a type variable nothing captures -- aliasing only '
+                . 'derives a binder for a function type, and this isn\'t one',
+        );
+
+        Type::alias('Numbers', Type::listOf(Type::var('T')));
+    }
+
+    /**
+     * A variable used only in the return type -- nothing in the parameters reaches it -- is still part of the
+     * derived binder: {@see Signature::quantified()} walks the return type too, not just the parameters. Nothing
+     * decides it from a call, so {@see Signature::instantiateForCall()} leaves it as `any`, but it isn't unbound.
+     */
+    public function testQuantifiedDerivesAVariableUsedOnlyInTheReturnType(): void
+    {
+        $signature = Signature::quantified(Type::func(Type::var('T')));
 
         self::assertSame(['T'], $signature?->binder());
     }
 
     /**
      * A consumer's own generic higher-order function -- one whose parameter is itself a generic function type, the
-     * way {@see \Eventjet\Ausdruck\BuiltinFunctions}' own `map` is -- has to build that parameter through
-     * {@see Type::nestedFunc()}, not {@see Type::func()}: the inner function type's `T` and `U` are the outer
-     * signature's own, not a binder of its own that shadows them. Built this way, a call through the declaration
-     * type-checks the same way a call to the built-in `map` does, and the signature reads back the way it printed.
+     * way {@see \Eventjet\Ausdruck\BuiltinFunctions}' own `map` is -- builds that parameter through
+     * {@see Type::func()} too, the same door as the outer signature: the inner function type's `T` and `U` are the
+     * outer signature's own, not a binder of its own that shadows them, since {@see Type::func()} never claims one.
+     * {@see Signature::quantified()} -- the same seam {@see Declarations} declares `myMap` through -- is what derives
+     * the outer signature's binder, and a call through the declaration type-checks the same way a call to the
+     * built-in `map` does, and the printed signature reads back to the same one.
      */
     public function testConsumerDeclaredGenericHigherOrderFunctionTypeChecksAndRoundTrips(): void
     {
         $myMap = Type::func(
             Type::listOf(Type::var('U')),
-            [Type::listOf(Type::var('T')), Type::nestedFunc(Type::var('U'), [Type::var('T')])],
+            [Type::listOf(Type::var('T')), Type::func(Type::var('U'), [Type::var('T')])],
         );
-        self::assertSame('fn<T, U>(list<T>, fn(T) -> U) -> list<U>', (string)$myMap);
+        $quantified = Signature::quantified($myMap);
+        self::assertNotNull($quantified);
+        self::assertSame('fn<T, U>(list<T>, fn(T) -> U) -> list<U>', (string)$quantified);
 
         /**
          * @psalm-suppress InternalMethod
          * @psalm-suppress InternalClass
          */
-        $node = TypeParser::parseString((string)$myMap);
+        $node = TypeParser::parseString((string)$quantified);
         self::assertNotInstanceOf(SyntaxError::class, $node);
         $reParsed = (new Types())->resolve($node);
         self::assertNotInstanceOf(TypeError::class, $reParsed);
-        self::assertTrue($myMap->equals($reParsed));
+        self::assertSame((string)$quantified, (string)$reParsed);
 
         $declarations = new Declarations(functions: ['myMap' => $myMap]);
         $expression = ExpressionParser::parse('nums:list<int>.myMap(|n| n:int > 2)', $declarations);
 
         self::assertSame('list<bool>', (string)$expression->getType());
-    }
-
-    /**
-     * A consumer that reaches for {@see Type::func()} instead of {@see Type::nestedFunc()} for a nested parameter --
-     * exactly the mistake {@see self::testConsumerDeclaredGenericHigherOrderFunctionTypeChecksAndRoundTrips()} avoids
-     * by using the right door -- used to get a type back that type-checked a call correctly but printed a signature
-     * the parser itself would reject, since the inner function type quietly picked up a binder of its own that
-     * shadows the outer one instead of sharing variables with it. Rejecting it here, at the call that made the
-     * mistake, is what keeps `parse(str(t)) === t` from ever having a chance to break this way.
-     */
-    public function testFuncRejectsANestedFunctionTypeWithANonEmptyBinderOfItsOwn(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            'A function type nested inside another one can\'t bind type variables of its own: a variable is '
-                . 'quantified once, by whichever function type encloses it',
-        );
-
-        $t = Type::var('T');
-        Type::func(Type::listOf($t), [Type::listOf($t), Type::func(Type::bool(), [$t])]);
-    }
-
-    /**
-     * The same guard {@see self::testFuncRejectsANestedFunctionTypeWithANonEmptyBinderOfItsOwn()} pins for
-     * {@see Type::func()} applies to {@see Type::genericFunc()} too: both doors mean "I am a complete,
-     * self-contained signature", so both reject a nested one that already claims to be one as well.
-     */
-    public function testGenericFuncRejectsANestedFunctionTypeWithANonEmptyBinderOfItsOwn(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-
-        $t = Type::var('T');
-        Type::genericFunc(['T'], Type::listOf($t), [Type::listOf($t), Type::genericFunc(['T'], Type::bool(), [$t])]);
-    }
-
-    /**
-     * A binder that names the same variable twice would print as `fn<T, T>(...)`, which the parser rejects the same
-     * way {@see \Eventjet\Ausdruck\Parser\TypeResolution::checkTypeVariable()} rejects one written twice by hand --
-     * so this is caught here instead of surfacing later as a broken `parse(str(t)) === t` round-trip.
-     */
-    public function testGenericFuncRejectsADuplicateNameInTheBinder(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Type variable T is already declared');
-
-        $t = Type::var('T');
-        Type::genericFunc(['T', 'T'], $t, [$t]);
     }
 
     /**
@@ -416,13 +411,12 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * The guard {@see self::testFuncRejectsANestedFunctionTypeWithANonEmptyBinderOfItsOwn()} pins looks for a
-     * nested function type that already owns variables of its own, not merely for nesting itself: a nested function
-     * type with no type variables at all -- `doCall`'s own receiver parameter, `fn(string) -> string`, built with
-     * {@see Type::func()} rather than {@see Type::nestedFunc()} because it has no variables for the two doors to
-     * disagree about -- has nothing to shadow, so it stays legal.
+     * A function type nested inside another one's own parameters -- `doCall`'s own receiver parameter,
+     * `fn(string) -> string` -- is built through {@see Type::func()} exactly like the outer one: there is only ever
+     * this one door, so nesting one function type inside another is never anything a caller has to get right by
+     * picking the right constructor.
      */
-    public function testFuncAllowsNestingAFunctionTypeWithNoVariablesOfItsOwn(): void
+    public function testFuncAllowsNestingAFunctionTypeAsAParameter(): void
     {
         $doCall = Type::func(Type::string(), [Type::func(Type::string(), [Type::string()]), Type::string()]);
 
@@ -432,16 +426,17 @@ final class TypeTest extends TestCase
     /**
      * A polymorphic function type and a monomorphic one over a variable belonging to an enclosing scope are
      * different types, even though their return type and parameters read the same: `fn<T>(T) -> T`'s `T` is decided
-     * fresh by every call, while `fn(T) -> T`'s `T` -- built with {@see Type::nestedFunc()}, the way it would be
-     * found as, say, a lambda parameter inside some other signature -- is one variable some enclosing signature
-     * owns. {@see Signature::hasOwnBinder()} is the fact that tells them apart, and {@see Type::isSubtypeOf()} has
-     * to read it, or the two compare equal.
+     * fresh by every call, while `fn(T) -> T`'s `T` -- the way {@see Type::func()} always builds it, since it never
+     * claims a binder of its own -- is one variable some enclosing signature owns. Aliasing derives a binder for a
+     * function type ({@see Type::alias()}), so aliasing the polymorphic one is the plain-API way to get one to
+     * compare against a bare, unquantified one. {@see Signature::hasOwnBinder()} is the fact that tells the two
+     * apart, and {@see Type::isSubtypeOf()} has to read it, or they compare equal.
      */
     public function testAPolymorphicFunctionTypeIsNotEqualToAMonomorphicOneOverAFreeVariable(): void
     {
         $t = Type::var('T');
-        $polymorphic = Type::func($t, [$t]);
-        $monomorphic = Type::nestedFunc($t, [$t]);
+        $monomorphic = Type::func($t, [$t]);
+        $polymorphic = Type::alias('F', $monomorphic);
 
         self::assertFalse($polymorphic->equals($monomorphic));
         self::assertFalse($monomorphic->equals($polymorphic));

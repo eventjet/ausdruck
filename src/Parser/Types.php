@@ -7,8 +7,6 @@ namespace Eventjet\Ausdruck\Parser;
 use Eventjet\Ausdruck\Type;
 use InvalidArgumentException;
 
-use function sprintf;
-
 /**
  * The public entry point for resolving a {@see TypeNode} against a set of aliases. Resolution itself is
  * {@see TypeResolution}'s job: a `fn<...>` binder adds type variables to the scope a node is resolved in, and that
@@ -19,33 +17,28 @@ use function sprintf;
 final class Types
 {
     /**
-     * An alias stands for one complete type -- see {@see Type::alias()} -- so $aliases is the one place a
-     * consumer-supplied {@see Type} is promoted to a name text can reference on its own, with nothing enclosing it:
-     * the one boundary, alongside {@see Declarations}'s functions and variables, that has to notice a $type built
-     * through {@see Type::nestedFunc()}, deferring a variable to a signature that was never going to enclose it, or
-     * a bare {@see Type::var()} used standalone -- either way, {@see Type::hasFreeVariables()} true. Left uncaught,
-     * `Mapper` naming such a $type would resolve every reference to it -- however many lists, Options, or struct
-     * fields deep the reference itself sits -- with a variable no written `fn<...>` binder could ever declare, since
-     * the text naming `Mapper` has no way to see what it hides.
+     * @var array<string, Type>
+     */
+    private readonly array $aliases;
+
+    /**
+     * An alias stands for one complete type -- see {@see Type::alias()}, which is what actually promotes every entry
+     * here: each is wrapped through it exactly the way a consumer calling {@see Type::alias()} directly would wrap
+     * one, so a function type is quantified and anything else that reaches a type variable nothing captures is
+     * rejected with {@see Type::alias()}'s own message, rather than this constructor keeping a second copy of that
+     * check.
      *
      * @param array<string, Type> $aliases
      *
-     * @throws InvalidArgumentException if an alias reaches a type variable nothing captures.
+     * @throws InvalidArgumentException {@see Type::alias()}
      */
-    public function __construct(private readonly array $aliases = [])
+    public function __construct(array $aliases = [])
     {
+        $wrapped = [];
         foreach ($aliases as $name => $type) {
-            if (!$type->hasFreeVariables()) {
-                continue;
-            }
-            throw new InvalidArgumentException(sprintf(
-                '%s is declared as %s, which reaches a type variable nothing captures -- every function type it '
-                    . 'reaches through Type::nestedFunc() needs its own binder instead, via Type::func() or '
-                    . 'Type::genericFunc()',
-                $name,
-                $type,
-            ));
+            $wrapped[$name] = Type::alias($name, $type);
         }
+        $this->aliases = $wrapped;
     }
 
     /**

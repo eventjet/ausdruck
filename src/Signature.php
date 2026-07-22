@@ -28,11 +28,11 @@ final class Signature implements Stringable
      *     Empty for a signature that defers every variable it reaches to whichever signature does own one, the same
      *     as one that genuinely has none of its own; nothing downstream ({@see FuncShape::collectVariables()},
      *     {@see FuncShape::substitute()}, {@see Type::bind()}) tells the two apart, since both recurse into this
-     *     signature's own parts the same way and find nothing to claim either way. {@see Type::func()} and
-     *     {@see Type::genericFunc()} are the two callers that pass one -- the former deriving it from $return and
-     *     $parameters themselves ({@see self::freeVariables()}), the latter taking it as given and checked --
-     *     {@see Type::nestedFunc()} passes none, and neither does a signature this class rebuilds internally while
-     *     substituting or instantiating one that already had none of its own.
+     *     signature's own parts the same way and find nothing to claim either way. {@see Type::func()} never passes
+     *     one -- it builds structure only -- and neither does a signature this class rebuilds internally while
+     *     substituting or instantiating one that already had none of its own; {@see self::quantified()} is what
+     *     derives one, once something promotes a function type to a complete signature, and
+     *     {@see Parser\TypeResolution} is what builds one directly with a binder written by hand.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -46,10 +46,9 @@ final class Signature implements Stringable
 
     /**
      * Every {@see Type::var()} $return and $parameters reach, in the order first seen -- receiver first, then the
-     * rest of the parameters, then the return type -- without a duplicate. The one walk {@see Type::func()} derives
-     * a top-level signature's own binder from, {@see Type::genericFunc()} checks a written one against, and
-     * {@see Parser\TypeResolution::resolveSignature()} checks a written one's unused names against, rather than each
-     * repeating it on its own.
+     * rest of the parameters, then the return type -- without a duplicate. The one walk {@see self::quantified()}
+     * derives a signature's own binder from, and {@see Parser\TypeResolution::resolveSignature()} checks a written
+     * one's unused names against, rather than each repeating it on its own.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -65,6 +64,32 @@ final class Signature implements Stringable
         }
         $found = $return->collectVariables($found);
         return array_keys($found);
+    }
+
+    /**
+     * $funcType promoted to a complete, self-contained signature -- the one it already holds
+     * ({@see Type::asFunction()}), but with its own binder derived from what its return type and parameters actually
+     * reach ({@see self::freeVariables()}): every name that walk finds, quantified, and nothing else, so there is
+     * nothing left here to reject the way a written binder is -- a name the walk doesn't find can't end up in the
+     * binder, and one it does can't end up missing either.
+     *
+     * This is the one seam a function type is promoted through, from "some function type, built through
+     * {@see Type::func()} without committing to who quantifies it" to "the outermost signature of a declaration or
+     * an alias target" -- see {@see Parser\Declarations} and {@see Type::alias()}, its two callers. Null if
+     * $funcType isn't a function type at all, which each of those turns into its own, differently-worded rejection
+     * instead of asking this a separate question first.
+     */
+    public static function quantified(Type $funcType): self|null
+    {
+        $signature = $funcType->asFunction();
+        if ($signature === null) {
+            return null;
+        }
+        return new self(
+            $signature->returnType,
+            $signature->parameters,
+            self::freeVariables($signature->returnType, $signature->parameters),
+        );
     }
 
     /**
@@ -102,10 +127,10 @@ final class Signature implements Stringable
 
     /**
      * The names this signature binds, without a duplicate, since one variable used twice is still one name. In the
-     * order {@see Type::func()} derived them in -- first seen walking $parameters then $returnType, receiver first --
-     * for a derived signature, or the order {@see Type::genericFunc()} was given for one written by hand, which
-     * needn't be the order a left-to-right walk would find them in. Empty for a signature that defers every variable
-     * it reaches to whichever signature does own one; see {@see self::hasOwnBinder()}.
+     * order {@see self::quantified()} derived them in -- first seen walking $parameters then $returnType, receiver
+     * first -- for a derived signature, or the order {@see Parser\TypeResolution::resolveSignature()} was given for
+     * one written by hand, which needn't be the order a left-to-right walk would find them in. Empty for a signature
+     * that defers every variable it reaches to whichever signature does own one; see {@see self::hasOwnBinder()}.
      *
      * @return list<string>
      */

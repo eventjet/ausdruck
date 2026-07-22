@@ -33,41 +33,35 @@ final class DeclarationsTest extends TestCase
     }
 
     /**
-     * {@see Type::nestedFunc()} defers every variable it reaches to whichever signature encloses it -- correct for a
-     * function type nested inside another one's own parameters or return type, but wrong here: a declaration is
-     * exactly the position nothing encloses. Built this way, the signature would read back with an empty binder
-     * despite reaching `T`, and every call would silently see `T` as `any` instead of having it decided by the
-     * argument -- the same defect {@see Type::func()} and {@see Type::genericFunc()} both already prevent for a
-     * caller that reaches for the right door.
+     * {@see Type::func()} never claims a binder of its own, so declaring a function with one is what quantifies it:
+     * {@see Signature::quantified()} derives `myHead`'s binder from `T`, the same variable the parameters and return
+     * type actually reach, rather than requiring the declaration to be built any differently from a nested function
+     * type.
      */
-    public function testAFunctionDeclaredThroughTheNestedDoorIsRejected(): void
+    public function testDeclaringAFunctionDerivesItsBinderFromWhatItReaches(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            'myHead is declared as fn(list<T>) -> T, built through Type::nestedFunc(), which leaves it without a '
-                . 'binder of its own -- a declaration needs Type::func() or Type::genericFunc() instead',
-        );
-
         $t = Type::var('T');
-        new Declarations(functions: ['myHead' => Type::nestedFunc($t, [Type::listOf($t)])]);
+
+        $declarations = new Declarations(functions: ['myHead' => Type::func($t, [Type::listOf($t)])]);
+
+        self::assertSame('fn<T>(list<T>) -> T', (string)$declarations->functions['myHead']);
     }
 
     /**
-     * The same wrong-door hole as {@see self::testAFunctionDeclaredThroughTheNestedDoorIsRejected()}, but for a
-     * variable, whose declared type doesn't have to be a function at all: here it's a list of one, so the variable
-     * {@see Type::nestedFunc()} defers is buried a level deeper than a direct {@see Type::asFunction()} check would
-     * ever look.
+     * A variable's declared type, unlike a function's, is never quantified: there is no `fn<...>` binder here for
+     * {@see Type::var()} to belong to, whether the variable sits bare or, as here, nested inside a list wrapping a
+     * function type nothing has quantified either.
      */
-    public function testAVariableWhoseTypeReachesTheNestedDoorIsRejected(): void
+    public function testAVariableWhoseTypeReachesAFreeVariableIsRejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'items is declared as list<fn(T) -> bool>, which reaches a type variable nothing captures -- every '
-                . 'function type it reaches through Type::nestedFunc() needs its own binder instead, via '
-                . 'Type::func() or Type::genericFunc()',
+            'items is declared as list<fn(T) -> bool>, which reaches a type variable nothing captures -- a '
+                . 'variable\'s declared type is never quantified the way a function\'s own declaration or a '
+                . 'Type::alias() target is, so nothing here would ever bind it',
         );
 
         $t = Type::var('T');
-        new Declarations(variables: ['items' => Type::listOf(Type::nestedFunc(Type::bool(), [$t]))]);
+        new Declarations(variables: ['items' => Type::listOf(Type::func(Type::bool(), [$t]))]);
     }
 }

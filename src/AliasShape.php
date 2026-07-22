@@ -32,16 +32,6 @@ final class AliasShape implements TypeShape
         return $this->target->collectVariables($found);
     }
 
-    /**
-     * Never true, and $target is never asked: see {@see Type::rejectNestedBinder()} for why the walk stops here
-     * rather than crossing into what the alias stands for.
-     */
-    #[Override]
-    public function hasNestedBinder(): bool
-    {
-        return false;
-    }
-
     #[Override]
     public function toString(): string
     {

@@ -235,21 +235,15 @@ against, not just declared: it has to be exactly the variables that turn out to 
 return type, so a written `fn<T, U>(int) -> int` where neither `T` nor `U` appears anywhere is rejected -- a name in
 the binder has to earn its place.
 
-In PHP, a type variable is `Type::var()`, and a signature's own binder needs no separate argument: `Type::func()` is
-the door for a complete, top-level signature, and derives its binder from wherever `Type::var()` is used in the
-return type and the parameters -- the same rule a written `fn<...>` binder is checked against. `Type::genericFunc()`
-is the PHP-API equivalent of writing a `fn<...>` binder explicitly: it takes the binder as an argument and validates
-it against the variables actually reachable, both ways, the same as a written signature is checked.
-
-`Type::func()` and `Type::genericFunc()` are only for the outermost signature of a declaration. A function type that
-appears *inside* another one's own parameters or return type -- a lambda parameter, the way `map`'s own is, or a
-generic callback taken by a custom function -- is built with `Type::nestedFunc()` instead, the PHP-API equivalent of
-writing a nested `fn(...)` with no binder of its own: its variables are shared with the signature that encloses it,
-not quantified separately, the same rule that makes a written `fn<T>(...)` nested inside another `fn<...>` a syntax
-error. Building a nested function type with `Type::func()` or `Type::genericFunc()` instead, when the variables it
-reaches are already quantified elsewhere, is rejected with an `InvalidArgumentException` rather than silently given a
-binder of its own that would shadow the enclosing one: a function type with no type variables of its own may still be
-nested with either door, since there's nothing there for the two to disagree about.
+In PHP, a type variable is `Type::var()`, and a function type is always `Type::func()`, whichever position it ends up
+in -- the outermost signature of a declaration, an alias target, or a fixed parameter nested inside another one's own
+parameters or return type, like a lambda parameter the way `map`'s own is, or a generic callback taken by a custom
+function. `Type::func()` itself never commits to a binder: declaring a function (`Declarations`) or aliasing one
+(`Type::alias()`) is what quantifies it, deriving its binder from wherever `Type::var()` turns out to be used in the
+return type and the parameters -- the same rule a written `fn<...>` binder is checked against. A function type nested
+inside another one shares its variables with whichever declaration or alias goes on to quantify them, rather than
+claiming any of its own, the same rule that makes a written `fn<T>(...)` nested inside another `fn<...>` a syntax
+error -- there's simply no second door here for that mistake to be made through.
 
 Because the call site decides them, the inline return type is rarely worth writing: `foo:list<string>.head()` is
 already an `Option<string>`. Writing one anyway is still allowed, and is then checked against the inferred one.
@@ -267,13 +261,14 @@ $declarations = new Declarations(functions: ['zip' => $zip]);
 ```
 
 A generic higher-order function -- one that itself takes a generic function as a parameter, the way `map` does --
-nests a `Type::var()` from the outer signature inside a `Type::nestedFunc()` for the inner one:
+nests a `Type::var()` from the outer signature inside a `Type::func()` for the inner one, built exactly the same way
+as the outer one:
 
 ```php
 // myMap: fn<T, U>(list<T>, fn(T) -> U) -> list<U>
 $myMap = Type::func(
     Type::listOf(Type::var('U')),
-    [Type::listOf(Type::var('T')), Type::nestedFunc(Type::var('U'), [Type::var('T')])],
+    [Type::listOf(Type::var('T')), Type::func(Type::var('U'), [Type::var('T')])],
 );
 $declarations = new Declarations(functions: ['myMap' => $myMap]);
 ```
