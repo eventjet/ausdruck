@@ -5,17 +5,15 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use InvalidArgumentException;
+use LogicException;
 use Override;
 use Stringable;
 
 use function array_fill_keys;
-use function array_intersect_key;
 use function array_is_list;
 use function array_key_exists;
 use function array_key_first;
 use function array_map;
-use function array_slice;
-use function count;
 use function get_object_vars;
 use function gettype;
 use function is_array;
@@ -27,18 +25,9 @@ use function sprintf;
  */
 final class Type implements Stringable
 {
-    /**
-     * The name $shape carries -- e.g. `list` in `list<T>`, or `T` for a variable -- cached here so the handful of
-     * private helpers below that compare it ({@see self::isNamed()}, {@see self::optionArg()}, {@see self::listArg()})
-     * don't each call {@see TypeShape::name()} again. Not part of the public API: a name alone doesn't say what kind
-     * of type it's the name of, which is exactly what those helpers exist to ask on a caller's behalf instead.
-     */
-    private readonly string $name;
-
     private function __construct(
         private readonly TypeShape $shape,
     ) {
-        $this->name = $shape->name();
     }
 
     /**
@@ -141,16 +130,23 @@ final class Type implements Stringable
      * parameter or a list's element type, or a lambda parameter like `filter`'s or `map`'s own, whose variables
      * belong to whatever encloses it rather than to itself. Nothing about $return or $parameters tells the two
      * positions apart; the caller says which one is meant by picking the constructor, the same choice
-     * {@see Parser\TypeResolution::resolveSignature()} makes from where in the source a signature was written.
-     * {@see self::genericFunc()} is a third door, for a caller that wants the derived binder checked against one
-     * written by hand.
+     * {@see Parser\TypeResolution::resolveSignature()} makes from where in the source a signature was written --
+     * except where $return or a parameter already answers that question for itself, by already being a function type
+     * with a non-empty binder of its own: see {@see self::rejectNestedBinder()}. {@see self::genericFunc()} is a
+     * third door, for a caller that wants the derived binder checked against one written by hand.
      *
      * @param list<Type> $parameters The types the PHP callable receives, in order. A function that is called as a
      *     receiver function -- `foo:string.substr:string(0, 3)` -- receives the expression it's called on as the first
      *     of them; see {@see Signature::receiverType()} and {@see Signature::argumentTypes()}.
+     *
+     * @throws InvalidArgumentException {@see self::rejectNestedBinder()}
      */
     public static function func(self $return, array $parameters = []): self
     {
+        self::rejectNestedBinder($return);
+        foreach ($parameters as $parameter) {
+            self::rejectNestedBinder($parameter);
+        }
         $binder = Signature::freeVariables($return, $parameters);
         return new self(new FuncShape(new Signature($return, $parameters, $binder)));
     }
@@ -181,29 +177,17 @@ final class Type implements Stringable
      *
      * @param list<string> $binder
      * @param list<Type> $parameters
+     *
+     * @throws InvalidArgumentException if $binder disagrees with the variables $return and $parameters actually
+     *     reach, in either direction, or {@see self::rejectNestedBinder()}.
      */
     public static function genericFunc(array $binder, self $return, array $parameters = []): self
     {
-        return self::genericFuncChecked($binder, $return, $parameters, Signature::freeVariables($return, $parameters));
-    }
-
-    /**
-     * {@see self::genericFunc()}'s own validation, taking $free rather than deriving it, for the one caller that has
-     * already had to walk $return and $parameters for its own purposes: {@see Parser\TypeResolution::resolveSignature()}
-     * checks its own written binder's names against a location in the source, and would otherwise make
-     * {@see self::genericFunc()} repeat the identical walk right after. Both directions are still checked here, not
-     * just the one the parser's own copy already ruled out, since this is also {@see self::genericFunc()}'s entire
-     * contract for a caller that isn't the parser.
-     *
-     * @param list<string> $binder
-     * @param list<Type> $parameters
-     * @param list<string> $free
-     *
-     * @internal
-     * @psalm-internal Eventjet\Ausdruck
-     */
-    public static function genericFuncChecked(array $binder, self $return, array $parameters, array $free): self
-    {
+        self::rejectNestedBinder($return);
+        foreach ($parameters as $parameter) {
+            self::rejectNestedBinder($parameter);
+        }
+        $free = Signature::freeVariables($return, $parameters);
         $freeSet = array_fill_keys($free, true);
         foreach ($binder as $name) {
             if (!array_key_exists($name, $freeSet)) {
@@ -265,6 +249,87 @@ final class Type implements Stringable
         return new self(new StructShape($fields));
     }
 
+    /**
+     * {@see self::bind()}'s function case: the return type always binds, and a parameter binds unless $actual's own
+     * parameter in that position is `any`, which is every {@see Lambda} parameter -- see {@see self::bind()}'s own
+     * docblock for why that's the rule rather than a position. Parameters are walked before the return type, the same
+     * order {@see Type::collectVariables()} walks a function type's own parts in, so a variable used both directly
+     * and through a nested function type is decided in the same place either way. Takes both signatures directly,
+     * rather than the two {@see Type}s they came from: {@see self::bind()} only ever calls this once it has already
+     * established, from $self's and $actual's own shapes, that both are function types, so there is nothing left here
+     * to guard against.
+     *
+     * Called from {@see FuncShape::bindSame()} rather than kept private: {@see self::canonical()} and
+     * {@see self::isNamed()}, which the `any`-skipping check below needs, are $this-bound private methods no shape
+     * class can call directly, the same reason {@see self::of()} exists for {@see TypeShape::substitute()}.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     *
+     * @param array<string, self> $bindings
+     * @return array<string, self>
+     */
+    public static function bindSignatures(Signature $signature, Signature $actualSignature, array $bindings): array
+    {
+        foreach ($signature->parameters as $index => $parameter) {
+            $actualParameter = $actualSignature->parameters[$index] ?? null;
+            if ($actualParameter === null || $actualParameter->canonical()->isNamed('any')) {
+                continue;
+            }
+            $bindings = $parameter->bind($actualParameter, $bindings);
+        }
+        return $signature->returnType->bind($actualSignature->returnType, $bindings);
+    }
+
+    /**
+     * {@see self::func()}'s and {@see self::genericFunc()}'s own guard: both doors mean "I am a complete,
+     * self-contained signature", so nothing reachable from $type -- however many lists, Options, or struct fields
+     * deep -- may itself already be a function type carrying a non-empty binder of its own. Left unchecked, such a
+     * $type would silently shadow the enclosing signature's binder instead of sharing variables with it -- the exact
+     * rank-1 rule {@see Parser\TypeResolution::resolveSignature()} enforces when a signature is written as a type
+     * string, applied here so a signature built directly through this API can't nest what the parser would reject.
+     * A caller that means to nest a function type this way wants {@see self::nestedFunc()} instead.
+     *
+     * The walk stops at a {@see AliasShape} rather than crossing into what it stands for: a named alias is its own
+     * complete, separately quantified signature -- `fn(Mapper) -> int` where `Mapper` stands for `fn<U>(U) -> U` is
+     * a fixed parameter, not a nested binder -- and {@see Parser\TypeResolution::resolveAlias()} never re-checks one
+     * against the position it's used in either, since it was already checked, if at all, when the alias was itself
+     * built.
+     *
+     * @throws InvalidArgumentException if $type reaches such a function type.
+     */
+    private static function rejectNestedBinder(self $type): void
+    {
+        $shape = $type->shape;
+        if ($shape instanceof AliasShape) {
+            return;
+        }
+        if ($shape instanceof FuncShape) {
+            if ($shape->signature->binder() !== []) {
+                throw new InvalidArgumentException(
+                    'A function type nested inside another one can\'t bind type variables of its own: a variable is '
+                        . 'quantified once, by whichever function type encloses it',
+                );
+            }
+            foreach ($shape->signature->parameters as $parameter) {
+                self::rejectNestedBinder($parameter);
+            }
+            self::rejectNestedBinder($shape->signature->returnType);
+            return;
+        }
+        if ($shape instanceof ApplicationShape) {
+            foreach ($shape->args as $arg) {
+                self::rejectNestedBinder($arg);
+            }
+            return;
+        }
+        if ($shape instanceof StructShape) {
+            foreach ($shape->fields as $field) {
+                self::rejectNestedBinder($field);
+            }
+        }
+    }
+
     private static function never(): self
     {
         return new self(new ApplicationShape('never'));
@@ -310,31 +375,6 @@ final class Type implements Stringable
         }
         $firstKey = array_key_first($value);
         return [self::fromValue($firstKey), self::fromValue($value[$firstKey])];
-    }
-
-    /**
-     * {@see self::bind()}'s function case: the return type always binds, and a parameter binds unless $actual's own
-     * parameter in that position is `any`, which is every {@see Lambda} parameter -- see {@see self::bind()}'s own
-     * docblock for why that's the rule rather than a position. Parameters are walked before the return type, the same
-     * order {@see Type::collectVariables()} walks a function type's own parts in, so a variable used both directly
-     * and through a nested function type is decided in the same place either way. Takes both signatures directly,
-     * rather than the two {@see Type}s they came from: {@see self::bind()} only ever calls this once it has already
-     * established, from $self's and $actual's own shapes, that both are function types, so there is nothing left here
-     * to guard against.
-     *
-     * @param array<string, self> $bindings
-     * @return array<string, self>
-     */
-    private static function bindSignatures(Signature $signature, Signature $actualSignature, array $bindings): array
-    {
-        foreach ($signature->parameters as $index => $parameter) {
-            $actualParameter = $actualSignature->parameters[$index] ?? null;
-            if ($actualParameter === null || $actualParameter->canonical()->isNamed('any')) {
-                continue;
-            }
-            $bindings = $parameter->bind($actualParameter, $bindings);
-        }
-        return $signature->returnType->bind($actualSignature->returnType, $bindings);
     }
 
     #[Override]
@@ -391,58 +431,36 @@ final class Type implements Stringable
         }
         $selfShape = $self->shape;
         $otherShape = $other->shape;
-        // A name alone isn't enough: {@see self::var()} takes any name without complaint, so a variable can share a
-        // name with a type it isn't -- `Type::var('list')` is not a `list<T>`, no matter that both are named `list`.
-        // $shape is what actually tells them apart; see {@see self::isNamed()}.
-        if ($selfShape::class !== $otherShape::class || $self->name !== $other->name) {
+        // A shared class alone isn't the whole answer either: two ApplicationShapes can be named differently, and
+        // two VariableShapes can too -- {@see self::var()} takes any name without complaint, so a variable can share
+        // a name with a type it isn't, `Type::var('list')` is not a `list<T>`. Each shape below answers that for
+        // itself, in {@see TypeShape::isSubtypeOfSame()}, which is also where the rest of the comparison -- args,
+        // signature, fields -- lives; a {@see AliasShape} never reaches here, having already been seen through by
+        // {@see self::canonical()} above.
+        if ($selfShape::class !== $otherShape::class) {
             return false;
         }
         if ($selfShape instanceof ApplicationShape && $otherShape instanceof ApplicationShape) {
-            // Same name, same shape, but two `ApplicationShape`s of that name can still differ argument by
-            // argument -- `map<int, string>` is not a subtype of `map<int, int>`, even though both are named `map`
-            // and neither is the `list` or `Option` case already handled above.
-            foreach ($selfShape->args as $index => $arg) {
-                $otherArg = $otherShape->args[$index] ?? null;
-                if ($otherArg === null || !$arg->isSubtypeOf($otherArg)) {
-                    return false;
-                }
-            }
+            return $selfShape->isSubtypeOfSame($otherShape);
         }
         if ($selfShape instanceof FuncShape && $otherShape instanceof FuncShape) {
-            $signature = $selfShape->signature;
-            $otherSignature = $otherShape->signature;
-            if (!$signature->returnType->isSubtypeOf($otherSignature->returnType)) {
-                return false;
-            }
-            foreach ($signature->parameters as $i => $param) {
-                $otherParam = $otherSignature->parameters[$i] ?? null;
-                if ($otherParam === null) {
-                    return false;
-                }
-                if (!$otherParam->isSubtypeOf($param)) {
-                    return false;
-                }
-            }
+            return $selfShape->isSubtypeOfSame($otherShape);
         }
         if ($selfShape instanceof StructShape && $otherShape instanceof StructShape) {
-            foreach ($otherShape->fields as $name => $fieldType) {
-                if (!array_key_exists($name, $selfShape->fields)) {
-                    return false;
-                }
-                if (!$selfShape->fields[$name]->isSubtypeOf($fieldType)) {
-                    return false;
-                }
-            }
+            return $selfShape->isSubtypeOfSame($otherShape);
         }
-        return true;
+        if ($selfShape instanceof VariableShape && $otherShape instanceof VariableShape) {
+            return $selfShape->isSubtypeOfSame($otherShape);
+        }
+        throw new LogicException(sprintf('Unhandled type shape %s', $selfShape::class));
     }
 
     /**
-     * This type as a function's signature, or null if it isn't one. The {@see Signature} returned here is always
-     * built through {@see self::func()} or {@see self::genericFunc()} -- a signature nested inside another one's own
-     * return type or parameters is only ever reached through {@see self::nestedFunc()}, never handed back on its
-     * own -- so {@see Signature::binder()} always reads the signature's own binder here, the same names it was
-     * declared with, never a deferral to something enclosing it.
+     * This type as a function's signature, or null if it isn't one. {@see Signature::binder()} answers back whatever
+     * this type was actually built with: a signature built through {@see self::func()} or {@see self::genericFunc()}
+     * reads back the binder it declared for itself, even an empty one, while one built through
+     * {@see self::nestedFunc()} -- meant to be read only as a piece of some other signature's own parameters or
+     * return type -- reads back none, whether or not a caller actually goes on to use it that way.
      */
     public function asFunction(): Signature|null
     {
@@ -508,36 +526,24 @@ final class Type implements Stringable
         $selfShape = $self->shape;
         $actualShape = $actual->shape;
         if ($selfShape instanceof VariableShape) {
-            return array_key_exists($self->name, $bindings) ? $bindings : [...$bindings, $self->name => $actual];
+            $name = $selfShape->name;
+            return array_key_exists($name, $bindings) ? $bindings : [...$bindings, $name => $actual];
         }
         $selfOption = $self->optionArg();
         if ($selfOption !== null && !$actual->isNamed('Option') && !$actual->isNamed('None')) {
             return $selfOption->bind($actual, $bindings);
         }
-        if ($selfShape::class !== $actualShape::class || $self->name !== $actual->name) {
+        if ($selfShape::class !== $actualShape::class) {
             return $bindings;
         }
         if ($selfShape instanceof FuncShape && $actualShape instanceof FuncShape) {
-            if ($selfShape->signature->hasOwnBinder()) {
-                return $bindings;
-            }
-            return self::bindSignatures($selfShape->signature, $actualShape->signature, $bindings);
+            return $selfShape->bindSame($actualShape, $bindings);
         }
         if ($selfShape instanceof StructShape && $actualShape instanceof StructShape) {
-            // A struct can be written with fewer fields than one reaches into. What the two have in common is what
-            // there is to learn from.
-            foreach (array_intersect_key($selfShape->fields, $actualShape->fields) as $name => $field) {
-                $bindings = $field->bind($actualShape->fields[$name], $bindings);
-            }
-            return $bindings;
+            return $selfShape->bindSame($actualShape, $bindings);
         }
         if ($selfShape instanceof ApplicationShape && $actualShape instanceof ApplicationShape) {
-            // Two types of the same shape can still be of different sizes: a lambda declares fewer parameters than
-            // the signature asks for. What the two have in common is what there is to learn from.
-            foreach (array_slice($selfShape->args, 0, count($actualShape->args)) as $index => $arg) {
-                $bindings = $arg->bind($actualShape->args[$index], $bindings);
-            }
-            return $bindings;
+            return $selfShape->bindSame($actualShape, $bindings);
         }
         return $bindings;
     }
@@ -594,14 +600,14 @@ final class Type implements Stringable
     /**
      * $this's own type argument, if $this is an `Option<...>` -- not seen through an alias first, so a caller that
      * needs that calls {@see self::canonical()} itself. Replaces what used to be a repeated
-     * `$shape instanceof ApplicationShape && $this->name === 'Option'` check, followed by an unguarded
+     * `$shape instanceof ApplicationShape && $shape->name === 'Option'` check, followed by an unguarded
      * `$shape->args[0]`, at every one of the five places {@see self::isSubtypeOf()} and {@see self::bind()} needed to
      * ask the same question.
      */
     private function optionArg(): self|null
     {
         $shape = $this->shape;
-        return $shape instanceof ApplicationShape && $this->name === 'Option' ? $shape->args[0] : null;
+        return $shape instanceof ApplicationShape && $shape->name === 'Option' ? $shape->args[0] : null;
     }
 
     /**
@@ -611,7 +617,7 @@ final class Type implements Stringable
     private function listArg(): self|null
     {
         $shape = $this->shape;
-        return $shape instanceof ApplicationShape && $this->name === 'list' ? $shape->args[0] : null;
+        return $shape instanceof ApplicationShape && $shape->name === 'list' ? $shape->args[0] : null;
     }
 
     /**
@@ -624,6 +630,7 @@ final class Type implements Stringable
      */
     private function isNamed(string $name): bool
     {
-        return $this->shape instanceof ApplicationShape && $this->name === $name;
+        $shape = $this->shape;
+        return $shape instanceof ApplicationShape && $shape->name === $name;
     }
 }

@@ -288,10 +288,11 @@ final class TypeResolution
             return $returnType;
         }
         // Which variables $returnType and $argTypes reach, not what a Signature's own binder is -- the question
-        // this asks either way, so it goes straight to the walk both Type::func() and Type::genericFunc() derive
-        // and check the same thing from, rather than building a Signature just to read it back off one. Computed
-        // once and handed to Type::genericFuncChecked() below, rather than left for it to walk again: that walk is
-        // the same one this method has just finished.
+        // this asks either way, so it goes straight to the walk Type::func() and Type::genericFunc() both derive
+        // and check the same thing from, rather than building a Signature just to read it back off one. This is
+        // purely for the error below, which needs a written parameter's own location to point at; Type::genericFunc()
+        // repeats the same walk once more once $binder is handed to it, rather than trusting this one, since it has
+        // no way to tell a caller who skipped straight to it from one who's already done this check.
         $free = Signature::freeVariables($returnType, $argTypes);
         $unused = self::firstUnused($node->typeParameters, $free);
         if ($unused !== null) {
@@ -307,7 +308,7 @@ final class TypeResolution
             return Type::nestedFunc($returnType, $argTypes);
         }
         $binder = array_map(static fn(Identifier $parameter): string => $parameter->name, $node->typeParameters);
-        return Type::genericFuncChecked($binder, $returnType, $argTypes, $free);
+        return Type::genericFunc($binder, $returnType, $argTypes);
     }
 
     private function resolveStruct(StructTypeNode $node): Type|TypeError

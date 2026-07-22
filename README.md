@@ -246,8 +246,10 @@ appears *inside* another one's own parameters or return type -- a lambda paramet
 generic callback taken by a custom function -- is built with `Type::nestedFunc()` instead, the PHP-API equivalent of
 writing a nested `fn(...)` with no binder of its own: its variables are shared with the signature that encloses it,
 not quantified separately, the same rule that makes a written `fn<T>(...)` nested inside another `fn<...>` a syntax
-error. Building a nested function type with `Type::func()` instead gives it a binder of its own, which shadows the
-enclosing one rather than sharing variables with it.
+error. Building a nested function type with `Type::func()` or `Type::genericFunc()` instead, when the variables it
+reaches are already quantified elsewhere, is rejected with an `InvalidArgumentException` rather than silently given a
+binder of its own that would shadow the enclosing one: a function type with no type variables of its own may still be
+nested with either door, since there's nothing there for the two to disagree about.
 
 Because the call site decides them, the inline return type is rarely worth writing: `foo:list<string>.head()` is
 already an `Option<string>`. Writing one anyway is still allowed, and is then checked against the inferred one.

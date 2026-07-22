@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use LogicException;
 use Override;
+
+use function assert;
 
 /**
  * A type variable -- see {@see Type::var()}: a placeholder a generic signature's call site decides, not a type with
@@ -18,12 +21,6 @@ final class VariableShape implements TypeShape
     public function __construct(
         public readonly string $name,
     ) {
-    }
-
-    #[Override]
-    public function name(): string
-    {
-        return $this->name;
     }
 
     /**
@@ -54,5 +51,29 @@ final class VariableShape implements TypeShape
     public function substitute(array $bindings): Type
     {
         return $bindings[$this->name] ?? Type::any();
+    }
+
+    /**
+     * Two variables of the same name are the same variable -- see {@see Type::var()}.
+     */
+    #[Override]
+    public function isSubtypeOfSame(TypeShape $other): bool
+    {
+        assert($other instanceof self);
+        return $this->name === $other->name;
+    }
+
+    /**
+     * Never actually called: {@see Type::bind()} asks whether $this is a variable, and binds it, before it ever
+     * compares two shapes' own classes against each other -- a {@see self} is never the left side of that
+     * comparison, so this never runs for real. Exists only because {@see TypeShape} requires it.
+     *
+     * @param array<string, Type> $bindings
+     * @return array<string, Type>
+     */
+    #[Override]
+    public function bindSame(TypeShape $other, array $bindings): array
+    {
+        throw new LogicException('Unreachable: Type::bind() resolves a variable on the left before comparing shapes');
     }
 }

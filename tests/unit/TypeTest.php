@@ -13,6 +13,7 @@ use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Type;
+use InvalidArgumentException;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -312,6 +313,71 @@ final class TypeTest extends TestCase
         $expression = ExpressionParser::parse('nums:list<int>.myMap(|n| n:int > 2)', $declarations);
 
         self::assertSame('list<bool>', (string)$expression->getType());
+    }
+
+    /**
+     * A consumer that reaches for {@see Type::func()} instead of {@see Type::nestedFunc()} for a nested parameter --
+     * exactly the mistake {@see self::testConsumerDeclaredGenericHigherOrderFunctionTypeChecksAndRoundTrips()} avoids
+     * by using the right door -- used to get a type back that type-checked a call correctly but printed a signature
+     * the parser itself would reject, since the inner function type quietly picked up a binder of its own that
+     * shadows the outer one instead of sharing variables with it. Rejecting it here, at the call that made the
+     * mistake, is what keeps `parse(str(t)) === t` from ever having a chance to break this way.
+     */
+    public function testFuncRejectsANestedFunctionTypeWithANonEmptyBinderOfItsOwn(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'A function type nested inside another one can\'t bind type variables of its own: a variable is '
+                . 'quantified once, by whichever function type encloses it',
+        );
+
+        $t = Type::var('T');
+        Type::func(Type::listOf($t), [Type::listOf($t), Type::func(Type::bool(), [$t])]);
+    }
+
+    /**
+     * The same guard {@see self::testFuncRejectsANestedFunctionTypeWithANonEmptyBinderOfItsOwn()} pins for
+     * {@see Type::func()} applies to {@see Type::genericFunc()} too: both doors mean "I am a complete,
+     * self-contained signature", so both reject a nested one that already claims to be one as well.
+     */
+    public function testGenericFuncRejectsANestedFunctionTypeWithANonEmptyBinderOfItsOwn(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        $t = Type::var('T');
+        Type::genericFunc(['T'], Type::listOf($t), [Type::listOf($t), Type::genericFunc(['T'], Type::bool(), [$t])]);
+    }
+
+    /**
+     * The guard {@see self::testFuncRejectsANestedFunctionTypeWithANonEmptyBinderOfItsOwn()} pins looks for a
+     * nested function type that already owns variables of its own, not merely for nesting itself: a nested function
+     * type with no type variables at all -- `doCall`'s own receiver parameter, `fn(string) -> string`, built with
+     * {@see Type::func()} rather than {@see Type::nestedFunc()} because it has no variables for the two doors to
+     * disagree about -- has nothing to shadow, so it stays legal.
+     */
+    public function testFuncAllowsNestingAFunctionTypeWithNoVariablesOfItsOwn(): void
+    {
+        $doCall = Type::func(Type::string(), [Type::func(Type::string(), [Type::string()]), Type::string()]);
+
+        self::assertSame('fn(fn(string) -> string, string) -> string', (string)$doCall);
+    }
+
+    /**
+     * A polymorphic function type and a monomorphic one over a variable belonging to an enclosing scope are
+     * different types, even though their return type and parameters read the same: `fn<T>(T) -> T`'s `T` is decided
+     * fresh by every call, while `fn(T) -> T`'s `T` -- built with {@see Type::nestedFunc()}, the way it would be
+     * found as, say, a lambda parameter inside some other signature -- is one variable some enclosing signature
+     * owns. {@see Signature::hasOwnBinder()} is the fact that tells them apart, and {@see Type::isSubtypeOf()} has
+     * to read it, or the two compare equal.
+     */
+    public function testAPolymorphicFunctionTypeIsNotEqualToAMonomorphicOneOverAFreeVariable(): void
+    {
+        $t = Type::var('T');
+        $polymorphic = Type::func($t, [$t]);
+        $monomorphic = Type::nestedFunc($t, [$t]);
+
+        self::assertFalse($polymorphic->equals($monomorphic));
+        self::assertFalse($monomorphic->equals($polymorphic));
     }
 
     /**

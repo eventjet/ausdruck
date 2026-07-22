@@ -7,6 +7,7 @@ namespace Eventjet\Ausdruck;
 use Override;
 
 use function array_map;
+use function assert;
 
 /**
  * A function type -- see {@see Type::func()}, {@see Type::genericFunc()} and {@see Type::nestedFunc()}. Whether the
@@ -22,12 +23,6 @@ final class FuncShape implements TypeShape
     public function __construct(
         public readonly Signature $signature,
     ) {
-    }
-
-    #[Override]
-    public function name(): string
-    {
-        return 'fn';
     }
 
     /**
@@ -76,5 +71,53 @@ final class FuncShape implements TypeShape
             $signature->returnType->substitute($bindings),
             array_map(static fn(Type $parameter): Type => $parameter->substitute($bindings), $signature->parameters),
         )));
+    }
+
+    /**
+     * Two function types agree on their own quantification before anything else: a polymorphic `fn<T>(T) -> T` and a
+     * monomorphic `fn(T) -> T` over a `T` some enclosing signature owns are different types, even though structurally
+     * their return type and parameters read the same -- {@see Signature::hasOwnBinder()} is what tells them apart.
+     * Once that agrees, the return type has to accept what the other returns, and each parameter -- contravariantly,
+     * the same rule an ordinary function subtyping check follows -- has to accept what it's declared to.
+     */
+    #[Override]
+    public function isSubtypeOfSame(TypeShape $other): bool
+    {
+        assert($other instanceof self);
+        $signature = $this->signature;
+        $otherSignature = $other->signature;
+        if ($signature->hasOwnBinder() !== $otherSignature->hasOwnBinder()) {
+            return false;
+        }
+        if (!$signature->returnType->isSubtypeOf($otherSignature->returnType)) {
+            return false;
+        }
+        foreach ($signature->parameters as $index => $parameter) {
+            $otherParameter = $otherSignature->parameters[$index] ?? null;
+            if ($otherParameter === null || !$otherParameter->isSubtypeOf($parameter)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * A signature with its own binder is fixed as far as this walk is concerned, the same way {@see
+     * self::collectVariables()} and {@see self::substitute()} both treat one -- there is nothing to learn from
+     * matching into a self-contained generic signature, since none of its variables are free for the enclosing walk
+     * to bind. Otherwise delegates to {@see Type::bindSignatures()}, which needs two {@see Type}-private helpers no
+     * shape class can call directly.
+     *
+     * @param array<string, Type> $bindings
+     * @return array<string, Type>
+     */
+    #[Override]
+    public function bindSame(TypeShape $other, array $bindings): array
+    {
+        if ($this->signature->hasOwnBinder()) {
+            return $bindings;
+        }
+        assert($other instanceof self);
+        return Type::bindSignatures($this->signature, $other->signature, $bindings);
     }
 }

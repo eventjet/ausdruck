@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use LogicException;
 use Override;
 
 /**
@@ -20,12 +21,6 @@ final class AliasShape implements TypeShape
         public readonly string $name,
         public readonly Type $target,
     ) {
-    }
-
-    #[Override]
-    public function name(): string
-    {
-        return $this->name;
     }
 
     /**
@@ -51,5 +46,29 @@ final class AliasShape implements TypeShape
     public function substitute(array $bindings): Type
     {
         return Type::of(new self($this->name, $this->target->substitute($bindings)));
+    }
+
+    /**
+     * Never actually called: {@see Type::isSubtypeOf()} canonicalizes both sides -- seeing through every alias --
+     * before it ever asks a shape this question, so a {@see self} is never one of the two being compared. Exists
+     * only because {@see TypeShape} requires it.
+     */
+    #[Override]
+    public function isSubtypeOfSame(TypeShape $other): bool
+    {
+        throw new LogicException('Unreachable: Type::isSubtypeOf() canonicalizes before comparing shapes');
+    }
+
+    /**
+     * Never actually called, for the same reason {@see self::isSubtypeOfSame()} never is: {@see Type::bind()}
+     * canonicalizes both sides before comparing shapes too.
+     *
+     * @param array<string, Type> $bindings
+     * @return array<string, Type>
+     */
+    #[Override]
+    public function bindSame(TypeShape $other, array $bindings): array
+    {
+        throw new LogicException('Unreachable: Type::bind() canonicalizes before comparing shapes');
     }
 }
