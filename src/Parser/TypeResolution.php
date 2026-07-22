@@ -116,9 +116,6 @@ final class TypeResolution
      */
     private static function firstUnused(array $typeParameters, array $binder): Identifier|null
     {
-        if ($typeParameters === []) {
-            return null;
-        }
         $derived = array_fill_keys($binder, true);
         foreach ($typeParameters as $parameter) {
             if (!array_key_exists($parameter->name, $derived)) {

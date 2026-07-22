@@ -7,6 +7,7 @@ namespace Eventjet\Ausdruck;
 use Override;
 
 use function array_map;
+use function assert;
 
 /**
  * A function type -- see {@see Type::func()}. Whether the {@see Signature} held here owns a binder of its own, and
@@ -72,9 +73,8 @@ final class FuncShape implements TypeShape
      * monomorphic `fn(T) -> T` over a `T` some enclosing signature owns are different types, even though structurally
      * their return type and parameters read the same -- {@see Signature::hasOwnBinder()} is what tells them apart.
      * Once that agrees, the return type has to accept what the other returns, and each parameter -- contravariantly,
-     * the same rule an ordinary function subtyping check follows -- has to accept what it's declared to. $other isn't
-     * necessarily a function type at all, so a shape mismatch is rejected here, the same way a quantification
-     * mismatch is.
+     * the same rule an ordinary function subtyping check follows -- has to accept what it's declared to. $other is
+     * guaranteed a {@see self} by {@see Type::isSubtypeOf()} before this is ever called.
      *
      * @todo Alpha-equivalence: `fn<T>(T) -> T` and `fn<U>(U) -> U` describe the same type but this doesn't say so,
      *     since neither side's binder is renamed to line up with the other's before the parameters and return type
@@ -83,9 +83,7 @@ final class FuncShape implements TypeShape
     #[Override]
     public function isSubtypeOf(TypeShape $other): bool
     {
-        if (!$other instanceof self) {
-            return false;
-        }
+        assert($other instanceof self);
         $signature = $this->signature;
         $otherSignature = $other->signature;
         if ($signature->hasOwnBinder() !== $otherSignature->hasOwnBinder()) {
@@ -110,9 +108,8 @@ final class FuncShape implements TypeShape
      * is `any`, which is every {@see Lambda} parameter -- see {@see Type::bind()}'s own docblock for why that's the
      * rule rather than a position. Parameters are walked before the return type, the same order
      * {@see self::collectVariables()} walks a function type's own parts in, so a variable used both directly and
-     * through a nested function type is decided in the same place either way. $other isn't necessarily a function
-     * type either, the same reason {@see self::isSubtypeOf()} checks it, and there is nothing to learn from one
-     * if it isn't.
+     * through a nested function type is decided in the same place either way. $other is guaranteed a {@see self} by
+     * {@see Type::bind()} before this is ever called.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
@@ -120,8 +117,9 @@ final class FuncShape implements TypeShape
     #[Override]
     public function bind(TypeShape $other, array $bindings): array
     {
+        assert($other instanceof self);
         $signature = $this->signature;
-        if ($signature->hasOwnBinder() || !$other instanceof self) {
+        if ($signature->hasOwnBinder()) {
             return $bindings;
         }
         $otherSignature = $other->signature;

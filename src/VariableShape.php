@@ -6,6 +6,8 @@ namespace Eventjet\Ausdruck;
 
 use Override;
 
+use function assert;
+
 /**
  * A type variable -- see {@see Type::var()}: a placeholder a generic signature's call site decides, not a type with
  * parts of its own, so this shape carries nothing but the name it was given.
@@ -51,19 +53,19 @@ final class VariableShape implements TypeShape
     }
 
     /**
-     * Two variables of the same name are the same variable -- see {@see Type::var()}. $other isn't necessarily one
-     * too, so a variable compared against any other shape answers false.
+     * Two variables of the same name are the same variable -- see {@see Type::var()}. $other is guaranteed a
+     * {@see self} by {@see Type::isSubtypeOf()} before this is ever called.
      */
     #[Override]
     public function isSubtypeOf(TypeShape $other): bool
     {
-        return $other instanceof self && $this->name === $other->name;
+        assert($other instanceof self);
+        return $this->name === $other->name;
     }
 
     /**
-     * Answers $bindings unchanged: {@see Type::bind()} asks whether $this is a variable, and binds it, before it
-     * ever reaches a shape comparison -- a {@see self} is never $this here in practice, but there is nothing to
-     * learn from one either way.
+     * Never actually called: {@see Type::bind()} asks whether $this is a variable, and binds it directly, before it
+     * ever reaches a shape comparison. Still implemented, since a shape has to.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>

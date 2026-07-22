@@ -25,13 +25,12 @@ use function sprintf;
  * A case here is also one of the two restrictions {@see self::isReservedName()} enforces: within the `fn<...>` binder
  * that declares it, a name a case here already spells could never again be written as the type it names, only as the
  * variable shadowing it, so {@see Parser\TypeResolution::checkTypeVariable()} rejects one when a signature is written
- * as a type string. {@see Type::var()} and {@see Type::alias()} reject the same names from the PHP builder side too --
- * not because the two PHP calls `Type::var('int')` and `Type::int()` are themselves ambiguous, they aren't, but
- * because {@see Type::__toString()} turns either one back into the written syntax the parser would then reject, and
- * this project treats `parse(str($type)) === $type` as a hard invariant. `fn` is the other restriction: not a case
- * here, since a function type is its own node shape ({@see Parser\FunctionTypeNode}), but still the one bare word
- * {@see Parser\TypeParser::parse()} always reads as introducing one, so a variable or alias named `fn` would print as
- * a bare `fn` no parser could ever read back as anything else.
+ * as a type string. {@see Type::var()} and {@see Type::alias()} reject the same names from the PHP builder side too,
+ * since {@see Type::__toString()} turns either one back into the written syntax the parser would then reject:
+ * `parse(str($type)) === $type` is a hard invariant this project holds throughout. `fn` is the other restriction: not
+ * a case here, since a function type is its own node shape ({@see Parser\FunctionTypeNode}), but still the one bare
+ * word {@see Parser\TypeParser::parse()} always reads as introducing one, so a variable or alias named `fn` would
+ * print as a bare `fn` no parser could ever read back as anything else.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck

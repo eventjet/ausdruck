@@ -7,8 +7,7 @@ namespace Eventjet\Ausdruck;
 use Override;
 
 use function array_map;
-use function array_slice;
-use function count;
+use function assert;
 
 /**
  * A name applied to its type arguments -- `list<T>`, `map<K, V>`, or a bare `int` with none. Every
@@ -63,15 +62,15 @@ final class ApplicationShape implements TypeShape
     }
 
     /**
-     * Same name, same shape, but two `ApplicationShape`s of that name can still differ argument by argument --
-     * `map<int, string>` is not a subtype of `map<int, int>`, even though both are named `map`. $other isn't
-     * necessarily an {@see ApplicationShape} at all, so a shape mismatch is rejected here, in the same breath as a
-     * name mismatch, rather than upstream.
+     * Same shape, guaranteed by {@see Type::isSubtypeOf()} before this is ever called, but two `ApplicationShape`s
+     * can still differ by name, or by argument even when the name agrees -- `map<int, string>` is not a subtype of
+     * `map<int, int>`, even though both are named `map`.
      */
     #[Override]
     public function isSubtypeOf(TypeShape $other): bool
     {
-        if (!$other instanceof self || $this->name !== $other->name) {
+        assert($other instanceof self);
+        if ($this->name !== $other->name) {
             return false;
         }
         foreach ($this->args as $index => $arg) {
@@ -84,9 +83,10 @@ final class ApplicationShape implements TypeShape
     }
 
     /**
-     * Two types of the same shape can still be of different sizes: a lambda declares fewer parameters than the
-     * signature asks for. What the two have in common is what there is to learn from -- and nothing is, if $other
-     * isn't even an {@see ApplicationShape}, or doesn't share $this's name.
+     * There is nothing to learn from $other's own arguments if the names don't even agree. Where they do, both sides
+     * have exactly as many arguments as {@see TypeConstructor::typeArgumentCount()} fixes for that name -- an
+     * `ApplicationShape` is never built any other way, see {@see Type::listOf()}, {@see Type::mapOf()} and the other
+     * scalar factories -- so unlike {@see FuncShape::bind()}'s parameters, one side is never shorter than the other.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
@@ -94,10 +94,11 @@ final class ApplicationShape implements TypeShape
     #[Override]
     public function bind(TypeShape $other, array $bindings): array
     {
-        if (!$other instanceof self || $this->name !== $other->name) {
+        assert($other instanceof self);
+        if ($this->name !== $other->name) {
             return $bindings;
         }
-        foreach (array_slice($this->args, 0, count($other->args)) as $index => $arg) {
+        foreach ($this->args as $index => $arg) {
             $bindings = $arg->bind($other->args[$index], $bindings);
         }
         return $bindings;

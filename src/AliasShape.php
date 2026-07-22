@@ -48,9 +48,8 @@ final class AliasShape implements TypeShape
     }
 
     /**
-     * Answers false honestly rather than asserting it's never asked: {@see Type::isSubtypeOf()} canonicalizes both
-     * sides -- seeing through every alias -- before it ever compares shapes, so a {@see self} is never $this here in
-     * practice, but nothing needs that to be true for this answer to still be correct.
+     * Never actually called: {@see Type::isSubtypeOf()} canonicalizes both sides -- seeing through every alias --
+     * before it ever compares shapes, so a {@see self} is never $this here. Still implemented, since a shape has to.
      */
     #[Override]
     public function isSubtypeOf(TypeShape $other): bool
@@ -59,9 +58,8 @@ final class AliasShape implements TypeShape
     }
 
     /**
-     * Answers $bindings unchanged, for the same reason {@see self::isSubtypeOf()} answers false rather than
-     * asserting unreachability: {@see Type::bind()} canonicalizes both sides before comparing shapes too, so a
-     * {@see self} is never $this here in practice, but there is nothing to learn from one either way.
+     * Never actually called, for the same reason {@see self::isSubtypeOf()} isn't: {@see Type::bind()} canonicalizes
+     * both sides before comparing shapes too.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>

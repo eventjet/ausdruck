@@ -9,6 +9,7 @@ use Override;
 use function array_intersect_key;
 use function array_key_exists;
 use function array_map;
+use function assert;
 
 /**
  * A struct, written as its fields between `{ }` rather than as a name -- see {@see Type::struct()}.
@@ -60,15 +61,13 @@ final class StructShape implements TypeShape
 
     /**
      * A struct is a subtype of another if it has at least the fields the other does, each of a subtype of the
-     * other's -- it may have more, which is what makes a struct type structural rather than nominal. $other isn't
-     * necessarily a struct at all, so a shape mismatch is rejected here rather than upstream.
+     * other's -- it may have more, which is what makes a struct type structural rather than nominal. $other is
+     * guaranteed a {@see self} by {@see Type::isSubtypeOf()} before this is ever called.
      */
     #[Override]
     public function isSubtypeOf(TypeShape $other): bool
     {
-        if (!$other instanceof self) {
-            return false;
-        }
+        assert($other instanceof self);
         foreach ($other->fields as $name => $fieldType) {
             if (!array_key_exists($name, $this->fields)) {
                 return false;
@@ -82,7 +81,7 @@ final class StructShape implements TypeShape
 
     /**
      * A struct can be written with fewer fields than one reaches into. What the two have in common is what there is
-     * to learn from -- and nothing is, if $other isn't even a struct.
+     * to learn from. $other is guaranteed a {@see self} by {@see Type::bind()} before this is ever called.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
@@ -90,9 +89,7 @@ final class StructShape implements TypeShape
     #[Override]
     public function bind(TypeShape $other, array $bindings): array
     {
-        if (!$other instanceof self) {
-            return $bindings;
-        }
+        assert($other instanceof self);
         foreach (array_intersect_key($this->fields, $other->fields) as $name => $field) {
             $bindings = $field->bind($other->fields[$name], $bindings);
         }

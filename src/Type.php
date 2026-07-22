@@ -323,22 +323,20 @@ final class Type implements Stringable
         if ($other->isNamed('any')) {
             return true;
         }
-        $selfOption = $self->optionArg();
-        if ($selfOption !== null) {
-            return $otherOption !== null && $selfOption->isSubtypeOf($otherOption);
-        }
         $selfList = $self->listArg();
         if ($selfList !== null && $selfList->isNamed('never') && $other->isNamed('map')) {
             return true;
         }
         $selfShape = $self->shape;
         $otherShape = $other->shape;
-        // Each shape decides for itself, in {@see TypeShape::isSubtypeOf()}, whether $other is even its own kind
-        // before comparing anything else -- two ApplicationShapes can be named differently, and two VariableShapes
-        // can too, {@see self::var('T')} and {@see self::var('U')} aren't the same variable -- which is also where
-        // the rest of the comparison -- args, signature, fields -- lives; a {@see AliasShape} never reaches here,
-        // having already been seen through by {@see self::canonical()} above.
-        return $selfShape->isSubtypeOf($otherShape);
+        // Same shape class, then the rest of the comparison -- name, args, signature, fields -- is that shape's own
+        // to make, in {@see TypeShape::isSubtypeOf()}; a mismatch is rejected here, the one place common to every
+        // shape, rather than duplicated as each implementation's own first check. A {@see AliasShape} never reaches
+        // here, having already been seen through by {@see self::canonical()} above -- this is also why `Option<X>`
+        // needs no case of its own above: once $self and $other are both Options, they're both ApplicationShapes
+        // of that name, and the pairwise-argument comparison below is the same recursive `X.isSubtypeOf(Y)` a
+        // dedicated case would run.
+        return $selfShape::class === $otherShape::class && $selfShape->isSubtypeOf($otherShape);
     }
 
     /**
@@ -365,14 +363,14 @@ final class Type implements Stringable
     /**
      * What $actual tells us about the variables in this type, added to what is already known. Matching is structural
      * and one-way: where the two types have the same shape, the variables on this side take the types facing them,
-     * and where they don't, there is nothing to learn and the bindings come back unchanged. $actual is seen through
-     * its aliases first, so a `Numbers` standing for `list<int>` still binds `T` in a `list<T>`, and so does a
-     * variable standing directly behind an alias, since canonicalizing happens before $actual's own shape is even
-     * asked about. $this isn't canonicalized the same way: every alias reachable from a declared parameter or return
-     * type is built through {@see self::alias()}, which never lets one reach a free variable except by quantifying
-     * it as a function's own binder -- opaque to this walk regardless, the same as any other self-contained generic
-     * function type, see {@see Signature::hasOwnBinder()} -- so there is nothing left for seeing through an alias on
-     * this side to uncover.
+     * and where they don't, there is nothing to learn and the bindings come back unchanged. Both sides are seen
+     * through their aliases first, the same as {@see self::isSubtypeOf()}, so a `Numbers` standing for `list<int>`
+     * still binds `T` in a `list<T>` on either side, and so does a variable standing directly behind an alias.
+     * Canonicalizing $this never actually uncovers a free variable an alias was hiding: every alias reachable from a
+     * declared parameter or return type is built through {@see self::alias()}, which never lets one reach a free
+     * variable except by quantifying it as a function's own binder -- opaque to this walk regardless, the same as
+     * any other self-contained generic function type, see {@see Signature::hasOwnBinder()}. Doing it anyway costs
+     * nothing and keeps {@see AliasShape::bind()} genuinely unreachable rather than merely unexercised.
      *
      * Shape, here, is the same shape {@see self::isSubtypeOf()} accepts as a match, not just equal names: $actual is
      * always the type of a value this type would have to accept, so wherever isSubtypeOf() would let $actual through
@@ -406,7 +404,7 @@ final class Type implements Stringable
      */
     public function bind(self $actual, array $bindings): array
     {
-        $self = $this;
+        $self = $this->canonical();
         $actual = $actual->canonical();
         $selfShape = $self->shape;
         $actualShape = $actual->shape;
@@ -418,7 +416,10 @@ final class Type implements Stringable
         if ($selfOption !== null && !$actual->isNamed('Option') && !$actual->isNamed('None')) {
             return $selfOption->bind($actual, $bindings);
         }
-        return $selfShape->bind($actualShape, $bindings);
+        // Same shape class, or there is nothing to learn -- the one place common to every shape a mismatch is
+        // rejected, rather than each implementation checking it as its own first step; see {@see self::isSubtypeOf()}
+        // for the same gate.
+        return $selfShape::class === $actualShape::class ? $selfShape->bind($actualShape, $bindings) : $bindings;
     }
 
     /**

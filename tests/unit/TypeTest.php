@@ -282,6 +282,159 @@ final class TypeTest extends TestCase
     }
 
     /**
+     * A fixed parameter that happens to itself already be a generic signature -- reached through an alias, the same
+     * way {@see self::testAliasingAFunctionTypeQuantifiesIt()} builds Mapper -- lends none of its own binder to a
+     * signature that merely takes it as a parameter: Mapper's own `U` is quantified by Mapper itself
+     * ({@see Signature::hasOwnBinder()}), not by whatever else Mapper is found inside -- {@see \Eventjet\Ausdruck\FuncShape}'s own-binder
+     * guard in {@see \Eventjet\Ausdruck\FuncShape::collectVariables()} is what keeps {@see Signature::freeVariables()} from seeing it.
+     * Without that guard this signature would derive a spurious `['U']` binder and print as `fn<U>(Mapper) -> int`
+     * instead of `fn(Mapper) -> int` -- the same corruption
+     * a-fixed-parameter-that-happens-to-be-generic-isnt-a-generic-parameter.txt pins for a written `fn<...>` resolved
+     * through the parser ({@see Signature::written()}); this is the same rule reached through the PHP-builder door,
+     * {@see Signature::quantified()}, instead.
+     */
+    public function testQuantifiedDoesNotBorrowABinderFromAFixedParameterThatIsAlreadyGeneric(): void
+    {
+        $mapper = Type::alias('Mapper', Type::func(Type::var('U'), [Type::var('U')]));
+
+        $quantified = Signature::quantified(Type::func(Type::int(), [$mapper]));
+
+        self::assertNotNull($quantified);
+        self::assertSame([], $quantified->binder());
+        self::assertSame('fn(Mapper) -> int', (string)$quantified);
+    }
+
+    /**
+     * The same guard, but with two variables of the enclosing signature's own already found by the time it's
+     * reached: {@see \Eventjet\Ausdruck\FuncShape::collectVariables()} answers $found back exactly as given, not a
+     * truncated copy of it -- `A` and `B`, found walking the parameters before Mapper's own position, both survive.
+     */
+    public function testQuantifiedKeepsEarlierVariablesWhenALaterParameterIsAlreadyGeneric(): void
+    {
+        $mapper = Type::alias('Mapper', Type::func(Type::var('U'), [Type::var('U')]));
+
+        $quantified = Signature::quantified(Type::func(Type::int(), [Type::var('A'), Type::var('B'), $mapper]));
+
+        self::assertNotNull($quantified);
+        self::assertSame(['A', 'B'], $quantified->binder());
+    }
+
+    /**
+     * {@see \Eventjet\Ausdruck\FuncShape::bind()}'s own-binder guard is the call-site-inference counterpart to
+     * {@see self::testQuantifiedDoesNotBorrowABinderFromAFixedParameterThatIsAlreadyGeneric()}'s
+     * {@see \Eventjet\Ausdruck\FuncShape::collectVariables()} guard: a fixed parameter that is itself an already-quantified generic
+     * function type reaches no variable of the enclosing signature's own scope -- not even one that happens to share
+     * a name with a variable Mapper's own binder captures, since `U` here names two different variables, Mapper's
+     * own and this signature's own, and only the latter may be decided by matching a call's arguments against it.
+     *
+     * Built through {@see Signature::quantified()} and {@see Signature::toType()} directly, rather than through
+     * {@see Type::alias()}: aliasing this parameter would route {@see Type::bind()} through
+     * {@see \Eventjet\Ausdruck\AliasShape::bind()}'s own unconditional no-op before ever reaching {@see \Eventjet\Ausdruck\FuncShape::bind()}, which would
+     * pin the wrong guard.
+     */
+    public function testBindDoesNotReachIntoAFixedParameterThatIsAlreadyGeneric(): void
+    {
+        $mapperSignature = Signature::quantified(Type::func(Type::var('U'), [Type::var('U')]));
+        self::assertNotNull($mapperSignature);
+        $mapper = $mapperSignature->toType();
+
+        $outer = Signature::quantified(Type::func(Type::var('U'), [$mapper, Type::var('U')]));
+        self::assertNotNull($outer);
+
+        $instantiated = $outer->instantiateForCall(Type::func(Type::string(), [Type::string()]), [Type::int()]);
+
+        self::assertSame('int', (string)$instantiated->returnType);
+    }
+
+    /**
+     * The same guard, but with two variables of the enclosing signature's own already bound by the time it's
+     * reached: {@see \Eventjet\Ausdruck\FuncShape::bind()} answers $bindings back exactly as given, not a truncated
+     * copy of it -- `A` and `B`, bound from the receiver and the first argument before Mapper's own position, both
+     * survive into the substituted return type.
+     */
+    public function testBindKeepsEarlierBindingsWhenALaterParameterIsAlreadyGeneric(): void
+    {
+        $mapperSignature = Signature::quantified(Type::func(Type::var('U'), [Type::var('U')]));
+        self::assertNotNull($mapperSignature);
+        $mapper = $mapperSignature->toType();
+
+        $outer = Signature::quantified(Type::func(
+            Type::struct(['a' => Type::var('A'), 'b' => Type::var('B')]),
+            [Type::var('A'), Type::var('B'), $mapper],
+        ));
+        self::assertNotNull($outer);
+
+        $instantiated = $outer->instantiateForCall(
+            Type::int(),
+            [Type::string(), Type::func(Type::string(), [Type::string()])],
+        );
+
+        self::assertSame('{ a: int, b: string }', (string)$instantiated->returnType);
+    }
+
+    /**
+     * {@see \Eventjet\Ausdruck\FuncShape::bind()} skips a parameter position whose actual type is `any` -- every
+     * {@see Lambda} parameter -- without abandoning the walk: a later, real parameter still decides whatever it
+     * faces. Two parameters in one nested function type, the first `any` and the second not, is what tells apart
+     * skipping this one position from stopping the walk there -- a signature with only one bindable parameter, or
+     * one where the `any` position comes last, reads the same either way.
+     */
+    public function testBindSkipsAnAnyParameterWithoutAbandoningTheWalk(): void
+    {
+        $outer = Signature::quantified(
+            Type::func(Type::var('U'), [Type::func(Type::bool(), [Type::var('T'), Type::var('U')])]),
+        );
+        self::assertNotNull($outer);
+
+        $instantiated = $outer->instantiateForCall(Type::func(Type::bool(), [Type::any(), Type::string()]), []);
+
+        self::assertSame('string', (string)$instantiated->returnType);
+    }
+
+    /**
+     * A shape mismatch -- here, `list<C>` faced with a `map` at a call site that's already wrong in some other way,
+     * before {@see Expr::call()}'s own checks get to say so -- teaches {@see \Eventjet\Ausdruck\ApplicationShape::bind()}
+     * nothing, but it doesn't undo what earlier parameters, walked first, already taught: `A` and `B` are decided by
+     * the receiver and the first argument before the second argument's mismatch is ever reached.
+     */
+    public function testBindStopsLearningAtAShapeMismatchWithoutLosingEarlierBindings(): void
+    {
+        $outer = Signature::quantified(Type::func(
+            Type::struct(['a' => Type::var('A'), 'b' => Type::var('B')]),
+            [Type::var('A'), Type::var('B'), Type::listOf(Type::var('C'))],
+        ));
+        self::assertNotNull($outer);
+
+        $instantiated = $outer->instantiateForCall(
+            Type::int(),
+            [Type::string(), Type::mapOf(Type::int(), Type::string())],
+        );
+
+        self::assertSame('{ a: int, b: string }', (string)$instantiated->returnType);
+    }
+
+    /**
+     * A struct can be written with fewer fields than the value actually reaching it has --
+     * {@see \Eventjet\Ausdruck\StructShape::bind()} learns only from the fields the two have in common; field types
+     * the declared side doesn't mention are neither read nor allowed to decide a variable declared elsewhere.
+     */
+    public function testBindLearnsOnlyFromTheStructFieldsBothSidesHave(): void
+    {
+        $outer = Signature::quantified(Type::func(
+            Type::struct(['name' => Type::var('T'), 'shoeSize' => Type::var('U')]),
+            [Type::struct(['name' => Type::var('T'), 'shoeSize' => Type::var('U')])],
+        ));
+        self::assertNotNull($outer);
+
+        $instantiated = $outer->instantiateForCall(
+            Type::struct(['name' => Type::string(), 'shoeSize' => Type::int(), 'age' => Type::int()]),
+            [],
+        );
+
+        self::assertSame('{ name: string, shoeSize: int }', (string)$instantiated->returnType);
+    }
+
+    /**
      * A consumer's own generic higher-order function -- one whose parameter is itself a generic function type, the
      * way {@see \Eventjet\Ausdruck\BuiltinFunctions}' own `map` is -- builds that parameter through
      * {@see Type::func()} too, the same door as the outer signature: the inner function type's `T` and `U` are the

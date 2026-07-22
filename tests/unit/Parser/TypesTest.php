@@ -25,6 +25,10 @@ final class TypesTest extends TestCase
     {
         yield 'Unknown function return type' => ['fn() -> Nope', 'Unknown type Nope'];
         yield 'Unknown function parameter' => ['fn(Nope) -> string', 'Unknown type Nope'];
+        // Nope isn't a registered alias, so it's unknown regardless of the arguments written after it -- not the
+        // "does not accept arguments" arity error a real alias's own name gets for the same written syntax, see
+        // ExpressionParserErrorTest's own "generic syntax on an alias" case.
+        yield 'Unknown type with type arguments' => ['Nope<string>', 'Unknown type Nope'];
     }
 
     #[DataProvider('resolveTypeErrorsCases')]
