@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use function array_keys;
 use function array_map;
 use function array_slice;
 use function count;
@@ -12,42 +11,32 @@ use function count;
 /**
  * A function type read as what it's for: a return type, a receiver, and the arguments a call passes in parentheses.
  *
- * $typeVariables is not taken as an argument: it is derived in the constructor from where {@see Type::var()} actually
- * turns out to be used in $returnType and $parameters, so a `Signature`, built however it was built, can't disagree
- * with its own return type and parameters about which names are quantified -- there's nothing to build it from that
- * doesn't already answer that question. {@see Type::asFunction()} is the way to get one starting from a {@see Type}.
+ * $typeVariables is not derived by this constructor: a signature built directly through it doesn't yet know whether
+ * it's a complete top-level declaration or another {@see Type::func()}'s own parameter or return type -- only the
+ * first of those owns a binder at all, since rank-1 polymorphism gives every variable reachable inside a signature
+ * to whichever one encloses it, and there is nothing about the return type and parameters alone that says which one
+ * this signature will turn out to be. {@see Type::asFunction()} is the way to get a signature read as a complete
+ * top-level declaration, with its binder derived; that's also what {@see Type::__toString()} prints back.
  *
  * @api
  */
 final class Signature
 {
     /**
-     * The names this function type's own `fn<...>` binder declares, in the order first found walking $parameters
-     * then $returnType -- receiver first, then the rest of the parameters, then the return type, the same order
-     * {@see self::instantiateForCall()} decides them in -- without a duplicate, since one variable used twice is
-     * still one name. What {@see Type::__toString()} prints back, and what {@see self::instantiateForCall()} has
-     * something to substitute for.
-     *
-     * @var list<string>
-     */
-    public readonly array $typeVariables;
-
-    /**
      * @param list<Type> $parameters The types the PHP callable receives, in order, receiver first -- `substr` is
      *     declared as `fn(string, int, int) -> string` and called as `foo:string.substr:string(0, 3)`, so its
      *     parameters are `[string, int, int]` and `foo` is checked against the first of them; see
      *     {@see self::receiverType()} and {@see self::argumentTypes()}.
+     * @param list<string> $typeVariables The names this signature's own `fn<...>` binder declares, in the order
+     *     first found walking $parameters then $returnType, without a duplicate -- empty unless something has
+     *     already derived it, which nothing but {@see Type::asFunction()} does; see this class's own docblock for
+     *     why that isn't this constructor.
      */
     public function __construct(
         public readonly Type $returnType,
         public readonly array $parameters = [],
+        public readonly array $typeVariables = [],
     ) {
-        $found = [];
-        foreach ($this->parameters as $parameter) {
-            $found = Type::collectVariables($parameter, $found);
-        }
-        $found = Type::collectVariables($this->returnType, $found);
-        $this->typeVariables = array_keys($found);
     }
 
     /**
@@ -89,11 +78,11 @@ final class Signature
      * says what was expected and {@see Expr::call()}'s receiver and argument checks report it, pointing at the
      * expression that's wrong.
      *
-     * A signature that names no variable at all is returned unchanged rather than substituted for nothing: since
-     * {@see self::__construct()} derives $typeVariables from where {@see Type::var()} is actually used, an empty
-     * $typeVariables here means there is no variable left anywhere in $returnType or $parameters for
-     * {@see Type::bind()} to find, so substituting would walk the whole signature only to rebuild it unchanged.
-     * Skipping it is purely that optimization -- correct either way, not load-bearing for either.
+     * A signature that names no variable at all is returned unchanged rather than substituted for nothing: this is
+     * only ever called on a signature obtained from {@see Type::asFunction()}, so an empty $typeVariables here means
+     * there is no variable left anywhere in $returnType or $parameters for {@see Type::bind()} to find, and
+     * substituting would walk the whole signature only to rebuild it unchanged. Skipping it is purely that
+     * optimization -- correct either way, not load-bearing for either.
      *
      * @param list<Type> $argumentTypes
      */

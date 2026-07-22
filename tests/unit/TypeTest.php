@@ -205,6 +205,23 @@ final class TypeTest extends TestCase
         self::assertTrue($instantiated->receiverType()?->isSubtypeOf(Type::listOf(Type::int())) ?? false);
     }
 
+    /**
+     * bind() canonicalizes both sides before asking whether either one is a variable, not just before comparing
+     * names: an alias standing directly for a variable -- not merely for a container of one, see
+     * {@see self::testVariableUnderAnAliasOnTheSignatureSideIsBound()} -- has to be seen through before that
+     * question is asked, or the variable case is skipped on the raw, still-aliased type and the name comparison
+     * that follows compares the variable's own name against the actual type's, which never match.
+     */
+    public function testVariableDirectlyBehindAnAliasIsBound(): void
+    {
+        $signature = Type::func(Type::var('T'), [Type::listOf(Type::alias('Elem', Type::var('T')))])->asFunction();
+        self::assertNotNull($signature);
+
+        $instantiated = $signature->instantiateForCall(Type::listOf(Type::int()), []);
+
+        self::assertTrue($instantiated->returnType->equals(Type::int()));
+    }
+
     public function testAliasTypeEqualsAliasTarget(): void
     {
         $concrete = Type::listOf(Type::string());

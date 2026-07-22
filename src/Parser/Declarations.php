@@ -10,7 +10,6 @@ use Eventjet\Ausdruck\Type;
 use InvalidArgumentException;
 
 use function array_key_exists;
-use function assert;
 use function sprintf;
 
 final class Declarations
@@ -34,14 +33,7 @@ final class Declarations
         public readonly array $variables = [],
         array $functions = [],
     ) {
-        $fns = [];
-        foreach (BuiltinFunctions::types() as $name => $type) {
-            $signature = $type->asFunction();
-            // Every built-in is declared with Type::func(), so this never actually fails; the assert is here for the
-            // type checker, not because this can go wrong at runtime.
-            assert($signature !== null);
-            $fns[$name] = $signature;
-        }
+        $fns = BuiltinFunctions::signatures();
         foreach ($functions as $name => $type) {
             if (array_key_exists($name, $fns)) {
                 throw new InvalidArgumentException(sprintf('Can\'t override built-in function %s', $name));

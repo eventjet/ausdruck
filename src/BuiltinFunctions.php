@@ -8,6 +8,7 @@ use Countable;
 
 use function array_map;
 use function array_slice;
+use function assert;
 use function count;
 use function in_array;
 use function substr;
@@ -46,6 +47,22 @@ final class BuiltinFunctions
     public static function types(): array
     {
         return array_map(static fn(array $fn): Type => $fn['type'], self::definitions());
+    }
+
+    /**
+     * The declared signature of every built-in, keyed by name, for use at parse time. Every entry in
+     * {@see self::definitions()} is declared with {@see Type::func()}, so {@see Type::asFunction()} is never null
+     * here -- the assert is for the type checker, not because this can go wrong at runtime.
+     *
+     * @return array<string, Signature>
+     */
+    public static function signatures(): array
+    {
+        return array_map(static function (Type $type): Signature {
+            $signature = $type->asFunction();
+            assert($signature !== null);
+            return $signature;
+        }, self::types());
     }
 
     /**

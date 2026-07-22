@@ -12,12 +12,12 @@ use function array_intersect_key;
 use function array_is_list;
 use function array_key_exists;
 use function array_key_first;
+use function array_keys;
 use function array_map;
 use function array_slice;
 use function count;
 use function get_object_vars;
 use function gettype;
-use function implode;
 use function is_array;
 use function is_string;
 use function sprintf;
@@ -28,47 +28,62 @@ use function sprintf;
 final class Type implements Stringable
 {
     /**
-     * @param list<self> $args
-     * @param array<string, Type> $fields
+     * The type arguments applied to {@see self::$name}, e.g. `T` and `U` in `map<T, U>` -- empty unless $shape is an
+     * {@see ApplicationShape}.
+     *
+     * @var list<self>
      */
+    public readonly array $args;
+
+    /**
+     * A struct's fields, keyed by name -- empty unless $shape is a {@see StructShape}; see {@see self::struct()}.
+     *
+     * @var array<string, self>
+     */
+    public readonly array $fields;
+
+    /**
+     * The type this one is an alias for -- null unless $shape is an {@see AliasShape}; see {@see self::alias()}.
+     */
+    public readonly self|null $aliasFor;
+
     private function __construct(
         public readonly string $name,
-        public readonly array $args = [],
-        public readonly self|null $aliasFor = null,
-        public readonly array $fields = [],
-        private readonly TypeKind $kind = TypeKind::Named,
-        private readonly Signature|null $signature = null,
+        private readonly TypeShape $shape,
     ) {
+        $this->args = $shape instanceof ApplicationShape ? $shape->args : [];
+        $this->fields = $shape instanceof StructShape ? $shape->fields : [];
+        $this->aliasFor = $shape instanceof AliasShape ? $shape->target : null;
     }
 
     public static function string(): self
     {
-        return new self('string');
+        return new self('string', new ApplicationShape());
     }
 
     public static function int(): self
     {
-        return new self('int');
+        return new self('int', new ApplicationShape());
     }
 
     public static function float(): self
     {
-        return new self('float');
+        return new self('float', new ApplicationShape());
     }
 
     public static function bool(): self
     {
-        return new self('bool');
+        return new self('bool', new ApplicationShape());
     }
 
     public static function listOf(self $item): self
     {
-        return new self('list', [$item]);
+        return new self('list', new ApplicationShape([$item]));
     }
 
     public static function mapOf(self $keys, self $values): self
     {
-        return new self('map', [$keys, $values]);
+        return new self('map', new ApplicationShape([$keys, $values]));
     }
 
     /**
@@ -77,20 +92,19 @@ final class Type implements Stringable
      * reads back as arguments applied to Bag and is rejected. Everything that needs to see through the name calls
      * {@see self::canonical()}.
      *
-     * $name is never checked against what $type itself is a {@see TypeKind} of: an alias's own kind is always
-     * {@see TypeKind::Named} regardless, since it prints as its own name ({@see self::toString()}) rather than as
-     * whatever it stands for, so `self::alias('Struct', ...)` prints as `Struct` and `self::alias('fn', ...)` prints
-     * as `fn`, neither one reachable through the checks that read {@see TypeKind::Struct} or a non-null
-     * {@see self::$signature} to mean the thing itself.
+     * $name is never checked against what $type itself is a shape of: an alias's own shape is always an
+     * {@see AliasShape}, since it prints as its own name ({@see self::toString()}) rather than as whatever it stands
+     * for -- so `self::alias('Struct', ...)` prints as `Struct` and `self::alias('fn', ...)` prints as `fn`, neither
+     * one reachable through the checks that look for a {@see StructShape} or a {@see FuncShape}.
      */
     public static function alias(string $name, self $type): self
     {
-        return new self($name, aliasFor: $type);
+        return new self($name, new AliasShape($type));
     }
 
     public static function any(): self
     {
-        return new self('any');
+        return new self('any', new ApplicationShape());
     }
 
     /**
@@ -99,8 +113,8 @@ final class Type implements Stringable
      * `list<string>` is checked against `fn(list<string>) -> Option<string>`; see {@see Signature::instantiateForCall()}.
      *
      * Variables are quantified at the top of the signature they appear in, so there is no binder to build here and two
-     * variables of the same name in one signature are the same variable -- {@see Signature::__construct()} derives
-     * that binder from where the variable turns out to be used, once the whole signature exists to look at.
+     * variables of the same name in one signature are the same variable -- {@see self::asFunction()} derives that
+     * binder from where the variable turns out to be used, once the whole signature exists to look at.
      *
      * A name a type constructor already spells, like `int` or `list`, is rejected as a type variable when a signature
      * is written as a type string -- see {@see Parser\TypeResolution::checkTypeVariable()} -- because within that
@@ -111,7 +125,7 @@ final class Type implements Stringable
      */
     public static function var(string $name): self
     {
-        return new self($name, kind: TypeKind::Variable);
+        return new self($name, new VariableShape());
     }
 
     /**
@@ -119,8 +133,11 @@ final class Type implements Stringable
      * which is also the only thing {@see self::asFunction()} ever returns: nothing outside this class reads a
      * function type any other way. The binder itself is never taken as an argument here -- rank-1 polymorphism means
      * every {@see Type::var()} reachable from $return or $parameters, at any depth, belongs to this signature and no
-     * other, so {@see Signature::__construct()} derives the binder from where those variables turn out to be, rather
-     * than this constructor validating a declared list against them; see that constructor's own docblock.
+     * other, so {@see self::asFunction()} derives the binder from where those variables turn out to be, rather than
+     * this constructor validating a declared list against them.
+     *
+     * The {@see Signature} stored here carries no binder of its own -- see {@see FuncShape}'s own docblock for why
+     * that can't be decided yet at this point.
      *
      * @param list<Type> $parameters The types the PHP callable receives, in order. A function that is called as a
      *     receiver function -- `foo:string.substr:string(0, 3)` -- receives the expression it's called on as the first
@@ -128,7 +145,7 @@ final class Type implements Stringable
      */
     public static function func(self $return, array $parameters = []): self
     {
-        return new self('fn', signature: new Signature($return, $parameters));
+        return new self('fn', new FuncShape(new Signature($return, $parameters)));
     }
 
     public static function fromValue(mixed $value): self
@@ -152,7 +169,7 @@ final class Type implements Stringable
 
     public static function option(self $some): self
     {
-        return new self('Option', [$some]);
+        return new self('Option', new ApplicationShape([$some]));
     }
 
     public static function some(self $some): self
@@ -162,7 +179,7 @@ final class Type implements Stringable
 
     public static function none(): self
     {
-        return new self('None');
+        return new self('None', new ApplicationShape());
     }
 
     /**
@@ -170,32 +187,35 @@ final class Type implements Stringable
      */
     public static function struct(array $fields): self
     {
-        return new self('Struct', fields: $fields, kind: TypeKind::Struct);
+        return new self('Struct', new StructShape($fields));
+    }
+
+    private static function never(): self
+    {
+        return new self('never', new ApplicationShape());
     }
 
     /**
      * Every {@see self::var()} reachable from $type, at any depth, folded into $found in the order first seen. A
-     * nested function type's own parameters and return type are walked parameters-first-then-return, same as
-     * {@see Signature::__construct()} walks its own -- one order, so a variable used both directly and through a
+     * nested function type's own parameters and return type are walked parameters-first-then-return, same order
+     * {@see self::deriveTypeVariables()} walks its own -- one order, so a variable used both directly and through a
      * nested function type is still found in the same place either way.
-     *
-     * @internal
-     * @psalm-internal Eventjet\Ausdruck
      *
      * @param array<string, true> $found
      * @return array<string, true>
      */
-    public static function collectVariables(self $type, array $found): array
+    private static function collectVariables(self $type, array $found): array
     {
-        if ($type->kind === TypeKind::Variable) {
+        $shape = $type->shape;
+        if ($shape instanceof VariableShape) {
             $found[$type->name] = true;
             return $found;
         }
-        if ($type->signature !== null) {
-            foreach ($type->signature->parameters as $parameter) {
+        if ($shape instanceof FuncShape) {
+            foreach ($shape->signature->parameters as $parameter) {
                 $found = self::collectVariables($parameter, $found);
             }
-            $found = self::collectVariables($type->signature->returnType, $found);
+            $found = self::collectVariables($shape->signature->returnType, $found);
         }
         foreach ($type->args as $arg) {
             $found = self::collectVariables($arg, $found);
@@ -209,9 +229,27 @@ final class Type implements Stringable
         return $found;
     }
 
-    private static function never(): self
+    /**
+     * The names $signature's own `fn<...>` binder declares, in the order first found walking its parameters then its
+     * return type -- receiver first, then the rest of the parameters, then the return type, the same order
+     * {@see Signature::instantiateForCall()} decides them in -- without a duplicate, since one variable used twice is
+     * still one name.
+     *
+     * Only ever called on a signature being read as a complete top-level declaration -- {@see self::asFunction()} and
+     * the outermost function type in a {@see self::toString()} printout -- since a signature reached through another
+     * one's own parameters or return type, however many lists, Options or struct fields deep, owns none of the
+     * variables reachable inside it; whichever signature encloses it does.
+     *
+     * @return list<string>
+     */
+    private static function deriveTypeVariables(Signature $signature): array
     {
-        return new self('never');
+        $found = [];
+        foreach ($signature->parameters as $parameter) {
+            $found = self::collectVariables($parameter, $found);
+        }
+        $found = self::collectVariables($signature->returnType, $found);
+        return array_keys($found);
     }
 
     /**
@@ -257,11 +295,26 @@ final class Type implements Stringable
     }
 
     /**
-     * @param list<string> $typeVariables
+     * {@see self::bind()}'s function case: the return type always binds, and a parameter binds unless $actual's own
+     * parameter in that position is `any`, which is every {@see Lambda} parameter -- see {@see self::bind()}'s own
+     * docblock for why that's the rule rather than a position. Takes both signatures directly, rather than the two
+     * {@see Type}s they came from: {@see self::bind()} only ever calls this once it has already established, from
+     * $self's and $actual's own shapes, that both are function types, so there is nothing left here to guard against.
+     *
+     * @param array<string, self> $bindings
+     * @return array<string, self>
      */
-    private static function binderString(array $typeVariables): string
+    private static function bindSignatures(Signature $signature, Signature $actualSignature, array $bindings): array
     {
-        return $typeVariables === [] ? '' : sprintf('<%s>', implode(', ', $typeVariables));
+        $bindings = $signature->returnType->bind($actualSignature->returnType, $bindings);
+        foreach ($signature->parameters as $index => $parameter) {
+            $actualParameter = $actualSignature->parameters[$index] ?? null;
+            if ($actualParameter === null || $actualParameter->canonical()->isAny()) {
+                continue;
+            }
+            $bindings = $parameter->bind($actualParameter, $bindings);
+        }
+        return $bindings;
     }
 
     #[Override]
@@ -315,25 +368,20 @@ final class Type implements Stringable
         }
         // A name alone isn't enough: {@see self::var()} takes any name without complaint, so a variable can share a
         // name with a type it isn't -- `Type::var('list')` is not a `list<T>`, no matter that both are named `list`.
-        // $kind is what actually tells them apart; see {@see self::isNamed()}.
-        if ($self->kind !== $other->kind || $self->name !== $other->name) {
+        // $shape is what actually tells them apart; see {@see self::isNamed()}.
+        if ($self->shape::class !== $other->shape::class || $self->name !== $other->name) {
             return false;
         }
         if ($self->isNamed('list')) {
             return $self->args[0]->isSubtypeOf($other->args[0]);
         }
-        // A function type is the one shape with a non-null $signature; see {@see self::func()}.
-        if ($self->signature !== null) {
-            $otherSignature = $other->signature;
-            if ($otherSignature === null) {
-                // Same name, but $other isn't actually a function type -- e.g. a Type::var('fn') the caller built
-                // directly, bypassing the parser. Not a function type of any kind, so not a matching one either.
+        if ($self->shape instanceof FuncShape && $other->shape instanceof FuncShape) {
+            $signature = $self->shape->signature;
+            $otherSignature = $other->shape->signature;
+            if (!$signature->returnType->isSubtypeOf($otherSignature->returnType)) {
                 return false;
             }
-            if (!$self->signature->returnType->isSubtypeOf($otherSignature->returnType)) {
-                return false;
-            }
-            foreach ($self->signature->parameters as $i => $param) {
+            foreach ($signature->parameters as $i => $param) {
                 $otherParam = $otherSignature->parameters[$i] ?? null;
                 if ($otherParam === null) {
                     return false;
@@ -343,7 +391,7 @@ final class Type implements Stringable
                 }
             }
         }
-        if ($self->kind === TypeKind::Struct) {
+        if ($self->shape instanceof StructShape) {
             foreach ($other->fields as $name => $fieldType) {
                 if (!array_key_exists($name, $self->fields)) {
                     return false;
@@ -357,23 +405,28 @@ final class Type implements Stringable
     }
 
     /**
-     * This type as a function's signature, or null if it isn't one: only {@see self::func()} builds a type with a
-     * {@see Signature} to return here, and {@see Signature::__construct()} has already derived its binder by the time
-     * it's stored on {@see self::$signature} -- rank-1 polymorphism means every {@see self::var()} reachable from the
-     * return type or a parameter, at any depth, is quantified by this signature and no other, since a function type
-     * nested inside this one's return type or parameters can never carry a binder of its own (rejected in written
-     * syntax by {@see Parser\TypeResolution::resolveSignature()}, and unrepresentable through this API in the first
-     * place, since {@see self::func()} takes no binder a caller could nest one into). So there is nothing left to do
-     * here but hand back what's already there.
+     * This type as a function's signature, or null if it isn't one, with its own `fn<...>` binder derived and
+     * attached: rank-1 polymorphism means every {@see self::var()} reachable from the return type or a parameter, at
+     * any depth, is quantified by this signature and no other, since a function type nested inside this one's return
+     * type or parameters can never carry a binder of its own (rejected in written syntax by
+     * {@see Parser\TypeResolution::resolveSignature()}, and unrepresentable through this API in the first place,
+     * since {@see self::func()} takes no binder a caller could nest one into) -- which is exactly why the
+     * {@see Signature} {@see self::func()} stores has no binder of its own; see {@see FuncShape}. Deriving one is
+     * what this method is for.
      */
     public function asFunction(): Signature|null
     {
-        return $this->canonical()->signature;
+        $shape = $this->canonical()->shape;
+        if (!$shape instanceof FuncShape) {
+            return null;
+        }
+        $signature = $shape->signature;
+        return new Signature($signature->returnType, $signature->parameters, self::deriveTypeVariables($signature));
     }
 
     public function isStruct(): bool
     {
-        return $this->canonical()->kind === TypeKind::Struct;
+        return $this->canonical()->shape instanceof StructShape;
     }
 
     public function getFieldType(string $name): self|null
@@ -386,7 +439,8 @@ final class Type implements Stringable
      * and one-way: where the two types have the same shape, the variables on this side take the types facing them,
      * and where they don't, there is nothing to learn and the bindings come back unchanged. Both sides are seen
      * through their aliases first, so a `Numbers` standing for `list<int>` still binds `T` in a `list<T>` regardless
-     * of which side names the alias and which spells the type out.
+     * of which side names the alias and which spells the type out -- and so does a variable standing behind an alias
+     * on either side, since canonicalizing happens before this type's own shape is even asked about.
      *
      * Shape, here, is the same shape {@see self::isSubtypeOf()} accepts as a match, not just equal names: $actual is
      * always the type of a value this type would have to accept, so wherever isSubtypeOf() would let $actual through
@@ -407,7 +461,7 @@ final class Type implements Stringable
      *
      * This is the recursive walk that applies to any type, not just a function's parameters, which is why it lives
      * here rather than on {@see Signature}; nothing outside the type system should call it directly. The function
-     * case itself is {@see self::bindFunction()}.
+     * case itself is {@see self::bindSignatures()}.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -417,20 +471,19 @@ final class Type implements Stringable
      */
     public function bind(self $actual, array $bindings): array
     {
-        if ($this->kind === TypeKind::Variable) {
-            return array_key_exists($this->name, $bindings) ? $bindings : [...$bindings, $this->name => $actual];
-        }
         $self = $this->canonical();
         $actual = $actual->canonical();
+        if ($self->shape instanceof VariableShape) {
+            return array_key_exists($self->name, $bindings) ? $bindings : [...$bindings, $self->name => $actual];
+        }
         if ($self->name === 'Option' && !$actual->isOption() && !$actual->isNone()) {
             return $self->args[0]->bind($actual, $bindings);
         }
-        if ($self->name !== $actual->name) {
+        if ($self->shape::class !== $actual->shape::class || $self->name !== $actual->name) {
             return $bindings;
         }
-        // A function type is the one shape with a non-null $signature; see {@see self::func()}.
-        if ($self->signature !== null) {
-            return $self->bindFunction($actual, $bindings);
+        if ($self->shape instanceof FuncShape && $actual->shape instanceof FuncShape) {
+            return self::bindSignatures($self->shape->signature, $actual->shape->signature, $bindings);
         }
         // Two types of the same shape can still be of different sizes: a lambda declares fewer parameters than the
         // signature asks for, and a struct is written with fewer fields than one reaches into. What the two have in
@@ -446,10 +499,11 @@ final class Type implements Stringable
 
     /**
      * This type with every variable replaced by what it was bound to, and every variable nothing bound replaced by
-     * `any`. A function type is rebuilt with a fresh {@see Signature} over the substituted return type and
-     * parameters rather than reusing the old one, so its binder is re-derived rather than carried over -- and comes
-     * back empty, since substitution replaces every variable, bound or not, leaving none for
-     * {@see Signature::__construct()} to find.
+     * `any`. A function type is rebuilt with a fresh, binder-less {@see Signature} over the substituted return type
+     * and parameters -- the same starting point {@see self::func()} itself builds from, see {@see FuncShape} -- so a
+     * substituted function type's binder is derived again from scratch if it's ever read through
+     * {@see self::asFunction()}, and comes back empty, since substitution replaces every variable, bound or not,
+     * leaving none for {@see self::deriveTypeVariables()} to find.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -458,87 +512,61 @@ final class Type implements Stringable
      */
     public function substitute(array $bindings): self
     {
-        if ($this->kind === TypeKind::Variable) {
+        $shape = $this->shape;
+        if ($shape instanceof VariableShape) {
             return $bindings[$this->name] ?? self::any();
         }
-        if ($this->signature !== null) {
+        if ($shape instanceof FuncShape) {
+            $signature = $shape->signature;
             return new self(
                 $this->name,
-                aliasFor: $this->aliasFor?->substitute($bindings),
-                signature: new Signature(
-                    $this->signature->returnType->substitute($bindings),
+                new FuncShape(new Signature(
+                    $signature->returnType->substitute($bindings),
                     array_map(
                         static fn(self $parameter): self => $parameter->substitute($bindings),
-                        $this->signature->parameters,
+                        $signature->parameters,
                     ),
+                )),
+            );
+        }
+        if ($shape instanceof AliasShape) {
+            return new self($this->name, new AliasShape($shape->target->substitute($bindings)));
+        }
+        if ($shape instanceof StructShape) {
+            return new self(
+                $this->name,
+                new StructShape(
+                    array_map(static fn(self $field): self => $field->substitute($bindings), $shape->fields),
                 ),
             );
         }
         return new self(
             $this->name,
-            array_map(static fn(self $arg): self => $arg->substitute($bindings), $this->args),
-            $this->aliasFor?->substitute($bindings),
-            array_map(static fn(self $field): self => $field->substitute($bindings), $this->fields),
-            $this->kind,
+            new ApplicationShape(array_map(static fn(self $arg): self => $arg->substitute($bindings), $this->args)),
         );
-    }
-
-    /**
-     * {@see self::bind()}'s Func case: the return type always binds, and a parameter binds unless $actual's own
-     * parameter in that position is `any`, which is every {@see Lambda} parameter -- see {@see self::bind()}'s own
-     * docblock for why that's the rule rather than a position. $this must already be canonical and have a non-null
-     * {@see self::$signature}; call {@see self::bind()} instead.
-     *
-     * @param array<string, self> $bindings
-     * @return array<string, self>
-     */
-    private function bindFunction(self $actual, array $bindings): array
-    {
-        $signature = $this->signature;
-        $actualSignature = $actual->signature;
-        if ($signature === null || $actualSignature === null) {
-            return $bindings;
-        }
-        $bindings = $signature->returnType->bind($actualSignature->returnType, $bindings);
-        foreach ($signature->parameters as $index => $parameter) {
-            $actualParameter = $actualSignature->parameters[$index] ?? null;
-            if ($actualParameter === null || $actualParameter->canonical()->isAny()) {
-                continue;
-            }
-            $bindings = $parameter->bind($actualParameter, $bindings);
-        }
-        return $bindings;
     }
 
     private function toString(bool $insideSignatureScope): string
     {
-        if ($this->kind === TypeKind::Struct) {
-            if ($this->fields === []) {
-                return '{}';
-            }
+        $shape = $this->shape;
+        if ($shape instanceof StructShape) {
             $fields = [];
             foreach ($this->fields as $name => $fieldType) {
                 $fields[] = $name . ': ' . $fieldType->toString($insideSignatureScope);
             }
-            return '{ ' . implode(', ', $fields) . ' }';
+            return TypeSyntax::struct($fields);
         }
-        // A function type is the one shape with a non-null $signature; see {@see self::func()}.
-        if ($this->signature !== null) {
-            $signature = $this->signature;
+        if ($shape instanceof FuncShape) {
+            $signature = $shape->signature;
             // A function type already inside another one's own return type or parameters can't have a binder of its
             // own -- see {@see self::asFunction()} -- so there is nothing of its own left to print here; its
             // variables print bare, referring to whichever binder encloses this whole printout instead.
-            $binder = $insideSignatureScope
-                ? ''
-                : self::binderString($signature->typeVariables);
+            $binder = $insideSignatureScope ? [] : self::deriveTypeVariables($signature);
             $params = array_map(static fn(self $arg): string => $arg->toString(true), $signature->parameters);
-            return sprintf('fn%s(%s) -> %s', $binder, implode(', ', $params), $signature->returnType->toString(true));
-        }
-        if ($this->args === []) {
-            return $this->name;
+            return TypeSyntax::func($binder, $params, $signature->returnType->toString(true));
         }
         $args = array_map(static fn(self $arg): string => $arg->toString($insideSignatureScope), $this->args);
-        return sprintf('%s<%s>', $this->name, implode(', ', $args));
+        return TypeSyntax::application($this->name, $args);
     }
 
     private function canonical(): self
@@ -548,7 +576,7 @@ final class Type implements Stringable
 
     /**
      * Whether this type is $name, told apart from a variable or a struct that merely happens to share the name by
-     * $kind rather than by $name alone -- $name is not unique on its own: {@see self::var()} takes any name without
+     * $shape rather than by $name alone -- $name is not unique on its own: {@see self::var()} takes any name without
      * checking it against what a real type of that name would be. Only meaningful for the handful of names
      * {@see TypeConstructor} spells and that this class also builds directly, like `None` and `never`; a plain
      * user-facing type is compared by identity through {@see self::isSubtypeOf()} instead, which needs more than a
@@ -556,7 +584,7 @@ final class Type implements Stringable
      */
     private function isNamed(string $name): bool
     {
-        return $this->kind === TypeKind::Named && $this->name === $name;
+        return $this->shape instanceof ApplicationShape && $this->name === $name;
     }
 
     private function isNone(): bool

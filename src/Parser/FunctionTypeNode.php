@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Eventjet\Ausdruck\TypeSyntax;
 use Override;
 
-use function implode;
-use function sprintf;
+use function array_map;
 
 /**
  * A function type, `fn<T>(int) -> T`: the one shape with a return type and a binder of its own, so the one that
@@ -38,11 +38,10 @@ final class FunctionTypeNode extends TypeNode
     #[Override]
     public function __toString(): string
     {
-        return sprintf(
-            'fn%s(%s) -> %s',
-            $this->typeParameters === [] ? '' : sprintf('<%s>', implode(', ', $this->typeParameters)),
-            implode(', ', $this->args),
-            $this->returnType,
+        return TypeSyntax::func(
+            array_map(static fn(Identifier $parameter): string => $parameter->name, $this->typeParameters),
+            array_map(static fn(TypeNode $arg): string => (string)$arg, $this->args),
+            (string)$this->returnType,
         );
     }
 }

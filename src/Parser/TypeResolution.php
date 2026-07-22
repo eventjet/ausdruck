@@ -281,7 +281,12 @@ final class TypeResolution
         if ($returnType instanceof TypeError) {
             return $returnType;
         }
-        $signature = new Signature($returnType, $argTypes);
+        // Built once and read back through asFunction() rather than built a second time from $returnType and
+        // $argTypes: that's also what derives the binder firstUnused() checks against, so there's nothing to build
+        // here that isn't already an answer to that question.
+        $type = Type::func($returnType, $argTypes);
+        $signature = $type->asFunction();
+        assert($signature !== null);
         $unused = self::firstUnused($node->typeParameters, $signature);
         if ($unused !== null) {
             return TypeError::create(
@@ -292,7 +297,7 @@ final class TypeResolution
                 $unused->location,
             );
         }
-        return Type::func($returnType, $argTypes);
+        return $type;
     }
 
     private function resolveStruct(StructTypeNode $node): Type|TypeError

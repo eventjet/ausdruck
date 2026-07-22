@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Eventjet\Ausdruck\TypeSyntax;
 use Override;
 
-use function implode;
-use function sprintf;
+use function array_map;
 
 /**
  * A struct type, `{ name: string }`: written as its fields between `{ }` rather than a name and its arguments between
@@ -32,6 +32,6 @@ final class StructTypeNode extends TypeNode
     #[Override]
     public function __toString(): string
     {
-        return $this->fields === [] ? '{}' : sprintf('{ %s }', implode(', ', $this->fields));
+        return TypeSyntax::struct(array_map(static fn(FieldTypeNode $field): string => (string)$field, $this->fields));
     }
 }

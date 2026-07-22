@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Eventjet\Ausdruck\TypeSyntax;
 use Override;
 use Stringable;
 
-use function implode;
-use function sprintf;
+use function array_map;
 
 /**
  * A name applied to type arguments, e.g. `map<T, U>` or a bare `int`. {@see FieldTypeNode}, {@see FunctionTypeNode}
@@ -34,8 +34,6 @@ class TypeNode implements Stringable
     #[Override]
     public function __toString(): string
     {
-        return $this->args === []
-            ? $this->name
-            : sprintf('%s<%s>', $this->name, implode(', ', $this->args));
+        return TypeSyntax::application($this->name, array_map(static fn(self $arg): string => (string)$arg, $this->args));
     }
 }
