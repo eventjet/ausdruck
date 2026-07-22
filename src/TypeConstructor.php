@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use function sprintf;
+
 /**
  * Every type the language spells itself with a name of its own that's written in angle brackets or bare -- `fn` is
  * its own node shape ({@see Parser\FunctionTypeNode}) rather than a case here, since {@see Parser\TypeResolution::resolve()}
@@ -20,13 +22,16 @@ namespace Eventjet\Ausdruck;
  * This lives in {@see Type}'s own namespace, not the parser's: a type is a thing the parser depends on, not the other
  * way around.
  *
- * A case here is also the one genuine restriction on a type variable's name: within the `fn<...>` binder that
- * declares it, a name a case here already spells could never again be written as the type it names, only as the
- * variable shadowing it, so {@see Parser\TypeResolution::checkTypeVariable()} rejects one. That is a rule about what a
- * reader can tell apart in written syntax, which is the one place it's enforced -- {@see Type::var()} and
- * {@see Type::alias()} take whatever name they're given, since two PHP calls picking `Type::var('int')` and
- * `Type::int()` are never ambiguous about which is which the way two occurrences of the bare word `int` in one
- * signature would be.
+ * A case here is also one of the two restrictions {@see self::isReservedName()} enforces: within the `fn<...>` binder
+ * that declares it, a name a case here already spells could never again be written as the type it names, only as the
+ * variable shadowing it, so {@see Parser\TypeResolution::checkTypeVariable()} rejects one when a signature is written
+ * as a type string. {@see Type::var()} and {@see Type::alias()} reject the same names from the PHP builder side too --
+ * not because the two PHP calls `Type::var('int')` and `Type::int()` are themselves ambiguous, they aren't, but
+ * because {@see Type::__toString()} turns either one back into the written syntax the parser would then reject, and
+ * this project treats `parse(str($type)) === $type` as a hard invariant. `fn` is the other restriction: not a case
+ * here, since a function type is its own node shape ({@see Parser\FunctionTypeNode}), but still the one bare word
+ * {@see Parser\TypeParser::parse()} always reads as introducing one, so a variable or alias named `fn` would print as
+ * a bare `fn` no parser could ever read back as anything else.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -43,6 +48,30 @@ enum TypeConstructor: string
     case Option = 'Option';
     case Some = 'Some';
     case None = 'None';
+
+    /**
+     * The message {@see Type::var()} and {@see Type::alias()} reject a reserved name with, worded once here so the
+     * two can't drift apart. $usage is what the name was being claimed as -- "a type variable" for the former, "an
+     * alias" for the latter -- since the two reservations exist for different reasons and a shared message that
+     * named only one of them would be wrong for the other.
+     */
+    public static function reservedNameMessage(string $name, string $usage = 'a type variable'): string
+    {
+        return sprintf('%s can\'t be %s: it is a type of its own', $name, $usage);
+    }
+
+    /**
+     * Whether $name is off-limits to a type variable or an alias built through {@see Type::var()} or
+     * {@see Type::alias()}: every name a case above already spells, plus `fn`, which isn't one of them and never will
+     * be -- see this enum's own class doc for why both are reserved. `Struct` and `never` are deliberately not
+     * reserved: neither is ever written as a name in this grammar either, a struct only as its fields and `never` not
+     * at all, so a variable or alias can be named either one without colliding with anything a reader could confuse
+     * it for -- see the fixtures showing both are ordinary names.
+     */
+    public static function isReservedName(string $name): bool
+    {
+        return $name === 'fn' || self::tryFrom($name) !== null;
+    }
 
     /**
      * How many type arguments this constructor is written with in angle brackets.

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use InvalidArgumentException;
-use LogicException;
 use Override;
 use Stringable;
 
@@ -81,11 +80,21 @@ final class Type implements Stringable
      *
      * $name is never checked against what $type itself is a shape of: an alias's own shape is always an
      * {@see AliasShape}, since it prints as its own name ({@see self::toString()}) rather than as whatever it stands
-     * for -- so `self::alias('Struct', ...)` prints as `Struct` and `self::alias('fn', ...)` prints as `fn`, neither
-     * one reachable through the checks that look for a {@see StructShape} or a {@see FuncShape}.
+     * for -- so `self::alias('Struct', ...)` prints as `Struct`, reachable through neither the check that looks for a
+     * {@see StructShape} nor the one that looks for a {@see FuncShape}.
+     *
+     * $name is rejected when {@see TypeConstructor::isReservedName()} says so -- every name a
+     * {@see TypeConstructor} case already spells, plus `fn`: {@see self::__toString()} turns this alias back into
+     * written syntax, and this project treats `parse(str($type)) === $type` as a hard invariant, so a name the parser
+     * could never read back as an alias reference the way it was built isn't a name this door hands out either.
+     *
+     * @throws InvalidArgumentException if $name is reserved.
      */
     public static function alias(string $name, self $type): self
     {
+        if (TypeConstructor::isReservedName($name)) {
+            throw new InvalidArgumentException(TypeConstructor::reservedNameMessage($name, 'an alias'));
+        }
         return new self(new AliasShape($name, $type));
     }
 
@@ -106,15 +115,22 @@ final class Type implements Stringable
      * written by hand and checking it against the same thing; {@see self::nestedFunc()} is the third, for a function
      * type that owns no binder of its own at all.
      *
-     * A name a type constructor already spells, like `int` or `list`, is rejected as a type variable when a signature
-     * is written as a type string -- see {@see Parser\TypeResolution::checkTypeVariable()} -- because within that
-     * signature's own text, the bare word could no longer mean the type once it also names the variable. That
-     * ambiguity is about written syntax, not about this constructor: `Type::var('int')` and `Type::int()` are two
-     * distinct, unambiguous PHP calls, so nothing here rejects the name `int` -- or any other -- the way the parser
-     * does.
+     * $name is rejected when {@see TypeConstructor::isReservedName()} says so -- the same names
+     * {@see Parser\TypeResolution::checkTypeVariable()} rejects when a signature is written as a type string, because
+     * within that signature's own text the bare word could no longer mean the type once it also names the variable.
+     * `Type::var('int')` and `Type::int()` are two distinct, unambiguous PHP calls, but {@see self::__toString()}
+     * turns this variable back into the written syntax the same parser reads, and this project treats
+     * `parse(str($type)) === $type` as a hard invariant: a signature built with `Type::var('int')` would print as
+     * `int` and read back as the type, not the variable, so the mismatch is rejected here instead of surfacing later
+     * as a silent misparse.
+     *
+     * @throws InvalidArgumentException if $name is reserved.
      */
     public static function var(string $name): self
     {
+        if (TypeConstructor::isReservedName($name)) {
+            throw new InvalidArgumentException(TypeConstructor::reservedNameMessage($name));
+        }
         return new self(new VariableShape($name));
     }
 
@@ -173,19 +189,29 @@ final class Type implements Stringable
      * and $parameters actually reach, both ways -- a name declared here that isn't reachable is dead, and one
      * reachable that isn't declared is the exact footgun a signature built by hand used to leave open before this
      * constructor started validating -- silently turning the missing name into `any` at the call site instead of
-     * failing where the mistake was made.
+     * failing where the mistake was made. A name declared twice is rejected too, the same way
+     * {@see Parser\TypeResolution::checkTypeVariable()} rejects one written twice in a `fn<...>` binder: two
+     * parameters answering to the same name would make one of them unreachable, and which one never has an intended
+     * answer.
      *
      * @param list<string> $binder
      * @param list<Type> $parameters
      *
-     * @throws InvalidArgumentException if $binder disagrees with the variables $return and $parameters actually
-     *     reach, in either direction, or {@see self::rejectNestedBinder()}.
+     * @throws InvalidArgumentException if $binder names the same variable twice, disagrees with the variables
+     *     $return and $parameters actually reach in either direction, or {@see self::rejectNestedBinder()}.
      */
     public static function genericFunc(array $binder, self $return, array $parameters = []): self
     {
         self::rejectNestedBinder($return);
         foreach ($parameters as $parameter) {
             self::rejectNestedBinder($parameter);
+        }
+        $declared = [];
+        foreach ($binder as $name) {
+            if (array_key_exists($name, $declared)) {
+                throw new InvalidArgumentException(sprintf('Type variable %s is already declared', $name));
+            }
+            $declared[$name] = true;
         }
         $free = Signature::freeVariables($return, $parameters);
         $freeSet = array_fill_keys($free, true);
@@ -196,7 +222,6 @@ final class Type implements Stringable
                 );
             }
         }
-        $declared = array_fill_keys($binder, true);
         foreach ($free as $name) {
             if (!array_key_exists($name, $declared)) {
                 throw new InvalidArgumentException(
@@ -247,38 +272,6 @@ final class Type implements Stringable
     public static function struct(array $fields): self
     {
         return new self(new StructShape($fields));
-    }
-
-    /**
-     * {@see self::bind()}'s function case: the return type always binds, and a parameter binds unless $actual's own
-     * parameter in that position is `any`, which is every {@see Lambda} parameter -- see {@see self::bind()}'s own
-     * docblock for why that's the rule rather than a position. Parameters are walked before the return type, the same
-     * order {@see Type::collectVariables()} walks a function type's own parts in, so a variable used both directly
-     * and through a nested function type is decided in the same place either way. Takes both signatures directly,
-     * rather than the two {@see Type}s they came from: {@see self::bind()} only ever calls this once it has already
-     * established, from $self's and $actual's own shapes, that both are function types, so there is nothing left here
-     * to guard against.
-     *
-     * Called from {@see FuncShape::bindSame()} rather than kept private: {@see self::canonical()} and
-     * {@see self::isNamed()}, which the `any`-skipping check below needs, are $this-bound private methods no shape
-     * class can call directly, the same reason {@see self::of()} exists for {@see TypeShape::substitute()}.
-     *
-     * @internal
-     * @psalm-internal Eventjet\Ausdruck
-     *
-     * @param array<string, self> $bindings
-     * @return array<string, self>
-     */
-    public static function bindSignatures(Signature $signature, Signature $actualSignature, array $bindings): array
-    {
-        foreach ($signature->parameters as $index => $parameter) {
-            $actualParameter = $actualSignature->parameters[$index] ?? null;
-            if ($actualParameter === null || $actualParameter->canonical()->isNamed('any')) {
-                continue;
-            }
-            $bindings = $parameter->bind($actualParameter, $bindings);
-        }
-        return $signature->returnType->bind($actualSignature->returnType, $bindings);
     }
 
     /**
@@ -404,6 +397,21 @@ final class Type implements Stringable
         return $this->canonical()->isNamed('Option');
     }
 
+    /**
+     * Whether this type is `any` -- the same kind of shortcut {@see self::isOption()} is, but exposed rather than
+     * kept private, since {@see FuncShape::bindSame()} needs to ask it about the type actually facing a function's
+     * parameter and {@see self::canonical()} and {@see self::isNamed()}, which it needs, are $this-bound private
+     * methods no shape class can call directly -- the same reason {@see self::of()} exists for
+     * {@see TypeShape::substitute()}.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     */
+    public function isAny(): bool
+    {
+        return $this->canonical()->isNamed('any');
+    }
+
     public function isSubtypeOf(self $other): bool
     {
         $self = $this->canonical();
@@ -432,27 +440,11 @@ final class Type implements Stringable
         $selfShape = $self->shape;
         $otherShape = $other->shape;
         // A shared class alone isn't the whole answer either: two ApplicationShapes can be named differently, and
-        // two VariableShapes can too -- {@see self::var()} takes any name without complaint, so a variable can share
-        // a name with a type it isn't, `Type::var('list')` is not a `list<T>`. Each shape below answers that for
-        // itself, in {@see TypeShape::isSubtypeOfSame()}, which is also where the rest of the comparison -- args,
-        // signature, fields -- lives; a {@see AliasShape} never reaches here, having already been seen through by
-        // {@see self::canonical()} above.
-        if ($selfShape::class !== $otherShape::class) {
-            return false;
-        }
-        if ($selfShape instanceof ApplicationShape && $otherShape instanceof ApplicationShape) {
-            return $selfShape->isSubtypeOfSame($otherShape);
-        }
-        if ($selfShape instanceof FuncShape && $otherShape instanceof FuncShape) {
-            return $selfShape->isSubtypeOfSame($otherShape);
-        }
-        if ($selfShape instanceof StructShape && $otherShape instanceof StructShape) {
-            return $selfShape->isSubtypeOfSame($otherShape);
-        }
-        if ($selfShape instanceof VariableShape && $otherShape instanceof VariableShape) {
-            return $selfShape->isSubtypeOfSame($otherShape);
-        }
-        throw new LogicException(sprintf('Unhandled type shape %s', $selfShape::class));
+        // two VariableShapes can too -- {@see self::var('T')} and {@see self::var('U')} aren't the same variable.
+        // Once the class matches, each shape answers the rest for itself, in {@see TypeShape::isSubtypeOfSame()},
+        // which is also where the rest of the comparison -- args, signature, fields -- lives; a {@see AliasShape}
+        // never reaches here, having already been seen through by {@see self::canonical()} above.
+        return $selfShape::class === $otherShape::class && $selfShape->isSubtypeOfSame($otherShape);
     }
 
     /**
@@ -511,7 +503,7 @@ final class Type implements Stringable
      *
      * This is the recursive walk that applies to any type, not just a function's parameters, which is why it lives
      * here rather than on {@see Signature}; nothing outside the type system should call it directly. The function
-     * case itself is {@see self::bindSignatures()}.
+     * case itself is {@see FuncShape::bindSame()}.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -533,19 +525,7 @@ final class Type implements Stringable
         if ($selfOption !== null && !$actual->isNamed('Option') && !$actual->isNamed('None')) {
             return $selfOption->bind($actual, $bindings);
         }
-        if ($selfShape::class !== $actualShape::class) {
-            return $bindings;
-        }
-        if ($selfShape instanceof FuncShape && $actualShape instanceof FuncShape) {
-            return $selfShape->bindSame($actualShape, $bindings);
-        }
-        if ($selfShape instanceof StructShape && $actualShape instanceof StructShape) {
-            return $selfShape->bindSame($actualShape, $bindings);
-        }
-        if ($selfShape instanceof ApplicationShape && $actualShape instanceof ApplicationShape) {
-            return $selfShape->bindSame($actualShape, $bindings);
-        }
-        return $bindings;
+        return $selfShape::class === $actualShape::class ? $selfShape->bindSame($actualShape, $bindings) : $bindings;
     }
 
     /**

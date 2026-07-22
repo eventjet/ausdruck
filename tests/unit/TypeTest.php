@@ -349,6 +349,73 @@ final class TypeTest extends TestCase
     }
 
     /**
+     * A binder that names the same variable twice would print as `fn<T, T>(...)`, which the parser rejects the same
+     * way {@see \Eventjet\Ausdruck\Parser\TypeResolution::checkTypeVariable()} rejects one written twice by hand --
+     * so this is caught here instead of surfacing later as a broken `parse(str(t)) === t` round-trip.
+     */
+    public function testGenericFuncRejectsADuplicateNameInTheBinder(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Type variable T is already declared');
+
+        $t = Type::var('T');
+        Type::genericFunc(['T', 'T'], $t, [$t]);
+    }
+
+    /**
+     * A name {@see TypeConstructor} already spells would print as, say, `fn<int>(int) -> int` -- indistinguishable
+     * from the built-in type `int` once it's written syntax, and rejected as a type variable for exactly that reason
+     * when a signature is parsed from a string. {@see Type::var()} rejects the same name for the same
+     * `parse(str(t)) === t` reason, even though the PHP calls `Type::var('int')` and `Type::int()` are themselves
+     * unambiguous.
+     */
+    public function testVarRejectsANameATypeConstructorAlreadySpells(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('int can\'t be a type variable: it is a type of its own');
+
+        Type::var('int');
+    }
+
+    /**
+     * `fn` isn't a {@see \Eventjet\Ausdruck\TypeConstructor} case -- a function type is its own node shape -- but
+     * it's still the one bare word {@see TypeParser::parse()} always reads as introducing a function type, so a
+     * variable named `fn` would print as a bare `fn` no parser could ever read back as a variable reference.
+     */
+    public function testVarRejectsFn(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('fn can\'t be a type variable: it is a type of its own');
+
+        Type::var('fn');
+    }
+
+    /**
+     * The same reservation {@see self::testVarRejectsANameATypeConstructorAlreadySpells()} pins for {@see Type::var()}
+     * applies to {@see Type::alias()} too, worded for an alias rather than a variable.
+     */
+    public function testAliasRejectsANameATypeConstructorAlreadySpells(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('list can\'t be an alias: it is a type of its own');
+
+        Type::alias('list', Type::int());
+    }
+
+    /**
+     * `Struct` and `never` are deliberately not reserved -- see the `named-Struct-is-an-ordinary-name` and
+     * `named-after-the-bottom-type` fixtures -- so {@see Type::var()} and {@see Type::alias()} still take them
+     * without complaint.
+     */
+    public function testVarAndAliasAllowStructAndNever(): void
+    {
+        self::assertSame('Struct', (string)Type::var('Struct'));
+        self::assertSame('never', (string)Type::var('never'));
+        self::assertSame('Struct', (string)Type::alias('Struct', Type::int()));
+        self::assertSame('never', (string)Type::alias('never', Type::int()));
+    }
+
+    /**
      * The guard {@see self::testFuncRejectsANestedFunctionTypeWithANonEmptyBinderOfItsOwn()} pins looks for a
      * nested function type that already owns variables of its own, not merely for nesting itself: a nested function
      * type with no type variables at all -- `doCall`'s own receiver parameter, `fn(string) -> string`, built with

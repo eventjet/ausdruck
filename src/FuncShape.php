@@ -48,9 +48,7 @@ final class FuncShape implements TypeShape
     #[Override]
     public function toString(): string
     {
-        $signature = $this->signature;
-        $params = array_map(static fn(Type $arg): string => (string)$arg, $signature->parameters);
-        return TypeSyntax::func($signature->binder(), $params, (string)$signature->returnType);
+        return (string)$this->signature;
     }
 
     /**
@@ -105,8 +103,13 @@ final class FuncShape implements TypeShape
      * A signature with its own binder is fixed as far as this walk is concerned, the same way {@see
      * self::collectVariables()} and {@see self::substitute()} both treat one -- there is nothing to learn from
      * matching into a self-contained generic signature, since none of its variables are free for the enclosing walk
-     * to bind. Otherwise delegates to {@see Type::bindSignatures()}, which needs two {@see Type}-private helpers no
-     * shape class can call directly.
+     * to bind.
+     *
+     * Otherwise: the return type always binds, and a parameter binds unless $other's own parameter in that position
+     * is `any`, which is every {@see Lambda} parameter -- see {@see Type::bind()}'s own docblock for why that's the
+     * rule rather than a position. Parameters are walked before the return type, the same order
+     * {@see self::collectVariables()} walks a function type's own parts in, so a variable used both directly and
+     * through a nested function type is decided in the same place either way.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
@@ -114,10 +117,19 @@ final class FuncShape implements TypeShape
     #[Override]
     public function bindSame(TypeShape $other, array $bindings): array
     {
-        if ($this->signature->hasOwnBinder()) {
+        $signature = $this->signature;
+        if ($signature->hasOwnBinder()) {
             return $bindings;
         }
         assert($other instanceof self);
-        return Type::bindSignatures($this->signature, $other->signature, $bindings);
+        $otherSignature = $other->signature;
+        foreach ($signature->parameters as $index => $parameter) {
+            $otherParameter = $otherSignature->parameters[$index] ?? null;
+            if ($otherParameter === null || $otherParameter->isAny()) {
+                continue;
+            }
+            $bindings = $parameter->bind($otherParameter, $bindings);
+        }
+        return $signature->returnType->bind($otherSignature->returnType, $bindings);
     }
 }

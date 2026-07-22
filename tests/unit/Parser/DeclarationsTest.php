@@ -31,4 +31,23 @@ final class DeclarationsTest extends TestCase
 
         new Declarations(functions: ['foo' => Type::int()]);
     }
+
+    /**
+     * {@see Type::nestedFunc()} defers every variable it reaches to whichever signature encloses it -- correct for a
+     * function type nested inside another one's own parameters or return type, but wrong here: a declaration is
+     * exactly the position nothing encloses. Built this way, the signature would read back with an empty binder
+     * despite reaching `T`, and every call would silently see `T` as `any` instead of having it decided by the
+     * argument -- the same defect {@see Type::func()} and {@see Type::genericFunc()} both already prevent for a
+     * caller that reaches for the right door.
+     */
+    public function testAFunctionDeclaredThroughTheNestedDoorIsRejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'myHead is declared as fn(list<T>) -> T, whose type variables no binder of its own quantifies',
+        );
+
+        $t = Type::var('T');
+        new Declarations(functions: ['myHead' => Type::nestedFunc($t, [Type::listOf($t)])]);
+    }
 }

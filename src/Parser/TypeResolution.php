@@ -331,11 +331,11 @@ final class TypeResolution
      * binder is never in question here—{@see self::resolveSignature()} rejects a nested one before it ever declares a
      * name to collide with.
      *
-     * A name a {@see TypeConstructor} case already spells is the one restriction that belongs here and nowhere else:
-     * within the signature this binder introduces the name for, the bare word could no longer mean the type once it
-     * also means the variable, which is a fact about this written text, not about {@see Type}'s own representation --
-     * {@see Type::var()} takes the same name without complaint, since two separate PHP calls are never ambiguous
-     * about which of them is meant the way one reused word in one signature would be.
+     * A name a {@see TypeConstructor} case already spells is the one restriction that belongs here for a reason
+     * specific to this written text: within the signature this binder introduces the name for, the bare word could no
+     * longer mean the type once it also means the variable. {@see Type::var()} rejects the same names too, but for a
+     * different reason -- see {@see TypeConstructor::isReservedName()} -- so the two checks agree without either one
+     * needing to know about the other.
      *
      * @param array<string, true> $typeVariables The names declared so far in the binder $parameter belongs to, which
      *     grows as {@see self::resolveSignature()} works through the binder's parameters, so that two variables in

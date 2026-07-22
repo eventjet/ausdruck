@@ -65,10 +65,9 @@ final class ApplicationShape implements TypeShape
 
     /**
      * Same name, same shape, but two `ApplicationShape`s of that name can still differ argument by argument --
-     * `map<int, string>` is not a subtype of `map<int, int>`, even though both are named `map`. {@see Type::var()}
-     * takes any name without complaint, so a variable can share a name with a type it isn't -- `Type::var('list')`
-     * is not a `list<T>` -- which is exactly why {@see Type::isSubtypeOf()} only reaches here once it already knows
-     * $other is an {@see ApplicationShape} too, rather than trusting the name alone.
+     * `map<int, string>` is not a subtype of `map<int, int>`, even though both are named `map`. This is also why
+     * {@see Type::isSubtypeOf()} only reaches here once it already knows $other is an {@see ApplicationShape} too,
+     * rather than comparing names directly across every shape.
      */
     #[Override]
     public function isSubtypeOfSame(TypeShape $other): bool
