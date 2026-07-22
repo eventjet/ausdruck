@@ -24,15 +24,10 @@ final class Signature implements Stringable
      *     declared as `fn(string, int, int) -> string` and called as `foo:string.substr:string(0, 3)`, so its
      *     parameters are `[string, int, int]` and `foo` is checked against the first of them; see
      *     {@see self::receiverType()} and {@see self::argumentTypes()}.
-     * @param list<string> $binder The names this signature quantifies for itself -- see {@see self::hasOwnBinder()}.
-     *     Empty for a signature that defers every variable it reaches to whichever signature does own one, the same
-     *     as one that genuinely has none of its own; nothing downstream ({@see FuncShape::collectVariables()},
-     *     {@see FuncShape::substitute()}, {@see Type::bind()}) tells the two apart, since both recurse into this
-     *     signature's own parts the same way and find nothing to claim either way. {@see Type::func()} never passes
-     *     one -- it builds structure only -- and neither does a signature this class rebuilds internally while
-     *     substituting or instantiating one that already had none of its own; {@see self::quantified()} is what
-     *     derives one, once something promotes a function type to a complete signature, and
-     *     {@see Parser\TypeResolution} is what builds one directly with a binder written by hand.
+     * @param list<string> $binder The names this signature quantifies for itself, empty if none -- see
+     *     {@see self::hasOwnBinder()} for what an empty binder means. {@see Type::func()} never passes one, since it
+     *     builds structure only; {@see self::quantified()} derives one from what a promoted function type reaches,
+     *     and {@see self::written()} takes one written by hand.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -93,6 +88,29 @@ final class Signature implements Stringable
     }
 
     /**
+     * A signature built with the binder a written `fn<...>` actually declared, rather than one derived from what
+     * $returnType and $parameters reach the way {@see self::quantified()} builds one: $binder is the author's own
+     * order, checked separately against what the signature reaches ({@see Parser\TypeResolution::firstUnused()}),
+     * and can be empty when nothing was written -- the same empty binder a signature nothing has quantified yet
+     * reads back too; see {@see self::hasOwnBinder()}.
+     *
+     * This and {@see Type::func()} are the two doors that build a function type's structure without validating it
+     * against a call site: {@see Type::func()} for every position that commits to no binder of its own, this one for
+     * the one place -- {@see Parser\TypeResolution::resolveSignature()} -- that resolves a binder written by hand
+     * and has to store exactly what was written, not derive one from where its names are first used.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     *
+     * @param list<Type> $parameters
+     * @param list<string> $binder
+     */
+    public static function written(Type $returnType, array $parameters, array $binder): self
+    {
+        return new self($returnType, $parameters, $binder);
+    }
+
+    /**
      * This signature the way it would be written -- e.g. `fn<T>(list<T>) -> T` -- with {@see self::binder()}'s
      * names in front, even when there are none to write.
      */
@@ -107,15 +125,29 @@ final class Signature implements Stringable
     }
 
     /**
-     * Whether this signature has anything to quantify: a function with no type variables at all and a signature
-     * that defers every variable it reaches to whichever signature does own one look identical here, both empty --
-     * see {@see self::binder()}'s own docblock for why nothing downstream needs to tell them apart.
+     * $this wrapped as a {@see Type} -- the door {@see self::written()}'s only caller uses to hand a resolved
+     * `fn<...>` node back as the {@see Type} it has to answer, since {@see Type::of()} and {@see FuncShape} are both
+     * {@see Type}'s own internals, not the parser's, and {@see self::written()}'s caller isn't a
+     * {@see TypeShape::substitute()} implementation either -- the only other place {@see Type::of()} is called from.
      *
-     * This is what lets {@see FuncShape::collectVariables()}, {@see FuncShape::substitute()} and {@see Type::bind()}
-     * tell a self-contained generic function type -- one nested inside a list, an Option, a struct field, or
-     * standing behind an alias used as a parameter -- from one whose variables genuinely belong to whatever encloses
-     * it: the former is opaque to all three, since rank-1 polymorphism means its variables are already quantified by
-     * itself, never by whatever it's found inside; the latter has nothing to be opaque about.
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     */
+    public function toType(): Type
+    {
+        return Type::of(new FuncShape($this));
+    }
+
+    /**
+     * Whether this signature has anything to quantify. Quantifying nothing is not quantifying: ∀∅.τ ≡ τ, so a
+     * function with no type variables at all and a signature that defers every variable it reaches to whichever
+     * signature does own one are the same type, and read identically here, both empty.
+     *
+     * This is the fact that lets {@see FuncShape::collectVariables()}, {@see FuncShape::substitute()},
+     * {@see FuncShape::bind()} and {@see Type::bind()} treat a self-contained generic function type -- one nested
+     * inside a list, an Option, a struct field, or standing behind an alias used as a parameter -- as opaque: rank-1
+     * polymorphism means its variables are already quantified by itself, never by whatever it's found inside, so
+     * there is nothing for any of those to claim or rewrite.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck

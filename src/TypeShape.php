@@ -29,9 +29,7 @@ interface TypeShape
     /**
      * Every {@see Type::var()} this shape reaches, folded into $found in the order first seen -- see
      * {@see Type::collectVariables()}. Most shapes simply recurse into whatever {@see Type}s they hold, but
-     * {@see FuncShape::collectVariables()} is the one that matters: a signature with its own binder is opaque to
-     * this walk, since its variables are already quantified by itself, not free for whatever is walking this shape
-     * to claim -- see {@see Signature::hasOwnBinder()}.
+     * {@see FuncShape::collectVariables()} is the one that matters -- see {@see Signature::hasOwnBinder()}.
      *
      * @param array<string, true> $found
      * @return array<string, true>

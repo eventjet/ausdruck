@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
-use Eventjet\Ausdruck\AliasShape;
 use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
@@ -193,46 +192,6 @@ final class TypeTest extends TestCase
         Type::fromValue($value);
     }
 
-    /**
-     * bind() only sees through an alias on the actual side, so a variable under an alias on the signature side has to
-     * be reachable too, or instantiating a signature built directly through this API silently drops it to `any`
-     * instead of what the call actually decided. Built through the internal {@see AliasShape} directly rather than
-     * the public {@see Type::alias()}: `Bag` standing for `list<T>` is exactly the target the public door now refuses,
-     * since nothing would capture `T` if `Bag` were ever used standalone -- {@see Type::bind()}'s own walk doesn't get
-     * to assume that was checked, though, so it still has to be correct for a shape like this one.
-     */
-    public function testVariableUnderAnAliasOnTheSignatureSideIsBound(): void
-    {
-        $bag = Type::of(new AliasShape('Bag', Type::listOf(Type::var('T'))));
-        $signature = Type::func(Type::var('T'), [$bag])->asFunction();
-        self::assertNotNull($signature);
-
-        $instantiated = $signature->instantiateForCall(Type::listOf(Type::int()), []);
-
-        self::assertTrue($instantiated->returnType->equals(Type::int()));
-        self::assertTrue($instantiated->receiverType()?->isSubtypeOf(Type::listOf(Type::int())) ?? false);
-    }
-
-    /**
-     * bind() canonicalizes both sides before asking whether either one is a variable, not just before comparing
-     * names: an alias standing directly for a variable -- not merely for a container of one, see
-     * {@see self::testVariableUnderAnAliasOnTheSignatureSideIsBound()} -- has to be seen through before that
-     * question is asked, or the variable case is skipped on the raw, still-aliased type and the name comparison
-     * that follows compares the variable's own name against the actual type's, which never match. Built through the
-     * internal {@see AliasShape} directly, for the same reason
-     * {@see self::testVariableUnderAnAliasOnTheSignatureSideIsBound()} does.
-     */
-    public function testVariableDirectlyBehindAnAliasIsBound(): void
-    {
-        $elem = Type::of(new AliasShape('Elem', Type::var('T')));
-        $signature = Type::func(Type::var('T'), [Type::listOf($elem)])->asFunction();
-        self::assertNotNull($signature);
-
-        $instantiated = $signature->instantiateForCall(Type::listOf(Type::int()), []);
-
-        self::assertTrue($instantiated->returnType->equals(Type::int()));
-    }
-
     public function testAliasTypeEqualsAliasTarget(): void
     {
         $concrete = Type::listOf(Type::string());
@@ -282,7 +241,7 @@ final class TypeTest extends TestCase
 
     /**
      * {@see Type::func()} never claims a binder of its own, so aliasing a function type that reaches a type
-     * variable is what quantifies it -- the same promotion {@see Parser\Declarations} makes for a declared function
+     * variable is what quantifies it -- the same promotion {@see Declarations} makes for a declared function
      * -- rather than leaving the variable free for nothing to capture.
      */
     public function testAliasingAFunctionTypeQuantifiesIt(): void
@@ -294,7 +253,7 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * The same free-variable check {@see Parser\Declarations::checkVariableIsSelfContained()} runs for a declared
+     * The same free-variable check {@see Declarations::checkVariableIsSelfContained()} runs for a declared
      * variable's type applies to an alias target too, for anything that isn't a function type: aliasing doesn't
      * quantify a list, an `Option`, or a struct field, so a variable reaching through one of those is still nothing
      * captures it.

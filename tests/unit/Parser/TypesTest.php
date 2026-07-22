@@ -8,6 +8,7 @@ use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeNode;
 use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
+use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Type;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -43,7 +44,7 @@ final class TypesTest extends TestCase
 
     /**
      * {@see Type::func()} never claims a binder of its own, so an alias's own target -- built the same way any
-     * other function type is -- is quantified by {@see Type::alias()} itself, the way {@see self::__construct()}
+     * other function type is -- is quantified by {@see Type::alias()} itself, the way {@see Types::__construct()}
      * pre-wraps every entry through it: a bare, unquantified `fn(T) -> bool` reaching a variable nothing else
      * captures is accepted here instead of being rejected, the way anything that isn't a function type still is.
      */

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Test\Unit\Parser;
 
 use Eventjet\Ausdruck\Parser\Declarations;
+use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Type;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -21,7 +22,7 @@ final class DeclarationsTest extends TestCase
 
     /**
      * A function without a function type is not a function anyone could ever call: rejecting it here, rather than
-     * downgrading it to "undeclared" wherever it's read, means every {@see Type} in {@see Declarations::$functions}
+     * downgrading it to "undeclared" wherever it's read, means every {@see Signature} in {@see Declarations::$functions}
      * really is one the receiver and argument checks can trust.
      */
     public function testFunctionMustBeDeclaredWithAFunctionType(): void

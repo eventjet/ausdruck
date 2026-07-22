@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
-use Eventjet\Ausdruck\FuncShape;
 use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Type;
 use Eventjet\Ausdruck\TypeConstructor;
@@ -27,10 +26,11 @@ use function sprintf;
  * A variable is quantified once, at the top of the signature it belongs to—see {@see Type::var()}—so a function type
  * reachable from another one's parameters or return type—however many lists, Options, or struct fields deep—can
  * never carry a binder of its own: {@see self::resolveSignature()} rejects one outright rather than letting an inner
- * `fn<...>` shadow or extend the outer scope, and $nestedInSignature stays set through every constructor below the
- * enclosing `fn`—list, Option, struct field, and any function type found there—not just a directly-nested function
- * type, which is how it reaches all of them: it is carried by $inner in {@see self::resolveSignature()}, the same
- * instance every one of those constructors recurses back through, rather than being recomputed at each level.
+ * `fn<...>` shadow or extend the outer scope. Rejecting it is $nestedInSignature's one job—resolving a signature
+ * doesn't otherwise ask whether it's nested—so it stays set through every constructor below the enclosing
+ * `fn`—list, Option, struct field, and any function type found there—not just a directly-nested function type,
+ * which is how the rejection reaches all of them: it is carried by $inner in {@see self::resolveSignature()}, the
+ * same instance every one of those constructors recurses back through, rather than being recomputed at each level.
  * $typeVariables itself only ever grows once, when the one binder a signature is allowed to have is resolved.
  *
  * @internal
@@ -182,11 +182,10 @@ final class TypeResolution
      * parameters and the return type alike, so a fresh resolution with the binder's names added is what resolves both.
      *
      * $node is rejected outright if it writes a binder of its own while $this->nestedInSignature is already true --
-     * see this class's own docblock for why a nested function type can never legally have one. The same flag also
-     * decides how the result is built: nested, {@see Type::func()} alone, since a nested function type never owns a
-     * binder of its own; not nested, the {@see Signature} is built directly with $node's own written binder stored
-     * on it -- even empty, if it wrote none at all -- rather than through {@see Type::func()}, which never stores
-     * one.
+     * see this class's own docblock for why a nested function type can never legally have one. That rejection is
+     * $nestedInSignature's one job: once past it, $node's own written binder -- even empty, if it wrote none at all,
+     * which a rejected nested one always does -- is what {@see Signature::written()} stores, the same door whether
+     * this resolution is nested or not.
      *
      * $node->typeParameters is what's written, not what {@see Signature::freeVariables()} would find from how the
      * result is actually used, so the two are checked against each other once the signature is built: a name written
@@ -241,11 +240,8 @@ final class TypeResolution
                 $unused->location,
             );
         }
-        if ($this->nestedInSignature) {
-            return Type::func($returnType, $argTypes);
-        }
         $binder = array_map(static fn(Identifier $parameter): string => $parameter->name, $node->typeParameters);
-        return Type::of(new FuncShape(new Signature($returnType, $argTypes, $binder)));
+        return Signature::written($returnType, $argTypes, $binder)->toType();
     }
 
     /**

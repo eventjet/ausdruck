@@ -29,9 +29,10 @@ final class Type implements Stringable
     }
 
     /**
-     * Wraps an already-built {@see TypeShape} as a {@see self} -- the door {@see TypeShape::substitute()}
-     * implementations use to hand one back, since {@see self::__construct()} is private and no shape class can call
-     * it directly.
+     * Wraps an already-built {@see TypeShape} as a {@see self} -- the door {@see self::__construct()}'s own privacy
+     * requires, since no shape class can call it directly. Every {@see TypeShape::substitute()} implementation uses
+     * it to hand its result back, and so does {@see Signature::toType()}, for the same reason: neither lives where
+     * {@see self::__construct()} does.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -155,15 +156,15 @@ final class Type implements Stringable
      * A function type: its return type, its parameters, and no binder of its own -- see {@see Signature::quantified()}
      * for the door that derives one, once something promotes $return and $parameters to a complete signature.
      *
-     * Every function type is built through this one door, whichever position it ends up in: the outermost signature
-     * of a declaration, an alias target, or a fixed parameter nested inside another one's own return type or
-     * parameters -- a generic function type used as a fixed parameter or a list's element type, or a lambda
-     * parameter like `filter`'s or `map`'s own. Nothing about $return or $parameters, or about which position this
-     * ends up in, has anything to disagree about, since a type built here shares whatever variables it reaches with
-     * whichever signature, if any, goes on to quantify it, rather than claiming any for itself -- the choice
-     * {@see Parser\TypeResolution::resolveSignature()} makes for a written signature is not which constructor to
-     * call, since there is only ever this one, but whether the signature it resolves is itself the one that
-     * quantifies, and with which written binder.
+     * This is the door for every function type that commits to no binder of its own, whichever position it ends up
+     * in: the outermost signature of a declaration or an alias target, before it's promoted, or a fixed parameter
+     * nested inside another one's own return type or parameters -- a generic function type used as a fixed parameter
+     * or a list's element type, or a lambda parameter like `filter`'s or `map`'s own. Nothing about $return or
+     * $parameters, or about which position this ends up in, has anything to disagree about, since a type built here
+     * shares whatever variables it reaches with whichever signature, if any, goes on to quantify it, rather than
+     * claiming any for itself. The one signature position that does commit to a binder as it's built -- a written
+     * `fn<...>` -- goes through {@see Signature::written()} instead, since that binder is the author's own, not
+     * something derived after the fact the way {@see Signature::quantified()} derives one.
      *
      * @param list<Type> $parameters The types the PHP callable receives, in order. A function that is called as a
      *     receiver function -- `foo:string.substr:string(0, 3)` -- receives the expression it's called on as the first
@@ -342,9 +343,7 @@ final class Type implements Stringable
 
     /**
      * This type as a function's signature, or null if it isn't one. {@see Signature::binder()} answers back whatever
-     * this type was actually built with: every function type built through {@see self::func()} reads back empty,
-     * since it commits to no binder of its own -- {@see Signature::quantified()} is what derives one, once
-     * something promotes this type to the outermost signature of a declaration or an alias target.
+     * this type was actually built with -- see {@see Signature::hasOwnBinder()} for what an empty one means.
      */
     public function asFunction(): Signature|null
     {
@@ -366,10 +365,14 @@ final class Type implements Stringable
     /**
      * What $actual tells us about the variables in this type, added to what is already known. Matching is structural
      * and one-way: where the two types have the same shape, the variables on this side take the types facing them,
-     * and where they don't, there is nothing to learn and the bindings come back unchanged. Both sides are seen
-     * through their aliases first, so a `Numbers` standing for `list<int>` still binds `T` in a `list<T>` regardless
-     * of which side names the alias and which spells the type out -- and so does a variable standing behind an alias
-     * on either side, since canonicalizing happens before this type's own shape is even asked about.
+     * and where they don't, there is nothing to learn and the bindings come back unchanged. $actual is seen through
+     * its aliases first, so a `Numbers` standing for `list<int>` still binds `T` in a `list<T>`, and so does a
+     * variable standing directly behind an alias, since canonicalizing happens before $actual's own shape is even
+     * asked about. $this isn't canonicalized the same way: every alias reachable from a declared parameter or return
+     * type is built through {@see self::alias()}, which never lets one reach a free variable except by quantifying
+     * it as a function's own binder -- opaque to this walk regardless, the same as any other self-contained generic
+     * function type, see {@see Signature::hasOwnBinder()} -- so there is nothing left for seeing through an alias on
+     * this side to uncover.
      *
      * Shape, here, is the same shape {@see self::isSubtypeOf()} accepts as a match, not just equal names: $actual is
      * always the type of a value this type would have to accept, so wherever isSubtypeOf() would let $actual through
@@ -388,10 +391,8 @@ final class Type implements Stringable
      * before the arguments a call passes -- to decide instead. See {@see Signature::instantiateForCall()} for why
      * first-wins is the useful half of the two everywhere else.
      *
-     * A parameter position that is itself a self-contained generic function type -- {@see Signature::hasOwnBinder()}
-     * true -- is fixed as far as this signature is concerned, the same way a concrete, non-variable type is: there is
-     * nothing to learn from matching into it, since none of its variables are free for this walk to bind. See
-     * {@see FuncShape::collectVariables()} for the same rule applied to what a signature's own binder is derived from.
+     * A parameter position that is itself a self-contained generic function type is fixed as far as this walk is
+     * concerned, the same way a concrete, non-variable type is -- see {@see Signature::hasOwnBinder()}.
      *
      * This is the recursive walk that applies to any type, not just a function's parameters, which is why it lives
      * here rather than on {@see Signature}; nothing outside the type system should call it directly. The function
@@ -405,7 +406,7 @@ final class Type implements Stringable
      */
     public function bind(self $actual, array $bindings): array
     {
-        $self = $this->canonical();
+        $self = $this;
         $actual = $actual->canonical();
         $selfShape = $self->shape;
         $actualShape = $actual->shape;

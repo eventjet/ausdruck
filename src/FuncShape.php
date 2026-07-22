@@ -9,10 +9,10 @@ use Override;
 use function array_map;
 
 /**
- * A function type -- see {@see Type::func()}. Whether the {@see Signature} held here owns a binder of its own is
- * {@see Signature::hasOwnBinder()}'s own answer, decided once, by {@see Signature::quantified()}, rather than
- * guessed from where this shape ends up sitting in a {@see Type} tree: a signature without one defers every
- * variable it reaches to whichever signature does, wherever that turns out to be.
+ * A function type -- see {@see Type::func()}. Whether the {@see Signature} held here owns a binder of its own, and
+ * what that means for the methods below, is {@see Signature::hasOwnBinder()}'s own answer to give, decided once by
+ * {@see Signature::quantified()} or {@see Signature::written()} rather than guessed from where this shape ends up
+ * sitting in a {@see Type} tree.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -25,8 +25,7 @@ final class FuncShape implements TypeShape
     }
 
     /**
-     * A signature with its own binder is opaque here: its variables are already quantified by itself, not free for
-     * whatever this shape is nested inside to claim -- see {@see Signature::hasOwnBinder()}.
+     * A signature with its own binder is opaque here -- see {@see Signature::hasOwnBinder()}.
      *
      * @param array<string, true> $found
      * @return array<string, true>
@@ -51,9 +50,7 @@ final class FuncShape implements TypeShape
     }
 
     /**
-     * A signature with its own binder is left untouched: substituting it would rewrite variables that belong to
-     * itself, not to whichever signature's own {@see Type::substitute()} call this shape is nested inside -- the
-     * same rule {@see self::collectVariables()} applies.
+     * A signature with its own binder is left untouched -- see {@see Signature::hasOwnBinder()}.
      *
      * @param array<string, Type> $bindings
      */
@@ -107,10 +104,7 @@ final class FuncShape implements TypeShape
     }
 
     /**
-     * A signature with its own binder is fixed as far as this walk is concerned, the same way {@see
-     * self::collectVariables()} and {@see self::substitute()} both treat one -- there is nothing to learn from
-     * matching into a self-contained generic signature, since none of its variables are free for the enclosing walk
-     * to bind.
+     * A signature with its own binder is fixed as far as this walk is concerned -- see {@see Signature::hasOwnBinder()}.
      *
      * Otherwise: the return type always binds, and a parameter binds unless $other's own parameter in that position
      * is `any`, which is every {@see Lambda} parameter -- see {@see Type::bind()}'s own docblock for why that's the
