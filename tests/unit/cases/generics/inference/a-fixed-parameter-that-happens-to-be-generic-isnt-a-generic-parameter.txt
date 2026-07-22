@@ -1,0 +1,15 @@
+(|x| x:int > 1).apply()
+-- Types --
+Mapper: fn<U>(U) -> U
+-- Functions --
+apply: fn(Mapper) -> int
+-- Type error --
+apply must be called on an expression of type Mapper, but |x| x:int > 1 is of type fn(any) -> bool
+-- Note --
+apply declares no binder of its own, so it isn't generic: Mapper is a fixed receiver type that happens to stand for a
+generic signature, not a type variable this call could decide. Before the binder a signature owns was stored rather
+than derived from tree position, a nested fn<U> reached through an alias like this one was invisible to the derivation
+walk and silently became part of apply's own binder instead -- which made this call type-check by instantiating U
+from the lambda, accepting any unary lambda where only a genuine ∀U. U -> U was declared. See
+an-alias-to-a-generic-signature-used-as-a-fixed-parameter-doesnt-borrow-its-binder for the same fix seen in how the
+type prints.

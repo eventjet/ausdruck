@@ -93,7 +93,7 @@ final class BuiltinFunctionsTest extends TestCase
 
     public function testDeclarationsExposeExactlyTheBuiltinsWithADeclaredType(): void
     {
-        $expected = array_keys(BuiltinFunctions::types());
+        $expected = array_keys(BuiltinFunctions::signatures());
         sort($expected);
 
         $declared = array_keys((new Declarations())->functions);
@@ -120,7 +120,7 @@ final class BuiltinFunctionsTest extends TestCase
      */
     public function testReadmeSpellsEveryBuiltinSignatureTheWayItIsDeclared(): void
     {
-        $declared = BuiltinFunctions::types();
+        $declared = BuiltinFunctions::signatures();
 
         foreach (self::readmeBuiltins() as $name => $signature) {
             self::assertSame(

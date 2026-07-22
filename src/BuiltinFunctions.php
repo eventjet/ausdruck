@@ -16,11 +16,11 @@ use function substr;
  * The single source of truth for the library's built-in functions.
  *
  * Every built-in has an implementation, exposed to evaluation ({@see Scope}) via {@see self::implementations()}, and a
- * declared {@see Type}, exposed to parsing ({@see Parser\Declarations}) via {@see self::types()}. Most of them are
- * generic: they say what they do to the elements of the list they're given without saying what those elements are, so
- * their signatures are written with {@see Type::var()} and are resolved per call site by {@see Signature::instantiateForCall()}.
- * That's what lets `count` accept any list while `contains` still insists that the needle is of the list's own element
- * type, and what makes `map` return a list of whatever its lambda returns.
+ * declared {@see Signature}, exposed to parsing ({@see Parser\Declarations}) via {@see self::signatures()}. Most of
+ * them are generic: they say what they do to the elements of the list they're given without saying what those elements
+ * are, so their signatures are written with {@see Type::var()} and are resolved per call site by
+ * {@see Signature::instantiateForCall()}. That's what lets `count` accept any list while `contains` still insists that
+ * the needle is of the list's own element type, and what makes `map` return a list of whatever its lambda returns.
  *
  * Keeping the name, implementation and signature together in one table here prevents the three from drifting apart.
  *
@@ -36,19 +36,6 @@ final class BuiltinFunctions
     public static function implementations(): array
     {
         return array_map(static fn(array $fn): callable => $fn['impl'], self::definitions());
-    }
-
-    /**
-     * The declared type of every built-in, keyed by name, for use at parse time.
-     *
-     * @return array<string, Type>
-     */
-    public static function types(): array
-    {
-        return array_map(
-            static fn(array $fn): Type => Type::func($fn['signature']->returnType, $fn['signature']->parameters),
-            self::definitions(),
-        );
     }
 
     /**

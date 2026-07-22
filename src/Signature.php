@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Override;
+use Stringable;
+
 use function array_keys;
 use function array_map;
 use function array_slice;
@@ -14,43 +17,83 @@ use function count;
  *
  * @api
  */
-final class Signature
+final class Signature implements Stringable
 {
     /**
      * @param list<Type> $parameters The types the PHP callable receives, in order, receiver first -- `substr` is
      *     declared as `fn(string, int, int) -> string` and called as `foo:string.substr:string(0, 3)`, so its
      *     parameters are `[string, int, int]` and `foo` is checked against the first of them; see
      *     {@see self::receiverType()} and {@see self::argumentTypes()}.
+     * @param list<string>|null $ownBinder The names this signature quantifies for itself, or null if it doesn't own
+     *     one at all -- see {@see self::hasOwnBinder()}. Only {@see Type::genericFunc()} ever passes a non-null
+     *     value here; every other caller leaves it null, deferring every variable this signature reaches to
+     *     whichever signature does own one.
      */
     public function __construct(
         public readonly Type $returnType,
         public readonly array $parameters = [],
+        private readonly array|null $ownBinder = null,
     ) {
     }
 
     /**
-     * The names this signature's own `fn<...>` binder declares, in the order first found walking $parameters then
-     * $returnType -- receiver first, then the rest of the parameters, then the return type, the same order
-     * {@see self::instantiateForCall()} decides them in -- without a duplicate, since one variable used twice is
-     * still one name. Derived fresh every time rather than stored, so it can never disagree with what this signature
-     * actually binds.
+     * This signature the way it would be written -- e.g. `fn<T>(list<T>) -> T` -- with {@see self::binder()}'s
+     * names in front, even when there are none to write.
+     */
+    #[Override]
+    public function __toString(): string
+    {
+        return TypeSyntax::func(
+            $this->binder(),
+            array_map(static fn(Type $parameter): string => (string)$parameter, $this->parameters),
+            (string)$this->returnType,
+        );
+    }
+
+    /**
+     * Whether this signature owns a binder of its own, decided once at construction rather than guessed from where
+     * this signature sits in a {@see Type} tree. A signature built through {@see Type::genericFunc()} -- and,
+     * through it, one {@see Parser\TypeResolution::resolveSignature()} resolves outside another one's own
+     * parameters or return type -- owns one, even an empty one; a signature built through {@see Type::func()}, or
+     * nested inside another written signature, never does, and defers every variable it reaches to whichever
+     * signature does.
      *
-     * Meaningful only once this signature is being read as a complete top-level declaration: a signature reached
-     * through another one's own parameters or return type, however many lists, Options or struct fields deep, owns
-     * none of the variables reachable inside it -- whichever signature encloses it does. Nothing on this object says
-     * which one this signature is; that's decided by where it sits in a {@see Type} tree, not by anything stored
-     * here -- see {@see Type::asFunction()} and {@see Type::__toString()}, the two places that call this on a
-     * signature they already know is the outermost one.
+     * This is what lets {@see FuncShape::collectVariables()}, {@see FuncShape::substitute()} and {@see Type::bind()}
+     * tell a self-contained generic function type -- one nested inside a list, an Option, a struct field, or
+     * standing behind an alias used as a parameter -- from one whose variables genuinely belong to whatever encloses
+     * it: the former is opaque to all three, since rank-1 polymorphism means its variables are already quantified by
+     * itself, never by whatever it's found inside.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     */
+    public function hasOwnBinder(): bool
+    {
+        return $this->ownBinder !== null;
+    }
+
+    /**
+     * The names this signature binds: what it was declared with, if {@see self::hasOwnBinder()} says there is one,
+     * or else the names first found walking $parameters then $returnType -- receiver first, then the rest of the
+     * parameters, then the return type, the same order {@see self::instantiateForCall()} decides them in -- without
+     * a duplicate, since one variable used twice is still one name.
+     *
+     * The derived fallback is what a signature built through {@see Type::func()} relies on: it never owns a binder
+     * of its own, so reading one back through {@see Type::asFunction()} derives it fresh from wherever the
+     * variables it reaches turned out to be.
      *
      * @return list<string>
      */
     public function binder(): array
     {
+        if ($this->ownBinder !== null) {
+            return $this->ownBinder;
+        }
         $found = [];
         foreach ($this->parameters as $parameter) {
-            $found = Type::collectVariables($parameter, $found);
+            $found = $parameter->collectVariables($found);
         }
-        $found = Type::collectVariables($this->returnType, $found);
+        $found = $this->returnType->collectVariables($found);
         return array_keys($found);
     }
 
@@ -93,19 +136,10 @@ final class Signature
      * says what was expected and {@see Expr::call()}'s receiver and argument checks report it, pointing at the
      * expression that's wrong.
      *
-     * A signature whose {@see self::binder()} names no variable at all is returned unchanged rather than substituted
-     * for nothing: this is only ever called on a signature obtained from {@see Type::asFunction()}, so an empty
-     * binder here means there is no variable left anywhere in $returnType or $parameters for {@see Type::bind()} to
-     * find, and substituting would walk the whole signature only to rebuild it unchanged. Skipping it is purely that
-     * optimization -- correct either way, not load-bearing for either.
-     *
      * @param list<Type> $argumentTypes
      */
     public function instantiateForCall(Type $receiver, array $argumentTypes): self
     {
-        if ($this->binder() === []) {
-            return $this;
-        }
         $arguments = [$receiver, ...$argumentTypes];
         $bindings = [];
         // Only the parameters an argument faces have anything to say. A call with the wrong number of arguments is

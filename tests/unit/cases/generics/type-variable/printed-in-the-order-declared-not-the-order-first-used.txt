@@ -1,0 +1,7 @@
+foo:fn<U, T>(list<T>, fn(T) -> U) -> list<U>
+-- Expression type --
+fn<U, T>(list<T>, fn(T) -> U) -> list<U>
+-- Note --
+U is declared first but T is the one a left-to-right walk of the parameters and the return type would see first, in
+list<T>. The binder is stored as written, not derived by that walk, so it prints back in the order it was declared --
+U before T -- rather than reordering it to the order it happens to be used in.

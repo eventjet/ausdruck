@@ -230,12 +230,17 @@ is a `list<string>` — the same function, two return types, neither of them wri
 
 A binder is the whole of a variable's scope, so a variable is a type anywhere below the `fn` that binds it, and a name
 no binder declares is not a variable: it is an alias, or an error. That's enforced for a signature written as a type
-string, where only a `fn<...>` binder can introduce a name that resolves to a variable. The binder itself is derived,
-not declared: it's exactly the variables that turn out to be used in the parameters and the return type, so a written
-`fn<T, U>(int) -> int` where neither `T` nor `U` appears anywhere is rejected -- a name in the binder has to earn its
-place. `Type::func()`, built directly through the PHP API instead of parsed from a type string, follows the same
-rule: a `Type::var()` used inside it is picked up automatically, wherever it's used, by whichever `Type::func()`
-encloses it.
+string, where only a `fn<...>` binder can introduce a name that resolves to a variable. The binder itself is checked
+against, not just declared: it has to be exactly the variables that turn out to be used in the parameters and the
+return type, so a written `fn<T, U>(int) -> int` where neither `T` nor `U` appears anywhere is rejected -- a name in
+the binder has to earn its place.
+
+In PHP, `Type::func()` follows a looser version of the same rule: a `Type::var()` used inside it is picked up
+automatically, wherever it's used, on the assumption that whatever reads the result back is treating it as a
+complete, top-level signature rather than one nested inside another. That assumption doesn't hold for a signature
+that is itself used as a fixed parameter type, a list's element type, or a struct field -- `Type::genericFunc()` is
+the PHP-API equivalent of writing a `fn<...>` binder explicitly: it takes the binder as an argument and validates it
+against the variables actually reachable, both ways, the same as a written signature is checked.
 
 Because the call site decides them, the inline return type is rarely worth writing: `foo:list<string>.head()` is
 already an `Option<string>`. Writing one anyway is still allowed, and is then checked against the inferred one.

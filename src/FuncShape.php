@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Override;
+
+use function array_map;
+
 /**
- * A function type -- see {@see Type::func()}. The {@see Signature} held here doesn't know, by itself, whether it
- * will be read as a complete top-level declaration or embedded as another one's own parameter or return type --
- * only the first of those actually owns the {@see Signature::binder()} it derives, since rank-1 polymorphism gives
- * every variable reachable inside a signature to whichever one encloses it. Nothing on the signature records which
- * one this is; {@see Type::asFunction()} and {@see Type::toString()} decide that by where this shape sits in a
- * {@see Type} tree, not by anything stored here.
+ * A function type -- see {@see Type::func()} and {@see Type::genericFunc()}. Whether the {@see Signature} held here
+ * owns a binder of its own is {@see Signature::hasOwnBinder()}'s own answer, decided once when the signature was
+ * built rather than guessed from where this shape ends up sitting in a {@see Type} tree: a signature without one
+ * defers every variable it reaches to whichever signature does, wherever that turns out to be.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -20,5 +22,60 @@ final class FuncShape implements TypeShape
     public function __construct(
         public readonly Signature $signature,
     ) {
+    }
+
+    #[Override]
+    public function name(): string
+    {
+        return 'fn';
+    }
+
+    /**
+     * A signature with its own binder is opaque here: its variables are already quantified by itself, not free for
+     * whatever this shape is nested inside to claim -- see {@see Signature::hasOwnBinder()}.
+     *
+     * @param array<string, true> $found
+     * @return array<string, true>
+     */
+    #[Override]
+    public function collectVariables(array $found): array
+    {
+        $signature = $this->signature;
+        if ($signature->hasOwnBinder()) {
+            return $found;
+        }
+        foreach ($signature->parameters as $parameter) {
+            $found = $parameter->collectVariables($found);
+        }
+        return $signature->returnType->collectVariables($found);
+    }
+
+    #[Override]
+    public function toString(): string
+    {
+        $signature = $this->signature;
+        $binder = $signature->hasOwnBinder() ? $signature->binder() : [];
+        $params = array_map(static fn(Type $arg): string => (string)$arg, $signature->parameters);
+        return TypeSyntax::func($binder, $params, (string)$signature->returnType);
+    }
+
+    /**
+     * A signature with its own binder is left untouched: substituting it would rewrite variables that belong to
+     * itself, not to whichever signature's own {@see Type::substitute()} call this shape is nested inside -- the
+     * same rule {@see self::collectVariables()} applies.
+     *
+     * @param array<string, Type> $bindings
+     */
+    #[Override]
+    public function substitute(array $bindings): static
+    {
+        $signature = $this->signature;
+        if ($signature->hasOwnBinder()) {
+            return $this;
+        }
+        return new self(new Signature(
+            $signature->returnType->substitute($bindings),
+            array_map(static fn(Type $parameter): Type => $parameter->substitute($bindings), $signature->parameters),
+        ));
     }
 }

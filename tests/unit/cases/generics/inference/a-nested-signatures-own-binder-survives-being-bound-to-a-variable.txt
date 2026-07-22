@@ -1,0 +1,13 @@
+foo:list<fn<U>(U) -> U>.pick(1)
+-- Functions --
+pick: fn<T>(list<T>, int) -> fn(T) -> int
+-- Expression type --
+fn(fn<U>(U) -> U) -> int
+-- Note --
+pick's own T is bound to foo's element type, fn<U>(U) -> U, a self-contained generic signature in its own right --
+its-own-binder-survives-nesting-in-a-list pins that such a value is legal. Substituting T into pick's return type,
+fn(T) -> int, has to place that whole signature there without disturbing it: the result is fn(fn<U>(U) -> U) -> int,
+not fn<U>(fn(U) -> U) -> int. The latter is what substitute() used to produce before a nested signature's own binder
+travelled with it: T's binding carried the U inside it, and the outer wrapper -- fn(T) -> int, which owns no
+variables of its own -- derived a binder from whatever variables it could still see once T was replaced, mistakenly
+inheriting U instead of leaving it where it already belonged.

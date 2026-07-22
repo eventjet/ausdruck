@@ -12,6 +12,7 @@ use LogicException;
 use function array_fill_keys;
 use function array_key_exists;
 use function array_key_last;
+use function array_map;
 use function assert;
 use function count;
 use function sprintf;
@@ -250,10 +251,21 @@ final class TypeResolution
      * one place that rule is enforced: {@see Type::func()} takes no binder a caller could nest one into, so there is
      * nothing left for it to reject the same shape with.
      *
-     * $node->typeParameters is what's written, not what {@see Signature::__construct()} would derive from how the
-     * result is actually used, so the two are checked against each other once the signature is built: a name written
-     * here that doesn't appear in a parameter or the return type is declared for nothing, and rejected rather than
+     * $node->typeParameters is what's written, not what {@see Signature::binder()} would derive from how the result
+     * is actually used, so the two are checked against each other once the signature is built: a name written here
+     * that doesn't appear in a parameter or the return type is declared for nothing, and rejected rather than
      * quietly accepted -- see {@see self::firstUnused()}.
+     *
+     * $node sits outside every enclosing signature's own parameters and return type exactly when
+     * $this->nestedInSignature is false -- the two are set together, in the branch below, for everything resolved
+     * beneath an enclosing `fn` -- which is also exactly when it's legal for $node to have written a binder of its
+     * own. That's the signal for which of {@see Type::func()} and {@see Type::genericFunc()} builds the result: a
+     * nested $node, however many lists, Options or struct fields deep, always defers its variables to whichever
+     * signature encloses it, the same as {@see Type::func()} always has; one that isn't nested owns whatever it
+     * declared -- even nothing, if it wrote no binder at all -- so it's built with that binder stored on it
+     * directly, rather than left to be derived later from wherever it happens to end up nested inside something
+     * else, which is what let a generic function type used as a fixed parameter type -- an alias, a list element --
+     * have its own variables mistaken for its enclosing signature's own.
      */
     private function resolveSignature(FunctionTypeNode $node): Type|TypeError
     {
@@ -300,7 +312,11 @@ final class TypeResolution
                 $unused->location,
             );
         }
-        return Type::func($returnType, $argTypes);
+        if ($this->nestedInSignature) {
+            return Type::func($returnType, $argTypes);
+        }
+        $binder = array_map(static fn(Identifier $parameter): string => $parameter->name, $node->typeParameters);
+        return Type::genericFunc($binder, $returnType, $argTypes);
     }
 
     private function resolveStruct(StructTypeNode $node): Type|TypeError
