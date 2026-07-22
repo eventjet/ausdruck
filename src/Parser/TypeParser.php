@@ -103,7 +103,7 @@ final class TypeParser
             return self::parseFunction($tokens, $parsedToken->location());
         }
         if ($tokens->peek()?->token !== Token::OpenAngle) {
-            return new TypeNode($name, [], $parsedToken->location());
+            return new ApplicationTypeNode($name, [], $parsedToken->location());
         }
         // Only a name with a declared arity of its own can commit to reading a type argument list. A name that isn't a
         // built-in constructor has none, and neither has one that is never written `name<...>` in the first place —
@@ -121,11 +121,11 @@ final class TypeParser
             // (`int<string>`) is read as a type on purpose, so the resolver can reject it by name.
             $args = self::tryTypeArguments($tokens);
             if ($args === null) {
-                return new TypeNode($name, [], $parsedToken->location());
+                return new ApplicationTypeNode($name, [], $parsedToken->location());
             }
         }
         $closeAngle = self::expect($tokens, Token::CloseAngle);
-        return new TypeNode($name, $args, $parsedToken->location()->to($closeAngle->location()));
+        return new ApplicationTypeNode($name, $args, $parsedToken->location()->to($closeAngle->location()));
     }
 
     /**

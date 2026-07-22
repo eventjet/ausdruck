@@ -7,6 +7,7 @@ namespace Eventjet\Ausdruck\Parser;
 use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Type;
 use Eventjet\Ausdruck\TypeConstructor;
+use LogicException;
 
 use function array_fill_keys;
 use function array_key_exists;
@@ -55,7 +56,7 @@ final class TypeResolution
      *
      * @param int<0, max> $expected
      */
-    private static function checkArity(TypeNode $node, int $expected): TypeError|null
+    private static function checkArity(ApplicationTypeNode $node, int $expected): TypeError|null
     {
         $args = $node->args;
         $given = count($args);
@@ -105,18 +106,19 @@ final class TypeResolution
     }
 
     /**
-     * The first name $node->typeParameters declares that $signature doesn't also derive for itself, or null if every
-     * declared name is put to use. A binder is written, not inferred, so a name that appears in it has to earn its
-     * place the same way any other written thing does.
+     * The first name $typeParameters declares that $binder doesn't also derive for itself, or null if every declared
+     * name is put to use. A binder is written, not inferred, so a name that appears in it has to earn its place the
+     * same way any other written thing does.
      *
      * @param list<Identifier> $typeParameters
+     * @param list<string> $binder
      */
-    private static function firstUnused(array $typeParameters, Signature $signature): Identifier|null
+    private static function firstUnused(array $typeParameters, array $binder): Identifier|null
     {
         if ($typeParameters === []) {
             return null;
         }
-        $derived = array_fill_keys($signature->typeVariables, true);
+        $derived = array_fill_keys($binder, true);
         foreach ($typeParameters as $parameter) {
             if (!array_key_exists($parameter->name, $derived)) {
                 return $parameter;
@@ -129,7 +131,8 @@ final class TypeResolution
      * A function type and a struct type are each their own node class, so they're told apart and dispatched before
      * anything else here asks what $node is named: {@see FunctionTypeNode} is a shape {@see self::resolveSignature()}
      * also handles directly, and a struct has no name at all, so it has no {@see TypeConstructor} case to be found by
-     * one.
+     * one. Everything past that dispatch is an {@see ApplicationTypeNode} -- the only other {@see TypeNode} there
+     * is -- which is what lets it, alone among the three, actually have a $name to ask about.
      *
      * Otherwise: a name the language spells itself is one of the other {@see TypeConstructor}s; the name a `fn<...>`
      * binder enclosing this node introduced is a type variable; anything else is a consumer's alias, or nothing at
@@ -142,6 +145,9 @@ final class TypeResolution
         }
         if ($node instanceof StructTypeNode) {
             return $this->resolveStruct($node);
+        }
+        if (!$node instanceof ApplicationTypeNode) {
+            throw new LogicException(sprintf('Unhandled type node %s', $node::class));
         }
         if (array_key_exists($node->name, $this->typeVariables)) {
             // A variable stands for one complete type, so like an alias it takes no arguments of its own.
@@ -172,14 +178,14 @@ final class TypeResolution
         };
     }
 
-    private function resolveList(TypeNode $node): Type|TypeError
+    private function resolveList(ApplicationTypeNode $node): Type|TypeError
     {
         assert(count($node->args) === 1);
         $valueType = $this->resolve($node->args[0]);
         return $valueType instanceof TypeError ? $valueType : Type::listOf($valueType);
     }
 
-    private function resolveMap(TypeNode $node): Type|TypeError
+    private function resolveMap(ApplicationTypeNode $node): Type|TypeError
     {
         assert(count($node->args) === 2);
         $args = $node->args;
@@ -206,7 +212,7 @@ final class TypeResolution
      * of silently dropping them—`Foo<int>` is as invalid as `int<string>`. {@see TypeParser::parse()} counts on that:
      * it reads a closed argument list after any name and leaves rejecting it to this resolver.
      */
-    private function resolveAlias(TypeNode $node): Type|TypeError|null
+    private function resolveAlias(ApplicationTypeNode $node): Type|TypeError|null
     {
         $type = $this->aliases[$node->name] ?? null;
         if ($type === null) {
@@ -219,13 +225,13 @@ final class TypeResolution
      * An Option is a Some that may be absent, so it is the type of its argument and nothing more—which is what
      * {@see self::resolveSome()} already resolves.
      */
-    private function resolveOption(TypeNode $node): Type|TypeError
+    private function resolveOption(ApplicationTypeNode $node): Type|TypeError
     {
         $some = $this->resolveSome($node);
         return $some instanceof TypeError ? $some : Type::option($some);
     }
 
-    private function resolveSome(TypeNode $node): Type|TypeError
+    private function resolveSome(ApplicationTypeNode $node): Type|TypeError
     {
         assert(count($node->args) === 1);
         return $this->resolve($node->args[0]);
@@ -270,8 +276,8 @@ final class TypeResolution
         }
         $inner = new self($this->aliases, $typeVariables, nestedInSignature: true);
         $argTypes = [];
-        foreach ($node->args as $arg) {
-            $argType = $inner->resolve($arg);
+        foreach ($node->parameters as $parameter) {
+            $argType = $inner->resolve($parameter);
             if ($argType instanceof TypeError) {
                 return $argType;
             }
@@ -281,13 +287,10 @@ final class TypeResolution
         if ($returnType instanceof TypeError) {
             return $returnType;
         }
-        // Built once and read back through asFunction() rather than built a second time from $returnType and
-        // $argTypes: that's also what derives the binder firstUnused() checks against, so there's nothing to build
-        // here that isn't already an answer to that question.
-        $type = Type::func($returnType, $argTypes);
-        $signature = $type->asFunction();
-        assert($signature !== null);
-        $unused = self::firstUnused($node->typeParameters, $signature);
+        // A plain Signature, not read back through Type::func()->asFunction(): that round trip existed only to get a
+        // binder to check firstUnused() against, and Signature::binder() derives the same thing directly from the
+        // return type and parameters this method already resolved.
+        $unused = self::firstUnused($node->typeParameters, (new Signature($returnType, $argTypes))->binder());
         if ($unused !== null) {
             return TypeError::create(
                 sprintf(
@@ -297,7 +300,7 @@ final class TypeResolution
                 $unused->location,
             );
         }
-        return $type;
+        return Type::func($returnType, $argTypes);
     }
 
     private function resolveStruct(StructTypeNode $node): Type|TypeError

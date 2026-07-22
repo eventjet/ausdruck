@@ -278,7 +278,7 @@ final class TypeTest extends TestCase
     {
         $signature = Type::func(Type::var('T'))->asFunction();
 
-        self::assertSame(['T'], $signature?->typeVariables);
+        self::assertSame(['T'], $signature?->binder());
     }
 
     /**

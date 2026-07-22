@@ -26,7 +26,7 @@ final class StructTypeNode extends TypeNode
         public readonly array $fields,
         Span $location,
     ) {
-        parent::__construct('', [], $location);
+        parent::__construct($location);
     }
 
     #[Override]

@@ -4,36 +4,22 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
-use Eventjet\Ausdruck\TypeSyntax;
-use Override;
 use Stringable;
 
-use function array_map;
-
 /**
- * A name applied to type arguments, e.g. `map<T, U>` or a bare `int`. {@see FieldTypeNode}, {@see FunctionTypeNode}
- * and {@see StructTypeNode} are their own classes, built directly by {@see TypeParser} rather than through a factory
- * here, because each carries parts -- a field's name and type, a function's return type and binder, a struct's
- * fields -- that nothing here has anywhere to put.
+ * A resolvable unit of parsed type syntax, told apart by which of its three subclasses it actually is: a name
+ * applied to arguments ({@see ApplicationTypeNode}), a function type ({@see FunctionTypeNode}), or a struct type
+ * ({@see StructTypeNode}) -- the same three {@see TypeResolution::resolve()} dispatches on. Carries only what's
+ * common to all three: the span it was written at, and how to print it back, which is why this doesn't also declare
+ * a $name or an $args a subclass would otherwise have to invent to fill.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-class TypeNode implements Stringable
+abstract class TypeNode implements Stringable
 {
-    /**
-     * @param list<self> $args The type's arguments, e.g. `T` and `U` in `map<T, U>`.
-     */
     public function __construct(
-        public readonly string $name,
-        public readonly array $args,
         public readonly Span $location,
     ) {
-    }
-
-    #[Override]
-    public function __toString(): string
-    {
-        return TypeSyntax::application($this->name, array_map(static fn(self $arg): string => (string)$arg, $this->args));
     }
 }

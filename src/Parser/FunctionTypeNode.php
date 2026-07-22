@@ -11,9 +11,11 @@ use function array_map;
 
 /**
  * A function type, `fn<T>(int) -> T`: the one shape with a return type and a binder of its own, so the one that
- * needs more than a name and its arguments. {@see TypeParser} builds one, and
- * {@see TypeResolution::resolveSignature()} is the one place that reads $returnType and $typeParameters -- both are
- * unconditionally there rather than nullable, so nothing has to assert that a node named `fn` has them.
+ * needs more than a name and its arguments -- and the one with no name of its own either, unlike
+ * {@see ApplicationTypeNode}: it's never looked up by one, only ever recognized by {@see TypeParser::parse()} seeing
+ * the keyword `fn` and routing to {@see TypeParser::parseFunction()} directly. {@see TypeResolution::resolveSignature()}
+ * is the one place that reads $parameters, $returnType and $typeParameters -- all unconditionally there rather than
+ * nullable, so nothing has to assert that they exist.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -27,12 +29,12 @@ final class FunctionTypeNode extends TypeNode
      *     carrying the span an error about it points at; see {@see TypeResolution::checkTypeVariable()}.
      */
     public function __construct(
-        array $parameters,
+        public readonly array $parameters,
         public readonly TypeNode $returnType,
         public readonly array $typeParameters,
         Span $location,
     ) {
-        parent::__construct('fn', $parameters, $location);
+        parent::__construct($location);
     }
 
     #[Override]
@@ -40,7 +42,7 @@ final class FunctionTypeNode extends TypeNode
     {
         return TypeSyntax::func(
             array_map(static fn(Identifier $parameter): string => $parameter->name, $this->typeParameters),
-            array_map(static fn(TypeNode $arg): string => (string)$arg, $this->args),
+            array_map(static fn(TypeNode $arg): string => (string)$arg, $this->parameters),
             (string)$this->returnType,
         );
     }

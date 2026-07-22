@@ -8,7 +8,6 @@ use Countable;
 
 use function array_map;
 use function array_slice;
-use function assert;
 use function count;
 use function in_array;
 use function substr;
@@ -40,29 +39,26 @@ final class BuiltinFunctions
     }
 
     /**
-     * The declared signature of every built-in, keyed by name, for use at parse time.
+     * The declared type of every built-in, keyed by name, for use at parse time.
      *
      * @return array<string, Type>
      */
     public static function types(): array
     {
-        return array_map(static fn(array $fn): Type => $fn['type'], self::definitions());
+        return array_map(
+            static fn(array $fn): Type => Type::func($fn['signature']->returnType, $fn['signature']->parameters),
+            self::definitions(),
+        );
     }
 
     /**
-     * The declared signature of every built-in, keyed by name, for use at parse time. Every entry in
-     * {@see self::definitions()} is declared with {@see Type::func()}, so {@see Type::asFunction()} is never null
-     * here -- the assert is for the type checker, not because this can go wrong at runtime.
+     * The declared signature of every built-in, keyed by name, for use at parse time.
      *
      * @return array<string, Signature>
      */
     public static function signatures(): array
     {
-        return array_map(static function (Type $type): Signature {
-            $signature = $type->asFunction();
-            assert($signature !== null);
-            return $signature;
-        }, self::types());
+        return array_map(static fn(array $fn): Signature => $fn['signature'], self::definitions());
     }
 
     /**
@@ -73,7 +69,7 @@ final class BuiltinFunctions
      * `head` answers an `Option` of it, and `map` answers a list of whatever its lambda returns, `U`. See
      * {@see Signature::instantiateForCall()} for how a call site decides them.
      *
-     * @return array<string, array{impl: callable, type: Type}>
+     * @return array<string, array{impl: callable, signature: Signature}>
      */
     private static function definitions(): array
     {
@@ -82,24 +78,30 @@ final class BuiltinFunctions
         $predicate = Type::func(Type::bool(), [$item]);
         $mapped = Type::var('U');
         return [
-            'contains' => ['impl' => self::contains(...), 'type' => Type::func(Type::bool(), [$items, $item])],
+            'contains' => ['impl' => self::contains(...), 'signature' => new Signature(Type::bool(), [$items, $item])],
             // Not generic: count and isSome answer the same thing whatever the list or Option holds, so the element
             // type their receiver could have named would go unused. list<any> and Option<any> say that directly,
             // rather than naming a T that nothing but the receiver would ever read.
-            'count' => ['impl' => self::count(...), 'type' => Type::func(Type::int(), [Type::listOf(Type::any())])],
-            'filter' => ['impl' => self::filter(...), 'type' => Type::func($items, [$items, $predicate])],
-            'head' => ['impl' => self::head(...), 'type' => Type::func(Type::option($item), [$items])],
-            'isSome' => ['impl' => self::isSome(...), 'type' => Type::func(Type::bool(), [Type::option(Type::any())])],
+            'count' => ['impl' => self::count(...), 'signature' => new Signature(Type::int(), [Type::listOf(Type::any())])],
+            'filter' => ['impl' => self::filter(...), 'signature' => new Signature($items, [$items, $predicate])],
+            'head' => ['impl' => self::head(...), 'signature' => new Signature(Type::option($item), [$items])],
+            'isSome' => [
+                'impl' => self::isSome(...),
+                'signature' => new Signature(Type::bool(), [Type::option(Type::any())]),
+            ],
             'map' => [
                 'impl' => self::map(...),
-                'type' => Type::func(Type::listOf($mapped), [$items, Type::func($mapped, [$item])]),
+                'signature' => new Signature(Type::listOf($mapped), [$items, Type::func($mapped, [$item])]),
             ],
-            'some' => ['impl' => self::some(...), 'type' => Type::func(Type::bool(), [$items, $predicate])],
-            'substr' => ['impl' => substr(...), 'type' => Type::func(Type::string(), [Type::string(), Type::int(), Type::int()])],
-            'tail' => ['impl' => self::tail(...), 'type' => Type::func($items, [$items])],
-            'take' => ['impl' => self::take(...), 'type' => Type::func($items, [$items, Type::int()])],
-            'unique' => ['impl' => self::unique(...), 'type' => Type::func($items, [$items])],
-            'unwrap' => ['impl' => self::identity(...), 'type' => Type::func($item, [Type::option($item)])],
+            'some' => ['impl' => self::some(...), 'signature' => new Signature(Type::bool(), [$items, $predicate])],
+            'substr' => [
+                'impl' => substr(...),
+                'signature' => new Signature(Type::string(), [Type::string(), Type::int(), Type::int()]),
+            ],
+            'tail' => ['impl' => self::tail(...), 'signature' => new Signature($items, [$items])],
+            'take' => ['impl' => self::take(...), 'signature' => new Signature($items, [$items, Type::int()])],
+            'unique' => ['impl' => self::unique(...), 'signature' => new Signature($items, [$items])],
+            'unwrap' => ['impl' => self::identity(...), 'signature' => new Signature($item, [Type::option($item)])],
         ];
     }
 
