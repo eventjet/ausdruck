@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Eventjet\Ausdruck\Type;
 use Eventjet\Ausdruck\TypeSyntax;
 use Override;
 
@@ -38,5 +39,11 @@ final class ApplicationTypeNode extends TypeNode
             $this->name,
             array_map(static fn(TypeNode $arg): string => (string)$arg, $this->args),
         );
+    }
+
+    #[Override]
+    public function resolveWith(TypeResolution $resolution): Type|TypeError
+    {
+        return $resolution->resolveApplication($this);
     }
 }

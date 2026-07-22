@@ -9,7 +9,6 @@ use Override;
 use function array_intersect_key;
 use function array_key_exists;
 use function array_map;
-use function assert;
 
 /**
  * A struct, written as its fields between `{ }` rather than as a name -- see {@see Type::struct()}.
@@ -40,6 +39,20 @@ final class StructShape implements TypeShape
         return $found;
     }
 
+    /**
+     * Folds {@see TypeShape::hasNestedBinder()} over $fields -- see there for what this asks.
+     */
+    #[Override]
+    public function hasNestedBinder(): bool
+    {
+        foreach ($this->fields as $field) {
+            if ($field->hasNestedBinder()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     #[Override]
     public function toString(): string
     {
@@ -61,12 +74,16 @@ final class StructShape implements TypeShape
 
     /**
      * A struct is a subtype of another if it has at least the fields the other does, each of a subtype of the
-     * other's -- it may have more, which is what makes a struct type structural rather than nominal.
+     * other's -- it may have more, which is what makes a struct type structural rather than nominal. $other isn't
+     * necessarily a struct at all: {@see Type::isSubtypeOf()} no longer checks that before asking, so a shape
+     * mismatch is rejected here rather than upstream.
      */
     #[Override]
     public function isSubtypeOfSame(TypeShape $other): bool
     {
-        assert($other instanceof self);
+        if (!$other instanceof self) {
+            return false;
+        }
         foreach ($other->fields as $name => $fieldType) {
             if (!array_key_exists($name, $this->fields)) {
                 return false;
@@ -80,7 +97,7 @@ final class StructShape implements TypeShape
 
     /**
      * A struct can be written with fewer fields than one reaches into. What the two have in common is what there is
-     * to learn from.
+     * to learn from -- and nothing is, if $other isn't even a struct.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
@@ -88,7 +105,9 @@ final class StructShape implements TypeShape
     #[Override]
     public function bindSame(TypeShape $other, array $bindings): array
     {
-        assert($other instanceof self);
+        if (!$other instanceof self) {
+            return $bindings;
+        }
         foreach (array_intersect_key($this->fields, $other->fields) as $name => $field) {
             $bindings = $field->bind($other->fields[$name], $bindings);
         }

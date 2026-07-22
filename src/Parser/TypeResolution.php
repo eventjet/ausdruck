@@ -7,7 +7,6 @@ namespace Eventjet\Ausdruck\Parser;
 use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Type;
 use Eventjet\Ausdruck\TypeConstructor;
-use LogicException;
 
 use function array_fill_keys;
 use function array_key_exists;
@@ -129,27 +128,24 @@ final class TypeResolution
     }
 
     /**
-     * A function type and a struct type are each their own node class, so they're told apart and dispatched before
-     * anything else here asks what $node is named: {@see FunctionTypeNode} is a shape {@see self::resolveSignature()}
-     * also handles directly, and a struct has no name at all, so it has no {@see TypeConstructor} case to be found by
-     * one. Everything past that dispatch is an {@see ApplicationTypeNode} -- the only other {@see TypeNode} there
-     * is -- which is what lets it, alone among the three, actually have a $name to ask about.
-     *
-     * Otherwise: a name the language spells itself is one of the other {@see TypeConstructor}s; the name a `fn<...>`
-     * binder enclosing this node introduced is a type variable; anything else is a consumer's alias, or nothing at
-     * all.
+     * Delegates outright, the same way {@see Types::resolve()} delegates to this class: which of
+     * {@see self::resolveApplication()}, {@see self::resolveSignature()} or {@see self::resolveStruct()} answers is
+     * {@see TypeNode::resolveWith()}'s call, one method per subclass rather than an `instanceof` chain repeated here
+     * -- see there for why.
      */
     public function resolve(TypeNode $node): Type|TypeError
     {
-        if ($node instanceof FunctionTypeNode) {
-            return $this->resolveSignature($node);
-        }
-        if ($node instanceof StructTypeNode) {
-            return $this->resolveStruct($node);
-        }
-        if (!$node instanceof ApplicationTypeNode) {
-            throw new LogicException(sprintf('Unhandled type node %s', $node::class));
-        }
+        return $node->resolveWith($this);
+    }
+
+    /**
+     * $node is the only one of the three {@see TypeNode} subclasses with a $name to ask about at all -- a function
+     * type is {@see self::resolveSignature()}'s own shape, and a struct type has no name -- so this is the one place
+     * a name the language spells itself is told apart from the name a `fn<...>` binder enclosing this node
+     * introduced as a type variable, from a consumer's alias, or from nothing at all.
+     */
+    public function resolveApplication(ApplicationTypeNode $node): Type|TypeError
+    {
         if (array_key_exists($node->name, $this->typeVariables)) {
             // A variable stands for one complete type, so like an alias it takes no arguments of its own.
             return self::checkArity($node, 0) ?? Type::var($node->name);
@@ -177,6 +173,97 @@ final class TypeResolution
             TypeConstructor::Some => $this->resolveSome($node),
             TypeConstructor::None => Type::none(),
         };
+    }
+
+    /**
+     * A function type is the one type that binds names of its own: the `<T, U>` in front of its parameters says which
+     * of the names inside it the call site decides rather than the declaration. The binder is in scope for the
+     * parameters and the return type alike, so a fresh resolution with the binder's names added is what resolves both.
+     *
+     * $node is rejected outright if it writes a binder of its own while $this->nestedInSignature is already true --
+     * see this class's own docblock for why a nested function type can never legally have one. The same flag is also
+     * the signal for which of {@see Type::nestedFunc()} and {@see Type::genericFunc()} builds the result: nested, it's
+     * built through {@see Type::nestedFunc()}, deferring every variable it reaches to whichever signature encloses
+     * it; not nested, it owns whatever it declared -- even nothing, if it wrote no binder at all -- built through
+     * {@see Type::genericFunc()}, with that binder stored on it directly.
+     *
+     * $node->typeParameters is what's written, not what {@see Signature::freeVariables()} would find from how the
+     * result is actually used, so the two are checked against each other once the signature is built: a name written
+     * here that doesn't appear in a parameter or the return type is declared for nothing, and rejected rather than
+     * quietly accepted -- see {@see self::firstUnused()}.
+     *
+     * Public, not private, so {@see FunctionTypeNode::resolveWith()} can call back into it: see {@see self::resolve()}.
+     */
+    public function resolveSignature(FunctionTypeNode $node): Type|TypeError
+    {
+        if ($this->nestedInSignature && $node->typeParameters !== []) {
+            $first = $node->typeParameters[0];
+            $last = $node->typeParameters[array_key_last($node->typeParameters)];
+            return TypeError::create(
+                'A function type nested inside another one can\'t bind type variables of its own: a variable is '
+                    . 'quantified once, by whichever function type encloses it',
+                $first->location->to($last->location),
+            );
+        }
+        $typeVariables = $this->typeVariables;
+        foreach ($node->typeParameters as $parameter) {
+            $error = $this->checkTypeVariable($parameter, $typeVariables);
+            if ($error !== null) {
+                return $error;
+            }
+            $typeVariables[$parameter->name] = true;
+        }
+        $inner = new self($this->aliases, $typeVariables, nestedInSignature: true);
+        $argTypes = [];
+        foreach ($node->parameters as $parameter) {
+            $argType = $inner->resolve($parameter);
+            if ($argType instanceof TypeError) {
+                return $argType;
+            }
+            $argTypes[] = $argType;
+        }
+        $returnType = $inner->resolve($node->returnType);
+        if ($returnType instanceof TypeError) {
+            return $returnType;
+        }
+        // Which variables $returnType and $argTypes reach, not what a Signature's own binder is -- the question
+        // this asks either way, so it goes straight to the walk Type::func() and Type::genericFunc() both derive
+        // and check the same thing from, rather than building a Signature just to read it back off one. This is
+        // purely for the error below, which needs a written parameter's own location to point at; Type::genericFunc()
+        // repeats the same walk once more once $binder is handed to it, rather than trusting this one, since it has
+        // no way to tell a caller who skipped straight to it from one who's already done this check.
+        $free = Signature::freeVariables($returnType, $argTypes);
+        $unused = self::firstUnused($node->typeParameters, $free);
+        if ($unused !== null) {
+            return TypeError::create(
+                sprintf(
+                    '%s is declared but doesn\'t appear in the parameters or the return type, so no call could ever decide it',
+                    $unused->name,
+                ),
+                $unused->location,
+            );
+        }
+        if ($this->nestedInSignature) {
+            return Type::nestedFunc($returnType, $argTypes);
+        }
+        $binder = array_map(static fn(Identifier $parameter): string => $parameter->name, $node->typeParameters);
+        return Type::genericFunc($binder, $returnType, $argTypes);
+    }
+
+    /**
+     * Public, not private, so {@see StructTypeNode::resolveWith()} can call back into it: see {@see self::resolve()}.
+     */
+    public function resolveStruct(StructTypeNode $node): Type|TypeError
+    {
+        $fields = [];
+        foreach ($node->fields as $field) {
+            $type = $this->resolve($field->fieldType);
+            if ($type instanceof TypeError) {
+                return $type;
+            }
+            $fields[$field->fieldName->name] = $type;
+        }
+        return Type::struct($fields);
     }
 
     private function resolveList(ApplicationTypeNode $node): Type|TypeError
@@ -236,92 +323,6 @@ final class TypeResolution
     {
         assert(count($node->args) === 1);
         return $this->resolve($node->args[0]);
-    }
-
-    /**
-     * A function type is the one type that binds names of its own: the `<T, U>` in front of its parameters says which
-     * of the names inside it the call site decides rather than the declaration. The binder is in scope for the
-     * parameters and the return type alike, so a fresh resolution with the binder's names added is what resolves both.
-     *
-     * $node is rejected outright if it writes a binder of its own while $this->nestedInSignature is already true --
-     * see this class's own docblock for why a nested function type can never legally have one. The same flag is also
-     * the signal for which of {@see Type::nestedFunc()} and {@see Type::genericFunc()} builds the result: nested, it's
-     * built through {@see Type::nestedFunc()}, deferring every variable it reaches to whichever signature encloses
-     * it; not nested, it owns whatever it declared -- even nothing, if it wrote no binder at all -- built through
-     * {@see Type::genericFunc()}, with that binder stored on it directly.
-     *
-     * $node->typeParameters is what's written, not what {@see Signature::freeVariables()} would find from how the
-     * result is actually used, so the two are checked against each other once the signature is built: a name written
-     * here that doesn't appear in a parameter or the return type is declared for nothing, and rejected rather than
-     * quietly accepted -- see {@see self::firstUnused()}.
-     */
-    private function resolveSignature(FunctionTypeNode $node): Type|TypeError
-    {
-        if ($this->nestedInSignature && $node->typeParameters !== []) {
-            $first = $node->typeParameters[0];
-            $last = $node->typeParameters[array_key_last($node->typeParameters)];
-            return TypeError::create(
-                'A function type nested inside another one can\'t bind type variables of its own: a variable is '
-                    . 'quantified once, by whichever function type encloses it',
-                $first->location->to($last->location),
-            );
-        }
-        $typeVariables = $this->typeVariables;
-        foreach ($node->typeParameters as $parameter) {
-            $error = $this->checkTypeVariable($parameter, $typeVariables);
-            if ($error !== null) {
-                return $error;
-            }
-            $typeVariables[$parameter->name] = true;
-        }
-        $inner = new self($this->aliases, $typeVariables, nestedInSignature: true);
-        $argTypes = [];
-        foreach ($node->parameters as $parameter) {
-            $argType = $inner->resolve($parameter);
-            if ($argType instanceof TypeError) {
-                return $argType;
-            }
-            $argTypes[] = $argType;
-        }
-        $returnType = $inner->resolve($node->returnType);
-        if ($returnType instanceof TypeError) {
-            return $returnType;
-        }
-        // Which variables $returnType and $argTypes reach, not what a Signature's own binder is -- the question
-        // this asks either way, so it goes straight to the walk Type::func() and Type::genericFunc() both derive
-        // and check the same thing from, rather than building a Signature just to read it back off one. This is
-        // purely for the error below, which needs a written parameter's own location to point at; Type::genericFunc()
-        // repeats the same walk once more once $binder is handed to it, rather than trusting this one, since it has
-        // no way to tell a caller who skipped straight to it from one who's already done this check.
-        $free = Signature::freeVariables($returnType, $argTypes);
-        $unused = self::firstUnused($node->typeParameters, $free);
-        if ($unused !== null) {
-            return TypeError::create(
-                sprintf(
-                    '%s is declared but doesn\'t appear in the parameters or the return type, so no call could ever decide it',
-                    $unused->name,
-                ),
-                $unused->location,
-            );
-        }
-        if ($this->nestedInSignature) {
-            return Type::nestedFunc($returnType, $argTypes);
-        }
-        $binder = array_map(static fn(Identifier $parameter): string => $parameter->name, $node->typeParameters);
-        return Type::genericFunc($binder, $returnType, $argTypes);
-    }
-
-    private function resolveStruct(StructTypeNode $node): Type|TypeError
-    {
-        $fields = [];
-        foreach ($node->fields as $field) {
-            $type = $this->resolve($field->fieldType);
-            if ($type instanceof TypeError) {
-                return $type;
-            }
-            $fields[$field->fieldName->name] = $type;
-        }
-        return Type::struct($fields);
     }
 
     /**

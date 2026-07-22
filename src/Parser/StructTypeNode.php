@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Eventjet\Ausdruck\Type;
 use Eventjet\Ausdruck\TypeSyntax;
 use Override;
 
@@ -33,5 +34,11 @@ final class StructTypeNode extends TypeNode
     public function __toString(): string
     {
         return TypeSyntax::struct(array_map(static fn(FieldTypeNode $field): string => (string)$field, $this->fields));
+    }
+
+    #[Override]
+    public function resolveWith(TypeResolution $resolution): Type|TypeError
+    {
+        return $resolution->resolveStruct($this);
     }
 }

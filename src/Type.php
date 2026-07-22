@@ -141,15 +141,16 @@ final class Type implements Stringable
      *
      * This is the door for a caller declaring a complete, self-contained signature -- the outermost one of a
      * declaration, never one nested inside another's own parameters or return type: it commits to that by deriving
-     * $return and $parameters' own binder ({@see Signature::freeVariables()}) and storing it. {@see self::nestedFunc()}
-     * is the other door, for a function type that IS that nested position -- a generic function type used as a fixed
-     * parameter or a list's element type, or a lambda parameter like `filter`'s or `map`'s own, whose variables
-     * belong to whatever encloses it rather than to itself. Nothing about $return or $parameters tells the two
-     * positions apart; the caller says which one is meant by picking the constructor, the same choice
-     * {@see Parser\TypeResolution::resolveSignature()} makes from where in the source a signature was written --
-     * except where $return or a parameter already answers that question for itself, by already being a function type
-     * with a non-empty binder of its own: see {@see self::rejectNestedBinder()}. {@see self::genericFunc()} is a
-     * third door, for a caller that wants the derived binder checked against one written by hand.
+     * $return and $parameters' own binder ({@see Signature::freeVariables()}) and handing it to
+     * {@see self::genericFunc()}, which is where the binder is actually stored and checked -- the derived one always
+     * agrees with what it reaches, by construction, so nothing here is ever rejected on that account.
+     * {@see self::nestedFunc()} is the other door, for a function type that IS that nested position -- a generic
+     * function type used as a fixed parameter or a list's element type, or a lambda parameter like `filter`'s or
+     * `map`'s own, whose variables belong to whatever encloses it rather than to itself. Nothing about $return or
+     * $parameters tells the two positions apart; the caller says which one is meant by picking the constructor, the
+     * same choice {@see Parser\TypeResolution::resolveSignature()} makes from where in the source a signature was
+     * written -- except where $return or a parameter already answers that question for itself, by already being a
+     * function type with a non-empty binder of its own: see {@see self::rejectNestedBinder()}.
      *
      * @param list<Type> $parameters The types the PHP callable receives, in order. A function that is called as a
      *     receiver function -- `foo:string.substr:string(0, 3)` -- receives the expression it's called on as the first
@@ -159,12 +160,7 @@ final class Type implements Stringable
      */
     public static function func(self $return, array $parameters = []): self
     {
-        self::rejectNestedBinder($return);
-        foreach ($parameters as $parameter) {
-            self::rejectNestedBinder($parameter);
-        }
-        $binder = Signature::freeVariables($return, $parameters);
-        return new self(new FuncShape(new Signature($return, $parameters, $binder)));
+        return self::genericFunc(Signature::freeVariables($return, $parameters), $return, $parameters);
     }
 
     /**
@@ -184,12 +180,13 @@ final class Type implements Stringable
     }
 
     /**
-     * A function type that owns its own binder, the same commitment {@see self::func()} makes, but with the binder
+     * A function type that owns its own binder, the same commitment {@see self::func()} makes -- indeed
+     * {@see self::func()} is built on top of this door, handing it the binder it derived -- but here the binder is
      * given rather than derived: this is the door for a caller that wants it checked against the variables $return
      * and $parameters actually reach, both ways -- a name declared here that isn't reachable is dead, and one
-     * reachable that isn't declared is the exact footgun a signature built by hand used to leave open before this
-     * constructor started validating -- silently turning the missing name into `any` at the call site instead of
-     * failing where the mistake was made. A name declared twice is rejected too, the same way
+     * reachable that isn't declared would silently turn the missing name into `any` at the call site instead of
+     * being decided by the call, so both directions are rejected rather than left to fail later. A name declared
+     * twice is rejected too, the same way
      * {@see Parser\TypeResolution::checkTypeVariable()} rejects one written twice in a `fn<...>` binder: two
      * parameters answering to the same name would make one of them unreachable, and which one never has an intended
      * answer.
@@ -283,43 +280,22 @@ final class Type implements Stringable
      * string, applied here so a signature built directly through this API can't nest what the parser would reject.
      * A caller that means to nest a function type this way wants {@see self::nestedFunc()} instead.
      *
-     * The walk stops at a {@see AliasShape} rather than crossing into what it stands for: a named alias is its own
-     * complete, separately quantified signature -- `fn(Mapper) -> int` where `Mapper` stands for `fn<U>(U) -> U` is
-     * a fixed parameter, not a nested binder -- and {@see Parser\TypeResolution::resolveAlias()} never re-checks one
-     * against the position it's used in either, since it was already checked, if at all, when the alias was itself
-     * built.
+     * The walk itself is {@see TypeShape::hasNestedBinder()}, one method per shape rather than an `instanceof` chain
+     * repeated here: a new shape has to answer for itself to exist at all, the same reason {@see TypeShape} exists.
+     * {@see AliasShape} answers false without looking inside the alias it wraps: a named alias is its own complete,
+     * separately quantified signature -- `fn(Mapper) -> int` where `Mapper` stands for `fn<U>(U) -> U` is a fixed
+     * parameter, not a nested binder -- and {@see Parser\TypeResolution::resolveAlias()} never re-checks one against
+     * the position it's used in either, since it was already checked, if at all, when the alias was itself built.
      *
      * @throws InvalidArgumentException if $type reaches such a function type.
      */
     private static function rejectNestedBinder(self $type): void
     {
-        $shape = $type->shape;
-        if ($shape instanceof AliasShape) {
-            return;
-        }
-        if ($shape instanceof FuncShape) {
-            if ($shape->signature->binder() !== []) {
-                throw new InvalidArgumentException(
-                    'A function type nested inside another one can\'t bind type variables of its own: a variable is '
-                        . 'quantified once, by whichever function type encloses it',
-                );
-            }
-            foreach ($shape->signature->parameters as $parameter) {
-                self::rejectNestedBinder($parameter);
-            }
-            self::rejectNestedBinder($shape->signature->returnType);
-            return;
-        }
-        if ($shape instanceof ApplicationShape) {
-            foreach ($shape->args as $arg) {
-                self::rejectNestedBinder($arg);
-            }
-            return;
-        }
-        if ($shape instanceof StructShape) {
-            foreach ($shape->fields as $field) {
-                self::rejectNestedBinder($field);
-            }
+        if ($type->shape->hasNestedBinder()) {
+            throw new InvalidArgumentException(
+                'A function type nested inside another one can\'t bind type variables of its own: a variable is '
+                    . 'quantified once, by whichever function type encloses it',
+            );
         }
     }
 
@@ -439,12 +415,12 @@ final class Type implements Stringable
         }
         $selfShape = $self->shape;
         $otherShape = $other->shape;
-        // A shared class alone isn't the whole answer either: two ApplicationShapes can be named differently, and
-        // two VariableShapes can too -- {@see self::var('T')} and {@see self::var('U')} aren't the same variable.
-        // Once the class matches, each shape answers the rest for itself, in {@see TypeShape::isSubtypeOfSame()},
-        // which is also where the rest of the comparison -- args, signature, fields -- lives; a {@see AliasShape}
-        // never reaches here, having already been seen through by {@see self::canonical()} above.
-        return $selfShape::class === $otherShape::class && $selfShape->isSubtypeOfSame($otherShape);
+        // Each shape decides for itself, in {@see TypeShape::isSubtypeOfSame()}, whether $other is even its own kind
+        // before comparing anything else -- two ApplicationShapes can be named differently, and two VariableShapes
+        // can too, {@see self::var('T')} and {@see self::var('U')} aren't the same variable -- which is also where
+        // the rest of the comparison -- args, signature, fields -- lives; a {@see AliasShape} never reaches here,
+        // having already been seen through by {@see self::canonical()} above.
+        return $selfShape->isSubtypeOfSame($otherShape);
     }
 
     /**
@@ -525,7 +501,7 @@ final class Type implements Stringable
         if ($selfOption !== null && !$actual->isNamed('Option') && !$actual->isNamed('None')) {
             return $selfOption->bind($actual, $bindings);
         }
-        return $selfShape::class === $actualShape::class ? $selfShape->bindSame($actualShape, $bindings) : $bindings;
+        return $selfShape->bindSame($actualShape, $bindings);
     }
 
     /**
@@ -542,6 +518,19 @@ final class Type implements Stringable
     public function collectVariables(array $found): array
     {
         return $this->shape->collectVariables($found);
+    }
+
+    /**
+     * Whether $this is, or itself reaches, a function type with a binder of its own -- delegated to
+     * {@see TypeShape::hasNestedBinder()}, which is where the rule differs per shape; see
+     * {@see self::rejectNestedBinder()} for what asks.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     */
+    public function hasNestedBinder(): bool
+    {
+        return $this->shape->hasNestedBinder();
     }
 
     /**
@@ -579,10 +568,9 @@ final class Type implements Stringable
 
     /**
      * $this's own type argument, if $this is an `Option<...>` -- not seen through an alias first, so a caller that
-     * needs that calls {@see self::canonical()} itself. Replaces what used to be a repeated
-     * `$shape instanceof ApplicationShape && $shape->name === 'Option'` check, followed by an unguarded
-     * `$shape->args[0]`, at every one of the five places {@see self::isSubtypeOf()} and {@see self::bind()} needed to
-     * ask the same question.
+     * needs that calls {@see self::canonical()} itself. The one place {@see self::isSubtypeOf()} and {@see self::bind()}
+     * ask whether a type is an `Option` and read its argument, rather than each checking
+     * `$shape instanceof ApplicationShape && $shape->name === 'Option'` and indexing `$shape->args[0]` directly.
      */
     private function optionArg(): self|null
     {

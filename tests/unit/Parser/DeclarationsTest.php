@@ -44,7 +44,8 @@ final class DeclarationsTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'myHead is declared as fn(list<T>) -> T, whose type variables no binder of its own quantifies',
+            'myHead is declared as fn(list<T>) -> T, built through Type::nestedFunc(), which leaves it without a '
+                . 'binder of its own -- a declaration needs Type::func() or Type::genericFunc() instead',
         );
 
         $t = Type::var('T');

@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use LogicException;
 use Override;
-
-use function assert;
 
 /**
  * A type variable -- see {@see Type::var()}: a placeholder a generic signature's call site decides, not a type with
@@ -34,6 +31,15 @@ final class VariableShape implements TypeShape
         return $found;
     }
 
+    /**
+     * Always false: a variable has no children to reach anything through -- see {@see TypeShape::hasNestedBinder()}.
+     */
+    #[Override]
+    public function hasNestedBinder(): bool
+    {
+        return false;
+    }
+
     #[Override]
     public function toString(): string
     {
@@ -54,19 +60,20 @@ final class VariableShape implements TypeShape
     }
 
     /**
-     * Two variables of the same name are the same variable -- see {@see Type::var()}.
+     * Two variables of the same name are the same variable -- see {@see Type::var()}. $other isn't necessarily one
+     * too: {@see Type::isSubtypeOf()} no longer checks the two shapes share a class before asking either of them this
+     * -- see {@see TypeShape::isSubtypeOfSame()} -- so a variable compared against any other shape answers false.
      */
     #[Override]
     public function isSubtypeOfSame(TypeShape $other): bool
     {
-        assert($other instanceof self);
-        return $this->name === $other->name;
+        return $other instanceof self && $this->name === $other->name;
     }
 
     /**
-     * Never actually called: {@see Type::bind()} asks whether $this is a variable, and binds it, before it ever
-     * compares two shapes' own classes against each other -- a {@see self} is never the left side of that
-     * comparison, so this never runs for real. Exists only because {@see TypeShape} requires it.
+     * Answers $bindings unchanged: {@see Type::bind()} asks whether $this is a variable, and binds it, before it
+     * ever reaches a same-shape comparison -- a {@see self} is never $this here in practice, but there is nothing to
+     * learn from one either way.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
@@ -74,6 +81,6 @@ final class VariableShape implements TypeShape
     #[Override]
     public function bindSame(TypeShape $other, array $bindings): array
     {
-        throw new LogicException('Unreachable: Type::bind() resolves a variable on the left before comparing shapes');
+        return $bindings;
     }
 }

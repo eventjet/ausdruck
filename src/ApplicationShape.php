@@ -8,7 +8,6 @@ use Override;
 
 use function array_map;
 use function array_slice;
-use function assert;
 use function count;
 
 /**
@@ -43,6 +42,20 @@ final class ApplicationShape implements TypeShape
         return $found;
     }
 
+    /**
+     * Folds {@see TypeShape::hasNestedBinder()} over $args -- see there for what this asks.
+     */
+    #[Override]
+    public function hasNestedBinder(): bool
+    {
+        foreach ($this->args as $arg) {
+            if ($arg->hasNestedBinder()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     #[Override]
     public function toString(): string
     {
@@ -65,15 +78,14 @@ final class ApplicationShape implements TypeShape
 
     /**
      * Same name, same shape, but two `ApplicationShape`s of that name can still differ argument by argument --
-     * `map<int, string>` is not a subtype of `map<int, int>`, even though both are named `map`. This is also why
-     * {@see Type::isSubtypeOf()} only reaches here once it already knows $other is an {@see ApplicationShape} too,
-     * rather than comparing names directly across every shape.
+     * `map<int, string>` is not a subtype of `map<int, int>`, even though both are named `map`. $other isn't
+     * necessarily an {@see ApplicationShape} at all: {@see Type::isSubtypeOf()} no longer checks that before asking,
+     * so a shape mismatch is rejected here, in the same breath as a name mismatch, rather than upstream.
      */
     #[Override]
     public function isSubtypeOfSame(TypeShape $other): bool
     {
-        assert($other instanceof self);
-        if ($this->name !== $other->name) {
+        if (!$other instanceof self || $this->name !== $other->name) {
             return false;
         }
         foreach ($this->args as $index => $arg) {
@@ -87,8 +99,8 @@ final class ApplicationShape implements TypeShape
 
     /**
      * Two types of the same shape can still be of different sizes: a lambda declares fewer parameters than the
-     * signature asks for. What the two have in common is what there is to learn from -- and nothing is, if the two
-     * don't even share a name.
+     * signature asks for. What the two have in common is what there is to learn from -- and nothing is, if $other
+     * isn't even an {@see ApplicationShape}, or doesn't share $this's name.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
@@ -96,8 +108,7 @@ final class ApplicationShape implements TypeShape
     #[Override]
     public function bindSame(TypeShape $other, array $bindings): array
     {
-        assert($other instanceof self);
-        if ($this->name !== $other->name) {
+        if (!$other instanceof self || $this->name !== $other->name) {
             return $bindings;
         }
         foreach (array_slice($this->args, 0, count($other->args)) as $index => $arg) {

@@ -60,9 +60,17 @@ final class Lambda extends Expression
             && $this->body->equals($other->body);
     }
 
+    /**
+     * A lambda is always an argument -- the nested position, never the outermost signature of a declaration -- so its
+     * variables, if its body's type has any, belong to whatever encloses it rather than to the lambda itself: see
+     * {@see Type::nestedFunc()} and {@see Type::func()}'s own docblock for the two positions.
+     */
     #[Override]
     public function getType(): Type
     {
-        return Type::func($this->body->getType(), array_map(static fn(string $_name) => Type::any(), $this->parameters));
+        return Type::nestedFunc(
+            $this->body->getType(),
+            array_map(static fn(string $_name) => Type::any(), $this->parameters),
+        );
     }
 }

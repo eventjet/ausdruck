@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use LogicException;
 use Override;
 
 /**
@@ -33,6 +32,16 @@ final class AliasShape implements TypeShape
         return $this->target->collectVariables($found);
     }
 
+    /**
+     * Never true, and $target is never asked: see {@see Type::rejectNestedBinder()} for why the walk stops here
+     * rather than crossing into what the alias stands for.
+     */
+    #[Override]
+    public function hasNestedBinder(): bool
+    {
+        return false;
+    }
+
     #[Override]
     public function toString(): string
     {
@@ -49,19 +58,20 @@ final class AliasShape implements TypeShape
     }
 
     /**
-     * Never actually called: {@see Type::isSubtypeOf()} canonicalizes both sides -- seeing through every alias --
-     * before it ever asks a shape this question, so a {@see self} is never one of the two being compared. Exists
-     * only because {@see TypeShape} requires it.
+     * Answers false honestly rather than asserting it's never asked: {@see Type::isSubtypeOf()} canonicalizes both
+     * sides -- seeing through every alias -- before it ever compares shapes, so a {@see self} is never $this here in
+     * practice, but nothing needs that to be true for this answer to still be correct.
      */
     #[Override]
     public function isSubtypeOfSame(TypeShape $other): bool
     {
-        throw new LogicException('Unreachable: Type::isSubtypeOf() canonicalizes before comparing shapes');
+        return false;
     }
 
     /**
-     * Never actually called, for the same reason {@see self::isSubtypeOfSame()} never is: {@see Type::bind()}
-     * canonicalizes both sides before comparing shapes too.
+     * Answers $bindings unchanged, for the same reason {@see self::isSubtypeOfSame()} answers false rather than
+     * asserting unreachability: {@see Type::bind()} canonicalizes both sides before comparing shapes too, so a
+     * {@see self} is never $this here in practice, but there is nothing to learn from one either way.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
@@ -69,6 +79,6 @@ final class AliasShape implements TypeShape
     #[Override]
     public function bindSame(TypeShape $other, array $bindings): array
     {
-        throw new LogicException('Unreachable: Type::bind() canonicalizes before comparing shapes');
+        return $bindings;
     }
 }

@@ -9,8 +9,6 @@ use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Type;
 use InvalidArgumentException;
 
-use function array_diff_key;
-use function array_fill_keys;
 use function array_key_exists;
 use function sprintf;
 
@@ -56,21 +54,22 @@ final class Declarations
      * reaches to whichever signature encloses it, correct for a function type nested inside another one's own
      * parameters or return type, but wrong here, where nothing encloses it -- the signature reads back with an empty
      * binder even though {@see Signature::freeVariables()} finds names in it, and every one of them silently becomes
-     * `any` at every call site instead of being decided by the call, the same defect {@see Type::func()} and
-     * {@see Type::genericFunc()} both already prevent for a caller that picks one of the two doors meant for a
-     * top-level declaration.
-     *
-     * Compared as sets, not order: {@see Signature::binder()} for a signature built through
-     * {@see Type::genericFunc()} is whatever a caller wrote it as, which needn't be the first-seen order
-     * {@see Signature::freeVariables()} finds the same names in.
+     * `any` at every call site instead of being decided by the call. {@see Type::func()} and
+     * {@see Type::genericFunc()}, the two doors meant for a top-level declaration, can't produce that: each already
+     * derives or validates its own binder against exactly the variables it reaches, both ways, so the only way a
+     * declared signature ever disagrees with its own free variables is by having been built through the wrong door
+     * in the first place -- checked here as that one fact, not re-derived as the two-directional set comparison
+     * {@see Type::genericFunc()} itself already made true by construction.
      */
     private static function checkBinderCoversFreeVariables(string $name, Type $type, Signature $signature): void
     {
-        $free = array_fill_keys(Signature::freeVariables($signature->returnType, $signature->parameters), true);
-        $declared = array_fill_keys($signature->binder(), true);
-        if (array_diff_key($free, $declared) !== [] || array_diff_key($declared, $free) !== []) {
+        if (
+            !$signature->hasOwnBinder()
+            && Signature::freeVariables($signature->returnType, $signature->parameters) !== []
+        ) {
             throw new InvalidArgumentException(sprintf(
-                '%s is declared as %s, whose type variables no binder of its own quantifies',
+                '%s is declared as %s, built through Type::nestedFunc(), which leaves it without a binder of its '
+                    . 'own -- a declaration needs Type::func() or Type::genericFunc() instead',
                 $name,
                 $type,
             ));

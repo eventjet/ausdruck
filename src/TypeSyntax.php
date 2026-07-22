@@ -12,9 +12,9 @@ use function sprintf;
  * fully resolved type, and {@see Parser\TypeNode} (with {@see Parser\FunctionTypeNode} and
  * {@see Parser\StructTypeNode}) prints one that's only gotten as far as parsing -- {@see Parser\TypeResolution::checkArity()}
  * prints a node that, by definition, failed to become a {@see Type}, so neither side can be built in terms of the
- * other. Both sides still spell the same three shapes the same way, which is what this keeps from drifting apart
- * again: an application and a function type once disagreed here about how an empty struct prints, `{}` on one side
- * and `{  }` on the other, before both were pinned down to one implementation.
+ * other. Both sides spell the same three shapes the same way -- an empty struct prints as `{}` on both, for
+ * instance -- which is what keeps an application, a function type and a struct type from drifting into two
+ * different spellings of the same shape.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
