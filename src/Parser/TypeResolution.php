@@ -181,8 +181,8 @@ final class TypeResolution
      * $node is rejected outright if it writes a binder of its own while $this->nestedInSignature is already true --
      * see this class's own docblock for why a nested function type can never legally have one. That rejection is
      * $nestedInSignature's one job: once past it, $node's own written binder -- even empty, if it wrote none at all,
-     * which a rejected nested one always does -- is what {@see Signature::written()} stores, the same door whether
-     * this resolution is nested or not.
+     * which a rejected nested one always does -- is what the {@see Signature} built below stores, unchanged, since
+     * {@see Signature::quantified()} keeps a binder that's already there rather than deriving one over it.
      *
      * $node->typeParameters is what's written, not what {@see Signature::freeVariables()} would find from how the
      * result is actually used, so the two are checked against each other once the signature is built: a name written
@@ -238,7 +238,7 @@ final class TypeResolution
             );
         }
         $binder = array_map(static fn(Identifier $parameter): string => $parameter->name, $node->typeParameters);
-        return Signature::written($returnType, $argTypes, $binder)->toType();
+        return (new Signature($returnType, $argTypes, $binder))->toType();
     }
 
     /**

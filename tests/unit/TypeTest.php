@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
+use Eventjet\Ausdruck\AliasShape;
+use Eventjet\Ausdruck\ApplicationShape;
 use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
@@ -13,6 +15,7 @@ use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Type;
+use Eventjet\Ausdruck\VariableShape;
 use InvalidArgumentException;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -290,8 +293,8 @@ final class TypeTest extends TestCase
      * Without that guard this signature would derive a spurious `['U']` binder and print as `fn<U>(Mapper) -> int`
      * instead of `fn(Mapper) -> int` -- the same corruption
      * a-fixed-parameter-that-happens-to-be-generic-isnt-a-generic-parameter.txt pins for a written `fn<...>` resolved
-     * through the parser ({@see Signature::written()}); this is the same rule reached through the PHP-builder door,
-     * {@see Signature::quantified()}, instead.
+     * through the parser ({@see \Eventjet\Ausdruck\Parser\TypeResolution::resolveSignature()}); this is the same rule
+     * reached through the PHP-builder door, {@see Signature::quantified()}, instead.
      */
     public function testQuantifiedDoesNotBorrowABinderFromAFixedParameterThatIsAlreadyGeneric(): void
     {
@@ -328,9 +331,9 @@ final class TypeTest extends TestCase
      * own and this signature's own, and only the latter may be decided by matching a call's arguments against it.
      *
      * Built through {@see Signature::quantified()} and {@see Signature::toType()} directly, rather than through
-     * {@see Type::alias()}: aliasing this parameter would route {@see Type::bind()} through
-     * {@see \Eventjet\Ausdruck\AliasShape::bind()}'s own unconditional no-op before ever reaching {@see \Eventjet\Ausdruck\FuncShape::bind()}, which would
-     * pin the wrong guard.
+     * {@see Type::alias()}: this is a test of {@see \Eventjet\Ausdruck\FuncShape::bind()}'s own guard, so the
+     * parameter is given to it as the generic function type it already is, without an alias's name in front of it
+     * that this test has no reason to ask about.
      */
     public function testBindDoesNotReachIntoAFixedParameterThatIsAlreadyGeneric(): void
     {
@@ -393,7 +396,7 @@ final class TypeTest extends TestCase
 
     /**
      * A shape mismatch -- here, `list<C>` faced with a `map` at a call site that's already wrong in some other way,
-     * before {@see Expr::call()}'s own checks get to say so -- teaches {@see \Eventjet\Ausdruck\ApplicationShape::bind()}
+     * before {@see Expr::call()}'s own checks get to say so -- teaches {@see ApplicationShape::bind()}
      * nothing, but it doesn't undo what earlier parameters, walked first, already taught: `A` and `B` are decided by
      * the receiver and the first argument before the second argument's mismatch is ever reached.
      */
@@ -643,5 +646,61 @@ final class TypeTest extends TestCase
     public function testToString(Type $type, string $expected): void
     {
         self::assertSame($expected, (string)$type);
+    }
+
+    /**
+     * The invariant {@see AliasShape}'s own docblock states -- an alias target can never reach a free variable, so
+     * {@see AliasShape::collectVariables()} and {@see AliasShape::substitute()} can only ever answer identity --
+     * pinned directly against the shape itself, rather than only against {@see Type::alias()}'s guard: built here
+     * with a target that *does* reach one, bypassing that guard the way weakening it would, both answer for real
+     * instead of silently staying identity, which is what would make the invariant's breakage visible.
+     */
+    public function testAliasShapeCollectVariablesAndSubstituteAreRealDelegationsNotAnIdentitySpecialCase(): void
+    {
+        $alias = new AliasShape('Foo', Type::var('T'));
+
+        self::assertSame(['T' => true], $alias->collectVariables([]));
+
+        $substituted = $alias->substitute(['T' => Type::string()]);
+
+        self::assertTrue($substituted->isSubtypeOf(Type::string()));
+        self::assertFalse($substituted->isSubtypeOf(Type::int()));
+    }
+
+    /**
+     * {@see AliasShape::isSubtypeOf()} and {@see AliasShape::bind()} are never reached through {@see Type} --
+     * {@see Type::isSubtypeOf()} and {@see Type::bind()} both see through an alias before ever comparing shapes --
+     * so both throw rather than answer either question quietly wrong. Pinned here directly against the shape, since
+     * nothing reachable through {@see Type} could ever exercise either method to begin with.
+     */
+    public function testAliasShapeIsSubtypeOfAndBindAreUnreachable(): void
+    {
+        $alias = new AliasShape('Foo', Type::int());
+        $int = new ApplicationShape('int');
+
+        $this->expectException(LogicException::class);
+        self::assertFalse($alias->isSubtypeOf($int));
+    }
+
+    public function testAliasShapeBindThrows(): void
+    {
+        $alias = new AliasShape('Foo', Type::int());
+        $int = new ApplicationShape('int');
+
+        $this->expectException(LogicException::class);
+        self::assertSame([], $alias->bind($int, []));
+    }
+
+    /**
+     * {@see VariableShape::bind()} is never reached through {@see Type::bind()}, which asks whether $this is a
+     * variable and binds it directly before ever comparing shapes -- so it throws rather than answer $bindings
+     * unchanged for a call that can't happen.
+     */
+    public function testVariableShapeBindThrows(): void
+    {
+        $variable = new VariableShape('T');
+
+        $this->expectException(LogicException::class);
+        self::assertSame([], $variable->bind(new VariableShape('T'), []));
     }
 }

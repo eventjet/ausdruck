@@ -87,9 +87,9 @@ final class Type implements Stringable
      * otherwise resolve every reference to this alias with a variable no written `fn<...>` binder could ever declare.
      *
      * $name is never checked against what $type itself is a shape of: an alias's own shape is always an
-     * {@see AliasShape}, since it prints as its own name ({@see self::toString()}) rather than as whatever it stands
-     * for -- so `self::alias('Struct', ...)` prints as `Struct`, reachable through neither the check that looks for a
-     * {@see StructShape} nor the one that looks for a {@see FuncShape}.
+     * {@see AliasShape}, since it prints as its own name ({@see AliasShape::toString()}) rather than as whatever it
+     * stands for -- so `self::alias('Struct', ...)` prints as `Struct`, reachable through neither the check that
+     * looks for a {@see StructShape} nor the one that looks for a {@see FuncShape}.
      *
      * $name is rejected when {@see TypeConstructor::isReservedName()} says so -- every name a
      * {@see TypeConstructor} case already spells, plus `fn`: {@see self::__toString()} turns this alias back into
@@ -163,8 +163,9 @@ final class Type implements Stringable
      * $parameters, or about which position this ends up in, has anything to disagree about, since a type built here
      * shares whatever variables it reaches with whichever signature, if any, goes on to quantify it, rather than
      * claiming any for itself. The one signature position that does commit to a binder as it's built -- a written
-     * `fn<...>` -- goes through {@see Signature::written()} instead, since that binder is the author's own, not
-     * something derived after the fact the way {@see Signature::quantified()} derives one.
+     * `fn<...>`, resolved by {@see Parser\TypeResolution::resolveSignature()} -- builds its {@see Signature} directly
+     * with that binder instead, since it's the author's own, not something derived after the fact the way
+     * {@see Signature::quantified()} derives one.
      *
      * @param list<Type> $parameters The types the PHP callable receives, in order. A function that is called as a
      *     receiver function -- `foo:string.substr:string(0, 3)` -- receives the expression it's called on as the first
@@ -327,16 +328,13 @@ final class Type implements Stringable
         if ($selfList !== null && $selfList->isNamed('never') && $other->isNamed('map')) {
             return true;
         }
-        $selfShape = $self->shape;
-        $otherShape = $other->shape;
-        // Same shape class, then the rest of the comparison -- name, args, signature, fields -- is that shape's own
-        // to make, in {@see TypeShape::isSubtypeOf()}; a mismatch is rejected here, the one place common to every
-        // shape, rather than duplicated as each implementation's own first check. A {@see AliasShape} never reaches
-        // here, having already been seen through by {@see self::canonical()} above -- this is also why `Option<X>`
-        // needs no case of its own above: once $self and $other are both Options, they're both ApplicationShapes
-        // of that name, and the pairwise-argument comparison below is the same recursive `X.isSubtypeOf(Y)` a
-        // dedicated case would run.
-        return $selfShape::class === $otherShape::class && $selfShape->isSubtypeOf($otherShape);
+        // The rest of the comparison -- name, args, signature, fields, and whether $other is even the same kind of
+        // shape at all -- is {@see TypeShape::isSubtypeOf()}'s own to make. A {@see AliasShape} never reaches here,
+        // having already been seen through by {@see self::canonical()} above -- this is also why `Option<X>` needs
+        // no case of its own above: once $self and $other are both Options, they're both ApplicationShapes of that
+        // name, and the pairwise-argument comparison below is the same recursive `X.isSubtypeOf(Y)` a dedicated case
+        // would run.
+        return $self->shape->isSubtypeOf($other->shape);
     }
 
     /**
@@ -407,7 +405,6 @@ final class Type implements Stringable
         $self = $this->canonical();
         $actual = $actual->canonical();
         $selfShape = $self->shape;
-        $actualShape = $actual->shape;
         if ($selfShape instanceof VariableShape) {
             $name = $selfShape->name;
             return array_key_exists($name, $bindings) ? $bindings : [...$bindings, $name => $actual];
@@ -416,10 +413,9 @@ final class Type implements Stringable
         if ($selfOption !== null && !$actual->isNamed('Option') && !$actual->isNamed('None')) {
             return $selfOption->bind($actual, $bindings);
         }
-        // Same shape class, or there is nothing to learn -- the one place common to every shape a mismatch is
-        // rejected, rather than each implementation checking it as its own first step; see {@see self::isSubtypeOf()}
-        // for the same gate.
-        return $selfShape::class === $actualShape::class ? $selfShape->bind($actualShape, $bindings) : $bindings;
+        // What's left, or nothing to learn if $actual isn't even the same kind of shape -- {@see TypeShape::bind()}'s
+        // own to decide; see {@see self::isSubtypeOf()} for the same question asked there.
+        return $selfShape->bind($actual->shape, $bindings);
     }
 
     /**

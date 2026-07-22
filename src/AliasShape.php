@@ -4,12 +4,19 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use LogicException;
 use Override;
 
 /**
  * An alias -- see {@see Type::alias()}: a name for one complete type, printed as that name rather than as $target,
  * which is why $target's own arguments, fields or signature never appear directly on the alias's own {@see Type}.
  * Everything that needs to see through the name resolves $target first.
+ *
+ * $target can never itself reach a free variable -- {@see Type::alias()} rejects one that does -- so
+ * {@see self::collectVariables()} and {@see self::substitute()}, real delegations to $target though they are, can
+ * only ever answer $found unchanged and a $target that reads the same, respectively. {@see Type::isSubtypeOf()} and
+ * {@see Type::bind()} both canonicalize $target away before ever comparing shapes, so {@see self::isSubtypeOf()} and
+ * {@see self::bind()} below are never called at all; both throw rather than answer either question quietly wrong.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -47,26 +54,21 @@ final class AliasShape implements TypeShape
         return Type::of(new self($this->name, $this->target->substitute($bindings)));
     }
 
-    /**
-     * Never actually called: {@see Type::isSubtypeOf()} canonicalizes both sides -- seeing through every alias --
-     * before it ever compares shapes, so a {@see self} is never $this here. Still implemented, since a shape has to.
-     */
     #[Override]
     public function isSubtypeOf(TypeShape $other): bool
     {
-        return false;
+        throw new LogicException(
+            'AliasShape::isSubtypeOf() is unreachable: Type::isSubtypeOf() sees through every alias first',
+        );
     }
 
     /**
-     * Never actually called, for the same reason {@see self::isSubtypeOf()} isn't: {@see Type::bind()} canonicalizes
-     * both sides before comparing shapes too.
-     *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
      */
     #[Override]
     public function bind(TypeShape $other, array $bindings): array
     {
-        return $bindings;
+        throw new LogicException('AliasShape::bind() is unreachable: Type::bind() sees through every alias first');
     }
 }

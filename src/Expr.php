@@ -380,13 +380,10 @@ final class Expr
         Span $nameLocation,
     ): Type {
         if ($annotation === null) {
-            if ($signature === null) {
-                throw TypeError::create(
-                    sprintf('Function %s is not declared and has no inline type', $name),
-                    $nameLocation,
-                );
-            }
-            return $signature->returnType;
+            return $signature !== null ? $signature->returnType : throw TypeError::create(
+                sprintf('Function %s is not declared and has no inline type', $name),
+                $nameLocation,
+            );
         }
         if ($signature !== null && !$annotation->type->isSubtypeOf($signature->returnType)) {
             throw TypeError::create(

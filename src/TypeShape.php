@@ -53,24 +53,23 @@ interface TypeShape
 
     /**
      * Whether $this is a subtype of $other, called from {@see Type::isSubtypeOf()} once both sides are already known
-     * to be concrete shapes -- aliases seen through, the None/any/Option/never/map coercions all handled -- and to be
-     * the same shape class: that gate lives once in {@see Type::isSubtypeOf()} itself, common to every shape, rather
-     * than as an `instanceof` check repeated at the top of each implementation below, so every implementation here
-     * can `assert($other instanceof self)` for the type checkers' sake and go straight to its own real comparison --
-     * name, args, signature, or fields, whichever is this shape's own. {@see AliasShape} is the one implementation
-     * that never runs at all: {@see Type::isSubtypeOf()} canonicalizes both sides -- seeing through every alias --
-     * before it ever reaches a shape class, so a {@see AliasShape} can never be either side of that match.
+     * to be concrete shapes -- aliases seen through, the None/any/Option/never/map coercions all handled. $other may
+     * be any shape, not necessarily this one's own class, so telling that mismatch apart from a real comparison is
+     * this method's own first step rather than a gate {@see Type} runs before calling it -- most implementations
+     * reject it before recovering $other's own class for the real comparison that follows: name, args, signature, or
+     * fields, whichever is this shape's own. {@see AliasShape} is the one implementation that never runs at all:
+     * {@see Type::isSubtypeOf()} canonicalizes both sides -- seeing through every alias -- before it ever reaches a
+     * shape class, so a {@see AliasShape} can never be either side of that match, and its own implementation throws
+     * rather than pretend to answer one.
      */
     public function isSubtypeOf(self $other): bool;
 
     /**
      * What $other, matched structurally against $this, teaches about the variables $this reaches -- {@see
      * Type::bind()}'s shape-comparison half, called on the same terms {@see self::isSubtypeOf()} is, with the same
-     * class gate and the same `assert()` this side of it. {@see VariableShape} answers a different question before
-     * ever reaching this comparison -- see {@see Type::bind()} -- and {@see AliasShape} is excluded from it the same
-     * way it is from {@see self::isSubtypeOf()}; both still implement this method, since a shape has to, rather than
-     * asserting they never will be called, answering $bindings unchanged since there is nothing to learn from either
-     * one either way.
+     * mismatch check this side of it. {@see VariableShape} answers a different question before ever reaching this
+     * comparison -- see {@see Type::bind()} -- so its own implementation here is as unreachable as
+     * {@see AliasShape}'s, and both throw rather than answer $bindings unchanged for a call that can't happen.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>

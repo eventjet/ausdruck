@@ -8,7 +8,6 @@ use Countable;
 
 use function array_map;
 use function array_slice;
-use function assert;
 use function count;
 use function in_array;
 use function substr;
@@ -66,7 +65,7 @@ final class BuiltinFunctions
         // A lambda parameter's own binder belongs to the built-in that takes it, not to the lambda type itself --
         // Type::func() leaves it that way, the same door a parsed `fn<T>(..., fn(T) -> bool, ...)` resolves its own
         // lambda parameter through, and the same door this built-in's own top-level signature is written with too;
-        // only self::signature(), quantifying via Signature::quantified(), tells the two positions apart.
+        // only self::signature(), deriving a binder via Signature::over(), tells the two positions apart.
         $predicate = Type::func(Type::bool(), [$item]);
         $mapped = Type::var('U');
         return [
@@ -101,20 +100,16 @@ final class BuiltinFunctions
     }
 
     /**
-     * A built-in's own, top-level {@see Signature}, quantified through {@see Signature::quantified()} -- the same
-     * seam {@see Parser\Declarations} promotes a consumer's own declared function through -- so whether a built-in's
-     * binder ends up derived the way a call site or {@see Type::__toString()} expects is decided in one place, not
-     * once per built-in. $return and $parameters build a function type first, so the assertion below never actually
-     * fails: {@see Signature::quantified()} only answers null for a $funcType that isn't a function type at all,
-     * which {@see Type::func()} always is.
+     * A built-in's own, top-level {@see Signature}, with its binder derived from what $return and $parameters reach
+     * -- {@see Signature::over()}, the same derivation {@see Signature::quantified()} runs a consumer's own declared
+     * function through -- so whether a built-in's binder ends up the way a call site or {@see Type::__toString()}
+     * expects is decided in one place, not once per built-in.
      *
      * @param list<Type> $parameters
      */
     private static function signature(Type $return, array $parameters = []): Signature
     {
-        $signature = Signature::quantified(Type::func($return, $parameters));
-        assert($signature !== null);
-        return $signature;
+        return Signature::over($return, $parameters);
     }
 
     /**

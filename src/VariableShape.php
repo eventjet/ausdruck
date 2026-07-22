@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use LogicException;
 use Override;
-
-use function assert;
 
 /**
  * A type variable -- see {@see Type::var()}: a placeholder a generic signature's call site decides, not a type with
@@ -53,19 +52,17 @@ final class VariableShape implements TypeShape
     }
 
     /**
-     * Two variables of the same name are the same variable -- see {@see Type::var()}. $other is guaranteed a
-     * {@see self} by {@see Type::isSubtypeOf()} before this is ever called.
+     * Two variables of the same name are the same variable -- see {@see Type::var()}.
      */
     #[Override]
     public function isSubtypeOf(TypeShape $other): bool
     {
-        assert($other instanceof self);
-        return $this->name === $other->name;
+        return $other instanceof self && $this->name === $other->name;
     }
 
     /**
-     * Never actually called: {@see Type::bind()} asks whether $this is a variable, and binds it directly, before it
-     * ever reaches a shape comparison. Still implemented, since a shape has to.
+     * Unreachable: {@see Type::bind()} asks whether $this is a variable, and binds it directly, before it ever
+     * reaches a shape comparison.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
@@ -73,6 +70,9 @@ final class VariableShape implements TypeShape
     #[Override]
     public function bind(TypeShape $other, array $bindings): array
     {
-        return $bindings;
+        throw new LogicException(
+            'VariableShape::bind() is unreachable: Type::bind() binds a variable directly, before it ever reaches a '
+                . 'shape comparison',
+        );
     }
 }

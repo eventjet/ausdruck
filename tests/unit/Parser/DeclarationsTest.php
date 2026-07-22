@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Test\Unit\Parser;
 
 use Eventjet\Ausdruck\Parser\Declarations;
+use Eventjet\Ausdruck\Parser\TypeParser;
+use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Type;
 use InvalidArgumentException;
@@ -64,5 +66,28 @@ final class DeclarationsTest extends TestCase
 
         $t = Type::var('T');
         new Declarations(variables: ['items' => Type::listOf(Type::func(Type::bool(), [$t]))]);
+    }
+
+    /**
+     * The written-binder counterpart to {@see self::testDeclaringAFunctionDerivesItsBinderFromWhatItReaches()}: a
+     * function type parsed from a written `fn<...>` already carries the binder
+     * {@see \Eventjet\Ausdruck\Parser\TypeResolution::resolveSignature()} stored, and {@see Signature::quantified()}
+     * keeps a binder that's already there rather than re-deriving one from a left-to-right walk -- so declaring
+     * `foo` prints its binder back in the order it was written, `U` before `T`, even though that walk would meet `T`
+     * first, in `list<T>`.
+     */
+    public function testDeclaringAParsedFunctionKeepsTheWrittenBinderOrder(): void
+    {
+        /**
+         * @psalm-suppress InternalClass
+         * @psalm-suppress InternalMethod
+         */
+        $nodes = TypeParser::parseDeclarations('foo: fn<U, T>(list<T>, fn(T) -> U) -> list<U>');
+        $type = (new Types())->resolve($nodes['foo']);
+        self::assertInstanceOf(Type::class, $type);
+
+        $declarations = new Declarations(functions: ['foo' => $type]);
+
+        self::assertSame('fn<U, T>(list<T>, fn(T) -> U) -> list<U>', (string)$declarations->functions['foo']);
     }
 }

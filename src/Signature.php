@@ -26,8 +26,10 @@ final class Signature implements Stringable
      *     {@see self::receiverType()} and {@see self::argumentTypes()}.
      * @param list<string> $binder The names this signature quantifies for itself, empty if none -- see
      *     {@see self::hasOwnBinder()} for what an empty binder means. {@see Type::func()} never passes one, since it
-     *     builds structure only; {@see self::quantified()} derives one from what a promoted function type reaches,
-     *     and {@see self::written()} takes one written by hand.
+     *     builds structure only; {@see self::over()} derives one from what $returnType and $parameters reach, for a
+     *     signature that has no binder of its own to keep, and {@see Parser\TypeResolution::resolveSignature()} --
+     *     the one place a binder is written by hand -- passes the author's own order straight to this constructor
+     *     instead, since {@see self::quantified()} keeps a binder that is already there rather than deriving one.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -63,10 +65,11 @@ final class Signature implements Stringable
 
     /**
      * $funcType promoted to a complete, self-contained signature -- the one it already holds
-     * ({@see Type::asFunction()}), but with its own binder derived from what its return type and parameters actually
-     * reach ({@see self::freeVariables()}): every name that walk finds, quantified, and nothing else, so there is
-     * nothing left here to reject the way a written binder is -- a name the walk doesn't find can't end up in the
-     * binder, and one it does can't end up missing either.
+     * ({@see Type::asFunction()}) -- with its own binder settled: kept as-is if it already has one of its own
+     * (a written `fn<...>`, resolved through {@see Parser\TypeResolution::resolveSignature()}, whose author's order
+     * this must not disturb), or derived from what its return type and parameters actually reach otherwise
+     * ({@see self::over()}). Either way there is nothing left here to reject the way a written binder is checked at
+     * parse time -- a derived binder can't miss a name or include a spurious one, by construction.
      *
      * This is the one seam a function type is promoted through, from "some function type, built through
      * {@see Type::func()} without committing to who quantifies it" to "the outermost signature of a declaration or
@@ -80,34 +83,24 @@ final class Signature implements Stringable
         if ($signature === null) {
             return null;
         }
-        return new self(
-            $signature->returnType,
-            $signature->parameters,
-            self::freeVariables($signature->returnType, $signature->parameters),
-        );
+        return $signature->hasOwnBinder() ? $signature : self::over($signature->returnType, $signature->parameters);
     }
 
     /**
-     * A signature built with the binder a written `fn<...>` actually declared, rather than one derived from what
-     * $returnType and $parameters reach the way {@see self::quantified()} builds one: $binder is the author's own
-     * order, checked separately against what the signature reaches ({@see Parser\TypeResolution::firstUnused()}),
-     * and can be empty when nothing was written -- the same empty binder a signature nothing has quantified yet
-     * reads back too; see {@see self::hasOwnBinder()}.
-     *
-     * This and {@see Type::func()} are the two doors that build a function type's structure without validating it
-     * against a call site: {@see Type::func()} for every position that commits to no binder of its own, this one for
-     * the one place -- {@see Parser\TypeResolution::resolveSignature()} -- that resolves a binder written by hand
-     * and has to store exactly what was written, not derive one from where its names are first used.
+     * A signature built fresh from $returnType and $parameters, with its own binder derived from what they reach --
+     * see {@see self::freeVariables()}. The door for a signature that has no binder of its own to keep:
+     * {@see self::quantified()} is the one caller that has to choose between this and keeping a binder already
+     * there, and {@see BuiltinFunctions::signature()} has nothing else to give a built-in's own top-level signature
+     * in the first place.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
      *
      * @param list<Type> $parameters
-     * @param list<string> $binder
      */
-    public static function written(Type $returnType, array $parameters, array $binder): self
+    public static function over(Type $returnType, array $parameters): self
     {
-        return new self($returnType, $parameters, $binder);
+        return new self($returnType, $parameters, self::freeVariables($returnType, $parameters));
     }
 
     /**
@@ -125,10 +118,11 @@ final class Signature implements Stringable
     }
 
     /**
-     * $this wrapped as a {@see Type} -- the door {@see self::written()}'s only caller uses to hand a resolved
-     * `fn<...>` node back as the {@see Type} it has to answer, since {@see Type::of()} and {@see FuncShape} are both
-     * {@see Type}'s own internals, not the parser's, and {@see self::written()}'s caller isn't a
-     * {@see TypeShape::substitute()} implementation either -- the only other place {@see Type::of()} is called from.
+     * $this wrapped as a {@see Type} -- the door {@see Parser\TypeResolution::resolveSignature()} uses to hand a
+     * resolved `fn<...>` node back as the {@see Type} it has to answer, since {@see Type::of()} and {@see FuncShape}
+     * are both {@see Type}'s own internals, not the parser's, and {@see Parser\TypeResolution::resolveSignature()}
+     * isn't a {@see TypeShape::substitute()} implementation either -- the only other place {@see Type::of()} is
+     * called from.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -210,10 +204,17 @@ final class Signature implements Stringable
      * says what was expected and {@see Expr::call()}'s receiver and argument checks report it, pointing at the
      * expression that's wrong.
      *
+     * A signature with no binder of its own reaches no variable for a call to decide -- see {@see self::hasOwnBinder()}
+     * -- so there is nothing here for it either: $this is handed back unchanged rather than rebuilt from a walk that
+     * could only ever bind nothing and substitute nothing, which every monomorphic call, like `substr`'s, is.
+     *
      * @param list<Type> $argumentTypes
      */
     public function instantiateForCall(Type $receiver, array $argumentTypes): self
     {
+        if (!$this->hasOwnBinder()) {
+            return $this;
+        }
         $arguments = [$receiver, ...$argumentTypes];
         $bindings = [];
         // Only the parameters an argument faces have anything to say. A call with the wrong number of arguments is

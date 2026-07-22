@@ -2,6 +2,8 @@ foo:fn<T, U>(int) -> int
 -- Type error --
 T is declared but doesn't appear in the parameters or the return type, so no call could ever decide it
 -- Note --
-The binder is derived from where a variable is actually used (see Type::asFunction()), not read back from what was
-written, so a written name has to earn its place. T is checked, and rejected, before U ever gets a turn -- the first
-of the two unused names is the one reported.
+A written binder is stored as written (see printed-in-the-order-declared-not-the-order-first-used.txt), but that
+doesn't mean any name written into it is accepted unchecked: TypeResolution::resolveSignature() separately walks the
+parameters and the return type to see which variables they actually reach, and rejects a written name that walk
+doesn't find, so a written name still has to earn its place. T is checked, and rejected, before U ever gets a turn --
+the first of the two unused names is the one reported.
