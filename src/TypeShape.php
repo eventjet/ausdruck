@@ -15,8 +15,8 @@ namespace Eventjet\Ausdruck;
  * repeated on {@see Type} for every operation that needs one: a new shape has to implement this interface to exist
  * at all, which the compiler enforces. {@see Type} keeps the coercion between two different shapes that
  * {@see Type::isSubtypeOf()} and {@see Type::bind()} each start with -- None into Option, never, any, and so on --
- * since that isn't any one shape's business either; both then delegate the rest of their work, once a same-shape
- * comparison is the only question left, to {@see self::isSubtypeOfSame()} and {@see self::bindSame()} below. {@see
+ * since that isn't any one shape's business either; both then delegate the rest of their work, once a shape
+ * comparison is the only question left, to {@see self::isSubtypeOf()} and {@see self::bind()} below. {@see
  * Type} also keeps a handful of small, private predicates that only ever ask about one specific shape by name --
  * is this an `Option`, a `list`, a struct -- rather than dispatching on whichever shape a {@see Type} happens to
  * hold; those aren't operations that differ per shape, so they have no reason to live here.
@@ -68,26 +68,28 @@ interface TypeShape
     public function substitute(array $bindings): Type;
 
     /**
-     * Whether $this is a subtype of $other, once {@see Type::isSubtypeOf()} has already established, from both
-     * sides' own classes, that there is a same-shape comparison to make at all -- called only then, so $other is
-     * always $this's own concrete class in practice, even though the parameter is typed as the wider {@see TypeShape}
-     * here: PHP requires every implementation of one interface method to accept the same parameter type, not a
-     * narrower one, so each implementation below asserts the narrower type its own docblock promises before reading
-     * $other's properties, the same way {@see Type::asFunction()}'s own callers assert a nullable non-null.
-     * {@see AliasShape} never implements this meaningfully: {@see Type::isSubtypeOf()} canonicalizes both sides
-     * before it ever asks a shape this question, so an alias is never one of the two being compared.
+     * Whether $this is a subtype of $other, called from {@see Type::isSubtypeOf()} once both sides are already known
+     * to be concrete shapes -- aliases seen through, the None/any/Option/never/map coercions all handled -- so all
+     * that's left is this one comparison. $other is not necessarily $this's own class: nothing upstream of this call
+     * gates on the two classes matching, so each implementation below checks `$other instanceof self` itself and
+     * answers false on a mismatch, the same way a name or field mismatch is answered, rather than that being asserted
+     * by a caller. {@see AliasShape} answers false unconditionally: {@see Type::isSubtypeOf()} canonicalizes both
+     * sides -- seeing through every alias -- before it ever asks a shape this question, so a {@see AliasShape} is
+     * never $this here in practice, but nothing needs that to be true for its answer to still be correct.
      */
-    public function isSubtypeOfSame(self $other): bool;
+    public function isSubtypeOf(self $other): bool;
 
     /**
      * What $other, matched structurally against $this, teaches about the variables $this reaches -- {@see
-     * Type::bind()}'s same-shape half, called on the same terms {@see self::isSubtypeOfSame()} is, with the same
-     * widened parameter type. A {@see VariableShape} answers a different question before ever reaching a same-shape
-     * comparison -- see {@see Type::bind()} -- so neither it nor {@see AliasShape}, excluded the same way it is from
-     * {@see self::isSubtypeOfSame()}, ever has $this called for real.
+     * Type::bind()}'s shape-comparison half, called on the same terms {@see self::isSubtypeOf()} is, with the same
+     * widened parameter type and the same "check it yourself" rule for a class mismatch. {@see VariableShape} answers
+     * a different question before ever reaching this comparison -- see {@see Type::bind()} -- and {@see AliasShape}
+     * is excluded from it the same way it is from {@see self::isSubtypeOf()}; both still implement this rather than
+     * asserting unreachability, answering $bindings unchanged, since there is nothing to learn from either one either
+     * way.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
      */
-    public function bindSame(self $other, array $bindings): array;
+    public function bind(self $other, array $bindings): array;
 }

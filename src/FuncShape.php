@@ -97,11 +97,11 @@ final class FuncShape implements TypeShape
      * their return type and parameters read the same -- {@see Signature::hasOwnBinder()} is what tells them apart.
      * Once that agrees, the return type has to accept what the other returns, and each parameter -- contravariantly,
      * the same rule an ordinary function subtyping check follows -- has to accept what it's declared to. $other isn't
-     * necessarily a function type at all: {@see Type::isSubtypeOf()} no longer checks that before asking, so a shape
-     * mismatch is rejected here, the same way a quantification mismatch is.
+     * necessarily a function type at all, so a shape mismatch is rejected here, the same way a quantification
+     * mismatch is.
      */
     #[Override]
-    public function isSubtypeOfSame(TypeShape $other): bool
+    public function isSubtypeOf(TypeShape $other): bool
     {
         if (!$other instanceof self) {
             return false;
@@ -134,14 +134,14 @@ final class FuncShape implements TypeShape
      * rule rather than a position. Parameters are walked before the return type, the same order
      * {@see self::collectVariables()} walks a function type's own parts in, so a variable used both directly and
      * through a nested function type is decided in the same place either way. $other isn't necessarily a function
-     * type either, the same reason {@see self::isSubtypeOfSame()} checks it, and there is nothing to learn from one
+     * type either, the same reason {@see self::isSubtypeOf()} checks it, and there is nothing to learn from one
      * if it isn't.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
      */
     #[Override]
-    public function bindSame(TypeShape $other, array $bindings): array
+    public function bind(TypeShape $other, array $bindings): array
     {
         $signature = $this->signature;
         if ($signature->hasOwnBinder() || !$other instanceof self) {

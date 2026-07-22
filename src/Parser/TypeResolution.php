@@ -332,11 +332,11 @@ final class TypeResolution
      * binder is never in question here—{@see self::resolveSignature()} rejects a nested one before it ever declares a
      * name to collide with.
      *
-     * A name a {@see TypeConstructor} case already spells is the one restriction that belongs here for a reason
-     * specific to this written text: within the signature this binder introduces the name for, the bare word could no
-     * longer mean the type once it also means the variable. {@see Type::var()} rejects the same names too, but for a
-     * different reason -- see {@see TypeConstructor::isReservedName()} -- so the two checks agree without either one
-     * needing to know about the other.
+     * Every name {@see TypeConstructor::isReservedName()} reserves is the one restriction that belongs here for a
+     * reason specific to this written text: within the signature this binder introduces the name for, the bare word
+     * could no longer mean the type once it also means the variable. {@see Type::var()} rejects the same names too,
+     * but for a different reason, so this calls the same helper directly rather than reimplementing it -- the one
+     * way the two can't drift apart.
      *
      * @param array<string, true> $typeVariables The names declared so far in the binder $parameter belongs to, which
      *     grows as {@see self::resolveSignature()} works through the binder's parameters, so that two variables in
@@ -344,9 +344,9 @@ final class TypeResolution
      */
     private function checkTypeVariable(Identifier $parameter, array $typeVariables): TypeError|null
     {
-        if (TypeConstructor::tryFrom($parameter->name) !== null) {
+        if (TypeConstructor::isReservedName($parameter->name)) {
             return TypeError::create(
-                sprintf('%s can\'t be a type variable: it is a type of its own', $parameter->name),
+                TypeConstructor::reservedNameMessage($parameter->name),
                 $parameter->location,
             );
         }

@@ -61,25 +61,24 @@ final class VariableShape implements TypeShape
 
     /**
      * Two variables of the same name are the same variable -- see {@see Type::var()}. $other isn't necessarily one
-     * too: {@see Type::isSubtypeOf()} no longer checks the two shapes share a class before asking either of them this
-     * -- see {@see TypeShape::isSubtypeOfSame()} -- so a variable compared against any other shape answers false.
+     * too, so a variable compared against any other shape answers false.
      */
     #[Override]
-    public function isSubtypeOfSame(TypeShape $other): bool
+    public function isSubtypeOf(TypeShape $other): bool
     {
         return $other instanceof self && $this->name === $other->name;
     }
 
     /**
      * Answers $bindings unchanged: {@see Type::bind()} asks whether $this is a variable, and binds it, before it
-     * ever reaches a same-shape comparison -- a {@see self} is never $this here in practice, but there is nothing to
+     * ever reaches a shape comparison -- a {@see self} is never $this here in practice, but there is nothing to
      * learn from one either way.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
      */
     #[Override]
-    public function bindSame(TypeShape $other, array $bindings): array
+    public function bind(TypeShape $other, array $bindings): array
     {
         return $bindings;
     }

@@ -33,6 +33,9 @@ final class Declarations
         public readonly array $variables = [],
         array $functions = [],
     ) {
+        foreach ($variables as $name => $type) {
+            self::checkVariableIsSelfContained($name, $type);
+        }
         $fns = BuiltinFunctions::signatures();
         foreach ($functions as $name => $type) {
             if (array_key_exists($name, $fns)) {
@@ -42,37 +45,55 @@ final class Declarations
             if ($signature === null) {
                 throw new InvalidArgumentException(sprintf('%s is declared as %s, which is not a function type', $name, $type));
             }
-            self::checkBinderCoversFreeVariables($name, $type, $signature);
+            self::checkFunctionIsSelfContained($name, $type);
             $fns[$name] = $signature;
         }
         $this->functions = $fns;
     }
 
     /**
-     * This is the one place a consumer-supplied {@see Type} is promoted to a declaration, so it's the one place that
-     * has to notice a signature built through the wrong door: {@see Type::nestedFunc()} defers every variable it
-     * reaches to whichever signature encloses it, correct for a function type nested inside another one's own
-     * parameters or return type, but wrong here, where nothing encloses it -- the signature reads back with an empty
-     * binder even though {@see Signature::freeVariables()} finds names in it, and every one of them silently becomes
-     * `any` at every call site instead of being decided by the call. {@see Type::func()} and
+     * This is the one place a consumer-supplied {@see Type} is promoted to a function declaration, so it's the one
+     * place that has to notice a signature built through the wrong door: {@see Type::nestedFunc()} defers every
+     * variable it reaches to whichever signature encloses it, correct for a function type nested inside another
+     * one's own parameters or return type, but wrong here, where nothing encloses it -- every one of its variables
+     * silently becomes `any` at every call site instead of being decided by the call. {@see Type::func()} and
      * {@see Type::genericFunc()}, the two doors meant for a top-level declaration, can't produce that: each already
      * derives or validates its own binder against exactly the variables it reaches, both ways, so the only way a
-     * declared signature ever disagrees with its own free variables is by having been built through the wrong door
-     * in the first place -- checked here as that one fact, not re-derived as the two-directional set comparison
-     * {@see Type::genericFunc()} itself already made true by construction.
+     * declared signature ever disagrees with its own free variables -- {@see Type::hasFreeVariables()}, the same
+     * walk {@see self::checkVariableIsSelfContained()} and {@see Types::__construct()} ask of a variable's or an
+     * alias's own type -- is by having been built through the wrong door in the first place.
      */
-    private static function checkBinderCoversFreeVariables(string $name, Type $type, Signature $signature): void
+    private static function checkFunctionIsSelfContained(string $name, Type $type): void
     {
-        if (
-            !$signature->hasOwnBinder()
-            && Signature::freeVariables($signature->returnType, $signature->parameters) !== []
-        ) {
-            throw new InvalidArgumentException(sprintf(
-                '%s is declared as %s, built through Type::nestedFunc(), which leaves it without a binder of its '
-                    . 'own -- a declaration needs Type::func() or Type::genericFunc() instead',
-                $name,
-                $type,
-            ));
+        if (!$type->hasFreeVariables()) {
+            return;
         }
+        throw new InvalidArgumentException(sprintf(
+            '%s is declared as %s, built through Type::nestedFunc(), which leaves it without a binder of its '
+                . 'own -- a declaration needs Type::func() or Type::genericFunc() instead',
+            $name,
+            $type,
+        ));
+    }
+
+    /**
+     * The same wrong-door hole as {@see self::checkFunctionIsSelfContained()}, but for a variable's declared type,
+     * which doesn't have to be a function type at all: {@see Type::nestedFunc()} can just as easily turn up nested
+     * inside a list, an `Option`, a struct field, or behind an alias, deferring a variable to a signature that was
+     * never going to enclose it because nothing here declares one -- or a bare {@see Type::var()} can be a variable's
+     * whole declared type, never bound by anything either.
+     */
+    private static function checkVariableIsSelfContained(string $name, Type $type): void
+    {
+        if (!$type->hasFreeVariables()) {
+            return;
+        }
+        throw new InvalidArgumentException(sprintf(
+            '%s is declared as %s, which reaches a type variable nothing captures -- every function type it '
+                . 'reaches through Type::nestedFunc() needs its own binder instead, via Type::func() or '
+                . 'Type::genericFunc()',
+            $name,
+            $type,
+        ));
     }
 }

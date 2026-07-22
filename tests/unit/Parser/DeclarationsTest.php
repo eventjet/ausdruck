@@ -51,4 +51,23 @@ final class DeclarationsTest extends TestCase
         $t = Type::var('T');
         new Declarations(functions: ['myHead' => Type::nestedFunc($t, [Type::listOf($t)])]);
     }
+
+    /**
+     * The same wrong-door hole as {@see self::testAFunctionDeclaredThroughTheNestedDoorIsRejected()}, but for a
+     * variable, whose declared type doesn't have to be a function at all: here it's a list of one, so the variable
+     * {@see Type::nestedFunc()} defers is buried a level deeper than a direct {@see Type::asFunction()} check would
+     * ever look.
+     */
+    public function testAVariableWhoseTypeReachesTheNestedDoorIsRejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'items is declared as list<fn(T) -> bool>, which reaches a type variable nothing captures -- every '
+                . 'function type it reaches through Type::nestedFunc() needs its own binder instead, via '
+                . 'Type::func() or Type::genericFunc()',
+        );
+
+        $t = Type::var('T');
+        new Declarations(variables: ['items' => Type::listOf(Type::nestedFunc(Type::bool(), [$t]))]);
+    }
 }

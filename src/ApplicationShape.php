@@ -79,11 +79,11 @@ final class ApplicationShape implements TypeShape
     /**
      * Same name, same shape, but two `ApplicationShape`s of that name can still differ argument by argument --
      * `map<int, string>` is not a subtype of `map<int, int>`, even though both are named `map`. $other isn't
-     * necessarily an {@see ApplicationShape} at all: {@see Type::isSubtypeOf()} no longer checks that before asking,
-     * so a shape mismatch is rejected here, in the same breath as a name mismatch, rather than upstream.
+     * necessarily an {@see ApplicationShape} at all, so a shape mismatch is rejected here, in the same breath as a
+     * name mismatch, rather than upstream.
      */
     #[Override]
-    public function isSubtypeOfSame(TypeShape $other): bool
+    public function isSubtypeOf(TypeShape $other): bool
     {
         if (!$other instanceof self || $this->name !== $other->name) {
             return false;
@@ -106,7 +106,7 @@ final class ApplicationShape implements TypeShape
      * @return array<string, Type>
      */
     #[Override]
-    public function bindSame(TypeShape $other, array $bindings): array
+    public function bind(TypeShape $other, array $bindings): array
     {
         if (!$other instanceof self || $this->name !== $other->name) {
             return $bindings;

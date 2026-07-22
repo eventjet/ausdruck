@@ -75,11 +75,10 @@ final class StructShape implements TypeShape
     /**
      * A struct is a subtype of another if it has at least the fields the other does, each of a subtype of the
      * other's -- it may have more, which is what makes a struct type structural rather than nominal. $other isn't
-     * necessarily a struct at all: {@see Type::isSubtypeOf()} no longer checks that before asking, so a shape
-     * mismatch is rejected here rather than upstream.
+     * necessarily a struct at all, so a shape mismatch is rejected here rather than upstream.
      */
     #[Override]
-    public function isSubtypeOfSame(TypeShape $other): bool
+    public function isSubtypeOf(TypeShape $other): bool
     {
         if (!$other instanceof self) {
             return false;
@@ -103,7 +102,7 @@ final class StructShape implements TypeShape
      * @return array<string, Type>
      */
     #[Override]
-    public function bindSame(TypeShape $other, array $bindings): array
+    public function bind(TypeShape $other, array $bindings): array
     {
         if (!$other instanceof self) {
             return $bindings;

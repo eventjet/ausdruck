@@ -63,13 +63,13 @@ final class AliasShape implements TypeShape
      * practice, but nothing needs that to be true for this answer to still be correct.
      */
     #[Override]
-    public function isSubtypeOfSame(TypeShape $other): bool
+    public function isSubtypeOf(TypeShape $other): bool
     {
         return false;
     }
 
     /**
-     * Answers $bindings unchanged, for the same reason {@see self::isSubtypeOfSame()} answers false rather than
+     * Answers $bindings unchanged, for the same reason {@see self::isSubtypeOf()} answers false rather than
      * asserting unreachability: {@see Type::bind()} canonicalizes both sides before comparing shapes too, so a
      * {@see self} is never $this here in practice, but there is nothing to learn from one either way.
      *
@@ -77,7 +77,7 @@ final class AliasShape implements TypeShape
      * @return array<string, Type>
      */
     #[Override]
-    public function bindSame(TypeShape $other, array $bindings): array
+    public function bind(TypeShape $other, array $bindings): array
     {
         return $bindings;
     }

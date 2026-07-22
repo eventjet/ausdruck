@@ -375,7 +375,7 @@ final class Type implements Stringable
 
     /**
      * Whether this type is `any` -- the same kind of shortcut {@see self::isOption()} is, but exposed rather than
-     * kept private, since {@see FuncShape::bindSame()} needs to ask it about the type actually facing a function's
+     * kept private, since {@see FuncShape::bind()} needs to ask it about the type actually facing a function's
      * parameter and {@see self::canonical()} and {@see self::isNamed()}, which it needs, are $this-bound private
      * methods no shape class can call directly -- the same reason {@see self::of()} exists for
      * {@see TypeShape::substitute()}.
@@ -415,12 +415,12 @@ final class Type implements Stringable
         }
         $selfShape = $self->shape;
         $otherShape = $other->shape;
-        // Each shape decides for itself, in {@see TypeShape::isSubtypeOfSame()}, whether $other is even its own kind
+        // Each shape decides for itself, in {@see TypeShape::isSubtypeOf()}, whether $other is even its own kind
         // before comparing anything else -- two ApplicationShapes can be named differently, and two VariableShapes
         // can too, {@see self::var('T')} and {@see self::var('U')} aren't the same variable -- which is also where
         // the rest of the comparison -- args, signature, fields -- lives; a {@see AliasShape} never reaches here,
         // having already been seen through by {@see self::canonical()} above.
-        return $selfShape->isSubtypeOfSame($otherShape);
+        return $selfShape->isSubtypeOf($otherShape);
     }
 
     /**
@@ -479,7 +479,7 @@ final class Type implements Stringable
      *
      * This is the recursive walk that applies to any type, not just a function's parameters, which is why it lives
      * here rather than on {@see Signature}; nothing outside the type system should call it directly. The function
-     * case itself is {@see FuncShape::bindSame()}.
+     * case itself is {@see FuncShape::bind()}.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -501,7 +501,7 @@ final class Type implements Stringable
         if ($selfOption !== null && !$actual->isNamed('Option') && !$actual->isNamed('None')) {
             return $selfOption->bind($actual, $bindings);
         }
-        return $selfShape->bindSame($actualShape, $bindings);
+        return $selfShape->bind($actualShape, $bindings);
     }
 
     /**
@@ -518,6 +518,29 @@ final class Type implements Stringable
     public function collectVariables(array $found): array
     {
         return $this->shape->collectVariables($found);
+    }
+
+    /**
+     * Whether $this reaches a {@see self::var()} with no enclosing binder to capture it -- true for a bare variable
+     * used on its own, for a function type built through {@see self::nestedFunc()} used standalone rather than
+     * nested inside whatever was supposed to enclose it, and for either one reached through a list, an `Option`, a
+     * struct field, or an alias, since {@see self::collectVariables()} -- the walk this delegates to, starting from
+     * nothing already found -- crosses all of those the same way {@see Signature::freeVariables()} crosses a
+     * signature's own parameters and return type.
+     *
+     * This is the question every boundary where a consumer-supplied $type is promoted to a standalone type, with
+     * nothing left to enclose it, has to ask before trusting it: {@see Parser\Types::__construct()} for an alias,
+     * and {@see Parser\Declarations} for a declared function or variable. A $type built entirely through
+     * {@see self::func()} and {@see self::genericFunc()} can never answer true, since each already derives or checks
+     * its own binder against exactly what it reaches; true here means a {@see self::nestedFunc()} or a bare
+     * {@see self::var()} ended up somewhere nothing encloses.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     */
+    public function hasFreeVariables(): bool
+    {
+        return $this->collectVariables([]) !== [];
     }
 
     /**
