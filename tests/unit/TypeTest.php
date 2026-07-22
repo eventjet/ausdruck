@@ -281,8 +281,8 @@ final class TypeTest extends TestCase
      * A fixed parameter that happens to itself already be a generic signature -- reached through an alias, the same
      * way {@see self::testAliasingAFunctionTypeQuantifiesIt()} builds Mapper -- lends none of its own binder to a
      * signature that merely takes it as a parameter: Mapper's own `U` is quantified by Mapper itself
-     * ({@see Signature::hasOwnBinder()}), not by whatever else Mapper is found inside -- {@see \Eventjet\Ausdruck\FuncShape}'s own-binder
-     * guard in {@see \Eventjet\Ausdruck\FuncShape::collectVariables()} is what keeps {@see Signature::freeVariables()} from seeing it.
+     * ({@see Signature::hasOwnBinder()}), not by whatever else Mapper is found inside -- the own-binder guard in
+     * {@see Signature::collectVariables()} is what keeps {@see Signature::freeVariables()} from seeing it.
      * Without that guard this signature would derive a spurious `['U']` binder and print as `fn<U>(Mapper) -> int`
      * instead of `fn(Mapper) -> int` -- the same corruption
      * a-fixed-parameter-that-happens-to-be-generic-isnt-a-generic-parameter.txt pins for a written `fn<...>` resolved
@@ -302,7 +302,7 @@ final class TypeTest extends TestCase
 
     /**
      * The same guard, but with two variables of the enclosing signature's own already found by the time it's
-     * reached: {@see \Eventjet\Ausdruck\FuncShape::collectVariables()} answers $found back exactly as given, not a
+     * reached: {@see Signature::collectVariables()} answers $found back exactly as given, not a
      * truncated copy of it -- `A` and `B`, found walking the parameters before Mapper's own position, both survive.
      */
     public function testQuantifiedKeepsEarlierVariablesWhenALaterParameterIsAlreadyGeneric(): void
@@ -316,15 +316,15 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * {@see \Eventjet\Ausdruck\FuncShape::bind()}'s own-binder guard is the call-site-inference counterpart to
+     * {@see Signature::bind()}'s own-binder guard is the call-site-inference counterpart to
      * {@see self::testQuantifiedDoesNotBorrowABinderFromAFixedParameterThatIsAlreadyGeneric()}'s
-     * {@see \Eventjet\Ausdruck\FuncShape::collectVariables()} guard: a fixed parameter that is itself an already-quantified generic
+     * {@see Signature::collectVariables()} guard: a fixed parameter that is itself an already-quantified generic
      * function type reaches no variable of the enclosing signature's own scope -- not even one that happens to share
      * a name with a variable Mapper's own binder captures, since `U` here names two different variables, Mapper's
      * own and this signature's own, and only the latter may be decided by matching a call's arguments against it.
      *
      * Built through {@see Signature::quantified()} and {@see Signature::toType()} directly, rather than through
-     * {@see Type::alias()}: this is a test of {@see \Eventjet\Ausdruck\FuncShape::bind()}'s own guard, so the
+     * {@see Type::alias()}: this is a test of {@see Signature::bind()}'s own guard, so the
      * parameter is given to it as the generic function type it already is, without an alias's name in front of it
      * that this test has no reason to ask about.
      */
@@ -344,7 +344,7 @@ final class TypeTest extends TestCase
 
     /**
      * The same guard, but with two variables of the enclosing signature's own already bound by the time it's
-     * reached: {@see \Eventjet\Ausdruck\FuncShape::bind()} answers $bindings back exactly as given, not a truncated
+     * reached: {@see Signature::bind()} answers $bindings back exactly as given, not a truncated
      * copy of it -- `A` and `B`, bound from the receiver and the first argument before Mapper's own position, both
      * survive into the substituted return type.
      */
@@ -369,7 +369,7 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * {@see \Eventjet\Ausdruck\FuncShape::bind()} skips a parameter position whose actual type is `any` -- every
+     * {@see Signature::bind()} skips a parameter position whose actual type is `any` -- every
      * {@see Lambda} parameter -- without abandoning the walk: a later, real parameter still decides whatever it
      * faces. Two parameters in one nested function type, the first `any` and the second not, is what tells apart
      * skipping this one position from stopping the walk there -- a signature with only one bindable parameter, or

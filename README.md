@@ -248,6 +248,10 @@ same way a written type string nests one -- and a signature like that is opaque 
 one can pass it around, store it in a list or an `Option`, or return it, but never reach through it for a variable of
 its own.
 
+Until it's quantified, a value built with `Type::func()` is open: printing it before declaring or aliasing it prints a
+variable's bare name, or a `fn<...>` missing the binder that would make it valid syntax again. `Signature::quantified($t)->toType()`
+promotes one directly, the same way `Declarations` and `Type::alias()` do, for the rarer case where neither fits.
+
 Because the call site decides them, the inline return type is rarely worth writing: `foo:list<string>.head()` is
 already an `Option<string>`. Writing one anyway is still allowed, and is then checked against the inferred one.
 

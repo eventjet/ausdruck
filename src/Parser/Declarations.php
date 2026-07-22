@@ -45,9 +45,34 @@ final class Declarations
             if ($signature === null) {
                 throw new InvalidArgumentException(sprintf('%s is declared as %s, which is not a function type', $name, $type));
             }
+            self::checkBinderDoesNotShadowAnAlias($name, $type, $signature, $types);
             $fns[$name] = $signature;
         }
         $this->functions = $fns;
+    }
+
+    /**
+     * The one restriction {@see TypeResolution::checkTypeVariable()} enforces that a builder-constructed function's
+     * own derived binder has no counterpart for: a written `fn<...>` binder is checked against $types's aliases at
+     * parse time, but a binder {@see Signature::quantified()} derives from {@see Type::func()}'s own free variables
+     * never passes through the parser at all, so this is the one place left to ask the same question of it before
+     * it's handed back as $name's own signature.
+     */
+    private static function checkBinderDoesNotShadowAnAlias(string $name, Type $type, Signature $signature, Types $types): void
+    {
+        foreach ($signature->binder() as $variable) {
+            if (!$types->hasAlias($variable)) {
+                continue;
+            }
+            throw new InvalidArgumentException(sprintf(
+                '%s is declared as %s, whose binder would have to introduce %s -- but %s already names a type, so a '
+                    . 'call could never tell the two apart',
+                $name,
+                $type,
+                $variable,
+                $variable,
+            ));
+        }
     }
 
     /**

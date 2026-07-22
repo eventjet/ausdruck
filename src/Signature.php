@@ -13,11 +13,15 @@ use function array_slice;
 use function count;
 
 /**
- * A function type read as what it's for: a return type, a receiver, and the arguments a call passes in parentheses.
+ * A function type read as what it's for: a return type, a receiver, and the arguments a call passes in parentheses --
+ * and, since a function type is one of the shapes a {@see Type} can hold, this class is also its own
+ * {@see TypeShape}: {@see self::collectVariables()} through {@see self::bind()} below are that interface's, called
+ * the way every other shape's are, from {@see Type} once it already holds a {@see self} rather than from a consumer
+ * of this @api class directly.
  *
  * @api
  */
-final class Signature implements Stringable
+final class Signature implements Stringable, TypeShape
 {
     /**
      * @param list<Type> $parameters The types the PHP callable receives, in order, receiver first -- `substr` is
@@ -118,18 +122,17 @@ final class Signature implements Stringable
     }
 
     /**
-     * $this wrapped as a {@see Type} -- the door {@see Parser\TypeResolution::resolveSignature()} uses to hand a
-     * resolved `fn<...>` node back as the {@see Type} it has to answer, since {@see Type::of()} and {@see FuncShape}
-     * are both {@see Type}'s own internals, not the parser's, and {@see Parser\TypeResolution::resolveSignature()}
-     * isn't a {@see TypeShape::substitute()} implementation either -- the only other place {@see Type::of()} is
-     * called from.
-     *
-     * @internal
-     * @psalm-internal Eventjet\Ausdruck
+     * $this wrapped as a {@see Type} -- the consumer-facing counterpart to {@see self::quantified()}, for placing a
+     * signature somewhere a {@see Type} belongs, such as a nested parameter or return type, without going through
+     * {@see Parser\Declarations} or {@see Type::alias()} to get there: `Signature::quantified($t)->toType()` is a
+     * function type promoted this way, printing and re-parsing the same way one declared or aliased does. $this
+     * without a binder of its own -- built directly through {@see self::over()}, or a bare {@see self::__construct()}
+     * -- isn't complete yet, see {@see self::hasOwnBinder()}, and wrapped here prints the same open text
+     * {@see Type::func()} does.
      */
     public function toType(): Type
     {
-        return Type::of(new FuncShape($this));
+        return Type::of($this);
     }
 
     /**
@@ -137,11 +140,11 @@ final class Signature implements Stringable
      * function with no type variables at all and a signature that defers every variable it reaches to whichever
      * signature does own one are the same type, and read identically here, both empty.
      *
-     * This is the fact that lets {@see FuncShape::collectVariables()}, {@see FuncShape::substitute()},
-     * {@see FuncShape::bind()} and {@see Type::bind()} treat a self-contained generic function type -- one nested
-     * inside a list, an Option, a struct field, or standing behind an alias used as a parameter -- as opaque: rank-1
-     * polymorphism means its variables are already quantified by itself, never by whatever it's found inside, so
-     * there is nothing for any of those to claim or rewrite.
+     * This is the fact that lets {@see self::collectVariables()}, {@see self::substitute()}, {@see self::bind()} and
+     * {@see Type::bind()} treat a self-contained generic function type -- one nested inside a list, an Option, a
+     * struct field, or standing behind an alias used as a parameter -- as opaque: rank-1 polymorphism means its
+     * variables are already quantified by itself, never by whatever it's found inside, so there is nothing for any of
+     * those to claim or rewrite.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -227,5 +230,117 @@ final class Signature implements Stringable
             $this->returnType->substitute($bindings),
             array_map(static fn(Type $parameter): Type => $parameter->substitute($bindings), $this->parameters),
         );
+    }
+
+    /**
+     * $this with its own binder -- see {@see self::hasOwnBinder()} -- opaque here: a self-contained generic
+     * signature's variables are quantified by itself, never by whatever type it's found inside.
+     *
+     * @param array<string, true> $found
+     * @return array<string, true>
+     */
+    #[Override]
+    public function collectVariables(array $found): array
+    {
+        if ($this->hasOwnBinder()) {
+            return $found;
+        }
+        foreach ($this->parameters as $parameter) {
+            $found = $parameter->collectVariables($found);
+        }
+        return $this->returnType->collectVariables($found);
+    }
+
+    /**
+     * {@see self::__toString()} itself, under the name {@see TypeShape} asks every shape for -- see {@see Type::__toString()}.
+     */
+    #[Override]
+    public function toString(): string
+    {
+        return (string)$this;
+    }
+
+    /**
+     * $this with its own binder left untouched -- see {@see self::hasOwnBinder()}.
+     *
+     * @param array<string, Type> $bindings
+     */
+    #[Override]
+    public function substitute(array $bindings): Type
+    {
+        if ($this->hasOwnBinder()) {
+            return Type::of($this);
+        }
+        return Type::of(new self(
+            $this->returnType->substitute($bindings),
+            array_map(static fn(Type $parameter): Type => $parameter->substitute($bindings), $this->parameters),
+        ));
+    }
+
+    /**
+     * Two function types agree on their own quantification before anything else: a polymorphic `fn<T>(T) -> T` and a
+     * monomorphic `fn(T) -> T` over a `T` some enclosing signature owns are different types, even though structurally
+     * their return type and parameters read the same -- {@see self::hasOwnBinder()} is what tells them apart. Once
+     * that agrees, the return type has to accept what the other returns, and each parameter -- contravariantly, the
+     * same rule an ordinary function subtyping check follows -- has to accept what it's declared to. $supertype may
+     * be any shape, not just this one's own class; that mismatch is rejected the same way a quantification mismatch
+     * is.
+     *
+     * @todo Alpha-equivalence: `fn<T>(T) -> T` and `fn<U>(U) -> U` describe the same type but this doesn't say so,
+     *     since neither side's binder is renamed to line up with the other's before the parameters and return type
+     *     are compared -- both would need the same name for `isSubtypeOf()` to reach true here. Left open.
+     */
+    #[Override]
+    public function isSubtypeOf(TypeShape $supertype): bool
+    {
+        if (!$supertype instanceof self) {
+            return false;
+        }
+        if ($this->hasOwnBinder() !== $supertype->hasOwnBinder()) {
+            return false;
+        }
+        if (!$this->returnType->isSubtypeOf($supertype->returnType)) {
+            return false;
+        }
+        foreach ($this->parameters as $index => $parameter) {
+            $otherParameter = $supertype->parameters[$index] ?? null;
+            if ($otherParameter === null || !$otherParameter->isSubtypeOf($parameter)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * $this with its own binder fixed as far as this walk is concerned -- see {@see self::hasOwnBinder()}.
+     *
+     * Otherwise: the return type always binds, and a parameter binds unless $actual's own parameter in that position
+     * is `any`, which is every {@see Lambda} parameter -- see {@see Type::bind()}'s own docblock for why that's the
+     * rule rather than a position. Parameters are walked before the return type, the same order
+     * {@see self::collectVariables()} walks a function type's own parts in, so a variable used both directly and
+     * through a nested function type is decided in the same place either way. $actual's shape may be any shape, not
+     * just this one's own class; there is nothing to learn if it isn't.
+     *
+     * @param array<string, Type> $bindings
+     * @return array<string, Type>
+     */
+    #[Override]
+    public function bind(Type $actual, array $bindings): array
+    {
+        $actualShape = $actual->shape();
+        if (!$actualShape instanceof self) {
+            return $bindings;
+        }
+        if ($this->hasOwnBinder()) {
+            return $bindings;
+        }
+        foreach ($this->parameters as $index => $parameter) {
+            $otherParameter = $actualShape->parameters[$index] ?? null;
+            if ($otherParameter === null || $otherParameter->isAny()) {
+                continue;
+            }
+            $bindings = $parameter->bind($otherParameter, $bindings);
+        }
+        return $this->returnType->bind($actualShape->returnType, $bindings);
     }
 }

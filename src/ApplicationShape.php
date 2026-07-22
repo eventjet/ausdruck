@@ -63,7 +63,10 @@ final class ApplicationShape implements TypeShape
     /**
      * $supertype may be any shape, not just this one's own class -- that mismatch is rejected the same way a name or
      * argument mismatch is: two `ApplicationShape`s can still differ by name, or by argument even when the name
-     * agrees -- `map<int, string>` is not a subtype of `map<int, int>`, even though both are named `map`.
+     * agrees -- `map<int, string>` is not a subtype of `map<int, int>`, even though both are named `map`. Once the
+     * name agrees, {@see self::bind()}'s own invariant holds here too -- both sides have exactly as many arguments as
+     * {@see TypeConstructor::typeArgumentCount()} fixes for that name -- so $supertype->args[$index] is trusted the
+     * same way {@see self::bind()} trusts it, rather than guarded a second time.
      */
     #[Override]
     public function isSubtypeOf(TypeShape $supertype): bool
@@ -72,8 +75,7 @@ final class ApplicationShape implements TypeShape
             return false;
         }
         foreach ($this->args as $index => $arg) {
-            $otherArg = $supertype->args[$index] ?? null;
-            if ($otherArg === null || !$arg->isSubtypeOf($otherArg)) {
+            if (!$arg->isSubtypeOf($supertype->args[$index])) {
                 return false;
             }
         }
@@ -84,7 +86,7 @@ final class ApplicationShape implements TypeShape
      * There is nothing to learn from $actual if its shape isn't this shape's own class, or if the names don't even
      * agree. Where they do, both sides have exactly as many arguments as {@see TypeConstructor::typeArgumentCount()}
      * fixes for that name -- an `ApplicationShape` is never built any other way, see {@see Type::listOf()},
-     * {@see Type::mapOf()} and the other scalar factories -- so unlike {@see FuncShape::bind()}'s parameters, one
+     * {@see Type::mapOf()} and the other scalar factories -- so unlike {@see Signature::bind()}'s parameters, one
      * side is never shorter than the other.
      *
      * @param array<string, Type> $bindings

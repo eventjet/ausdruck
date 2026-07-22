@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Test\Unit\Parser;
 
 use Eventjet\Ausdruck\Parser\Declarations;
+use Eventjet\Ausdruck\Parser\ExpressionParser;
+use Eventjet\Ausdruck\Parser\TypeNode;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Test\Unit\ParsesTypeSyntax;
@@ -87,5 +89,45 @@ final class DeclarationsTest extends TestCase
         $declarations = new Declarations(functions: ['foo' => $type]);
 
         self::assertSame('fn<U, T>(list<T>, fn(T) -> U) -> list<U>', (string)$declarations->functions['foo']);
+    }
+
+    /**
+     * $g already owns a binder of its own -- parsed from written `fn<T>(T) -> T` syntax -- so it is opaque to
+     * whatever binder {@see Signature::quantified()} derives for `f` around it: the derivation is free to reuse the
+     * same name T, the same way {@see \Eventjet\Ausdruck\Parser\TypeResolution::resolveSignature()} lets a nested,
+     * self-contained `fn<...>` reuse an enclosing binder's name (see
+     * generics/type-variable/reusing-an-enclosing-binders-name). Printing `f` back has to produce text the parser
+     * accepts again, not one that rejects T as already declared.
+     */
+    public function testADerivedBinderMayReuseANestedSignaturesOwnBinderName(): void
+    {
+        $g = ExpressionParser::parse('x:fn<T>(T) -> T')->getType();
+
+        $declarations = new Declarations(functions: ['f' => Type::func(Type::var('T'), [$g, Type::var('T')])]);
+        $printed = (string)$declarations->functions['f'];
+
+        self::assertSame('fn<T>(fn<T>(T) -> T, T) -> T', $printed);
+        $node = self::parseTypeString($printed);
+        self::assertInstanceOf(TypeNode::class, $node);
+        self::assertInstanceOf(Type::class, (new Types())->resolve($node));
+    }
+
+    /**
+     * The written-binder counterpart already rejects a binder that shadows a registered alias
+     * ({@see \Eventjet\Ausdruck\Parser\TypeResolution::checkTypeVariable()}) -- a builder-constructed function's own
+     * derived binder never passes through that check, since {@see Type::func()} and {@see Type::var()} see neither
+     * the enclosing {@see Types} nor each other, so {@see Declarations} is the one seam left to ask the same
+     * question of it.
+     */
+    public function testADerivedBinderThatShadowsARegisteredAliasIsRejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'f is declared as fn(Foo) -> Foo, whose binder would have to introduce Foo -- but Foo already names a '
+                . 'type, so a call could never tell the two apart',
+        );
+
+        $types = new Types(['Foo' => Type::int()]);
+        new Declarations(types: $types, functions: ['f' => Type::func(Type::var('Foo'), [Type::var('Foo')])]);
     }
 }

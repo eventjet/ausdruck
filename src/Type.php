@@ -22,6 +22,12 @@ use function sprintf;
  */
 final class Type implements Stringable
 {
+    /**
+     * The bottom type's own name -- see {@see self::never()} for why this, alone among the names this class spells,
+     * isn't read from a {@see TypeConstructor} case.
+     */
+    private const string NEVER = 'never';
+
     private function __construct(
         private readonly TypeShape $shape,
     ) {
@@ -43,32 +49,32 @@ final class Type implements Stringable
 
     public static function string(): self
     {
-        return new self(new ApplicationShape('string'));
+        return new self(new ApplicationShape(TypeConstructor::String->value));
     }
 
     public static function int(): self
     {
-        return new self(new ApplicationShape('int'));
+        return new self(new ApplicationShape(TypeConstructor::Int->value));
     }
 
     public static function float(): self
     {
-        return new self(new ApplicationShape('float'));
+        return new self(new ApplicationShape(TypeConstructor::Float->value));
     }
 
     public static function bool(): self
     {
-        return new self(new ApplicationShape('bool'));
+        return new self(new ApplicationShape(TypeConstructor::Bool->value));
     }
 
     public static function listOf(self $item): self
     {
-        return new self(new ApplicationShape('list', [$item]));
+        return new self(new ApplicationShape(TypeConstructor::List->value, [$item]));
     }
 
     public static function mapOf(self $keys, self $values): self
     {
-        return new self(new ApplicationShape('map', [$keys, $values]));
+        return new self(new ApplicationShape(TypeConstructor::Map->value, [$keys, $values]));
     }
 
     /**
@@ -88,7 +94,7 @@ final class Type implements Stringable
      * $name is never checked against what $type itself is a shape of: an alias's own shape is always an
      * {@see AliasShape}, since it prints as its own name ({@see AliasShape::toString()}) rather than as whatever it
      * stands for -- so `self::alias('Struct', ...)` prints as `Struct`, reachable through neither the check that
-     * looks for a {@see StructShape} nor the one that looks for a {@see FuncShape}.
+     * looks for a {@see StructShape} nor the one that looks for a {@see Signature}.
      *
      * $name is rejected when {@see TypeConstructor::isReservedName()} says so -- every name a
      * {@see TypeConstructor} case already spells, plus `fn`: {@see self::__toString()} turns this alias back into
@@ -105,7 +111,7 @@ final class Type implements Stringable
         }
         $signature = Signature::quantified($type);
         if ($signature !== null) {
-            $type = new self(new FuncShape($signature));
+            $type = $signature->toType();
         } elseif ($type->hasFreeVariables()) {
             throw new InvalidArgumentException(sprintf(
                 '%s is declared as %s, which reaches a type variable nothing captures -- aliasing only derives a '
@@ -119,7 +125,7 @@ final class Type implements Stringable
 
     public static function any(): self
     {
-        return new self(new ApplicationShape('any'));
+        return new self(new ApplicationShape(TypeConstructor::Any->value));
     }
 
     /**
@@ -166,13 +172,20 @@ final class Type implements Stringable
      * with that binder instead, since it's the author's own, not something derived after the fact the way
      * {@see Signature::quantified()} derives one.
      *
+     * The type this returns is open, not a complete signature: if $return or $parameters reach a {@see self::var()}
+     * nothing here binds, {@see self::__toString()} prints text -- a bare variable name, or a `fn<...>` missing its
+     * own binder -- that {@see Parser\ExpressionParser} can't read back as the same type, since nothing has said yet
+     * which of those names a call gets to decide. {@see Declarations} and {@see self::alias()} are the two doors that
+     * promote a value built here into one that does print and re-parse; call {@see Signature::quantified()} on it and
+     * {@see Signature::toType()} the result to promote one directly, without either.
+     *
      * @param list<Type> $parameters The types the PHP callable receives, in order. A function that is called as a
      *     receiver function -- `foo:string.substr:string(0, 3)` -- receives the expression it's called on as the first
      *     of them; see {@see Signature::receiverType()} and {@see Signature::argumentTypes()}.
      */
     public static function func(self $return, array $parameters = []): self
     {
-        return new self(new FuncShape(new Signature($return, $parameters)));
+        return new self(new Signature($return, $parameters));
     }
 
     public static function fromValue(mixed $value): self
@@ -196,7 +209,7 @@ final class Type implements Stringable
 
     public static function option(self $some): self
     {
-        return new self(new ApplicationShape('Option', [$some]));
+        return new self(new ApplicationShape(TypeConstructor::Option->value, [$some]));
     }
 
     public static function some(self $some): self
@@ -206,7 +219,7 @@ final class Type implements Stringable
 
     public static function none(): self
     {
-        return new self(new ApplicationShape('None'));
+        return new self(new ApplicationShape(TypeConstructor::None->value));
     }
 
     /**
@@ -217,9 +230,16 @@ final class Type implements Stringable
         return new self(new StructShape($fields));
     }
 
+    /**
+     * The bottom type: the element type of an empty list or map, since nothing about an empty one says what its
+     * elements would be -- see {@see self::keyAndValueTypeFromArray()}. `never` is deliberately not a
+     * {@see TypeConstructor} case -- see that enum's own class doc -- so unlike every other name spelled below,
+     * {@see self::NEVER} is this class's own single source for it, read here and everywhere {@see self::isNamed()}
+     * asks about it, rather than a literal repeated at each site.
+     */
     private static function never(): self
     {
-        return new self(new ApplicationShape('never'));
+        return new self(new ApplicationShape(self::NEVER));
     }
 
     /**
@@ -303,12 +323,12 @@ final class Type implements Stringable
 
     public function isOption(): bool
     {
-        return $this->canonical()->isNamed('Option');
+        return $this->canonical()->isNamed(TypeConstructor::Option->value);
     }
 
     /**
      * Whether this type is `any` -- the same kind of shortcut {@see self::isOption()} is, but exposed rather than
-     * kept private, since {@see FuncShape::bind()} needs to ask it about the type actually facing a function's
+     * kept private, since {@see Signature::bind()} needs to ask it about the type actually facing a function's
      * parameter and {@see self::canonical()} and {@see self::isNamed()}, which it needs, are $this-bound private
      * methods no shape class can call directly -- the same reason {@see self::of()} exists for
      * {@see TypeShape::substitute()}.
@@ -318,28 +338,28 @@ final class Type implements Stringable
      */
     public function isAny(): bool
     {
-        return $this->canonical()->isNamed('any');
+        return $this->canonical()->isNamed(TypeConstructor::Any->value);
     }
 
     public function isSubtypeOf(self $other): bool
     {
         $self = $this->canonical();
         $other = $other->canonical();
-        if ($self->isNamed('None')) {
-            return $other->isNamed('None') || $other->isNamed('Option');
+        if ($self->isNamed(TypeConstructor::None->value)) {
+            return $other->isNamed(TypeConstructor::None->value) || $other->isNamed(TypeConstructor::Option->value);
         }
         $otherOption = $other->optionArg();
-        if ($otherOption !== null && !$self->isNamed('Option')) {
+        if ($otherOption !== null && !$self->isNamed(TypeConstructor::Option->value)) {
             return $self->isSubtypeOf($otherOption);
         }
-        if ($self->isNamed('never')) {
+        if ($self->isNamed(self::NEVER)) {
             return true;
         }
-        if ($other->isNamed('any')) {
+        if ($other->isNamed(TypeConstructor::Any->value)) {
             return true;
         }
         $selfList = $self->listArg();
-        if ($selfList !== null && $selfList->isNamed('never') && $other->isNamed('map')) {
+        if ($selfList !== null && $selfList->isNamed(self::NEVER) && $other->isNamed(TypeConstructor::Map->value)) {
             return true;
         }
         // The rest of the comparison -- name, args, signature, fields, and whether $other is even the same kind of
@@ -358,7 +378,7 @@ final class Type implements Stringable
     public function asFunction(): Signature|null
     {
         $shape = $this->canonical()->shape;
-        return $shape instanceof FuncShape ? $shape->signature : null;
+        return $shape instanceof Signature ? $shape : null;
     }
 
     public function isStruct(): bool
@@ -406,7 +426,7 @@ final class Type implements Stringable
      *
      * This is the recursive walk that applies to any type, not just a function's parameters, which is why it lives
      * here rather than on {@see Signature}; nothing outside the type system should call it directly. The function
-     * case itself is {@see FuncShape::bind()}.
+     * case itself is {@see Signature::bind()}.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -419,7 +439,11 @@ final class Type implements Stringable
         $self = $this->canonical();
         $actual = $actual->canonical();
         $selfOption = $self->optionArg();
-        if ($selfOption !== null && !$actual->isNamed('Option') && !$actual->isNamed('None')) {
+        if (
+            $selfOption !== null
+            && !$actual->isNamed(TypeConstructor::Option->value)
+            && !$actual->isNamed(TypeConstructor::None->value)
+        ) {
             return $selfOption->bind($actual, $bindings);
         }
         // What's left, or nothing to learn if $actual isn't even the same kind of shape -- {@see TypeShape::bind()}'s
@@ -471,7 +495,7 @@ final class Type implements Stringable
      * `any` -- delegated straight to {@see TypeShape::substitute()}, which is where the rule differs per shape:
      * {@see VariableShape::substitute()} answers its own binding directly, since what a variable substitutes to can
      * be any shape at all, not necessarily another variable; every other shape rebuilds its own kind with its
-     * children substituted, including {@see FuncShape}, whose own implementation leaves a nested signature with its
+     * children substituted, including {@see Signature}, whose own implementation leaves a nested signature with its
      * own binder untouched rather than rewriting variables that belong to itself.
      *
      * @internal
@@ -503,12 +527,15 @@ final class Type implements Stringable
      * $this's own type argument, if $this is an `Option<...>` -- not seen through an alias first, so a caller that
      * needs that calls {@see self::canonical()} itself. The one place {@see self::isSubtypeOf()} and {@see self::bind()}
      * ask whether a type is an `Option` and read its argument, rather than each checking
-     * `$shape instanceof ApplicationShape && $shape->name === 'Option'` and indexing `$shape->args[0]` directly.
+     * `$shape instanceof ApplicationShape && $shape->name === TypeConstructor::Option->value` and indexing
+     * `$shape->args[0]` directly.
      */
     private function optionArg(): self|null
     {
         $shape = $this->shape;
-        return $shape instanceof ApplicationShape && $shape->name === 'Option' ? $shape->args[0] : null;
+        return $shape instanceof ApplicationShape && $shape->name === TypeConstructor::Option->value
+            ? $shape->args[0]
+            : null;
     }
 
     /**
@@ -518,7 +545,9 @@ final class Type implements Stringable
     private function listArg(): self|null
     {
         $shape = $this->shape;
-        return $shape instanceof ApplicationShape && $shape->name === 'list' ? $shape->args[0] : null;
+        return $shape instanceof ApplicationShape && $shape->name === TypeConstructor::List->value
+            ? $shape->args[0]
+            : null;
     }
 
     /**
