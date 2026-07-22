@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Type;
 use Eventjet\Ausdruck\TypeConstructor;
 
@@ -104,19 +105,17 @@ final class TypeResolution
     }
 
     /**
-     * The first name $node->typeParameters declares that {@see Type::asFunction()} doesn't also derive for
-     * $funcType, or null if every declared name is put to use. A binder is written, not inferred, so a name that
-     * appears in it has to earn its place the same way any other written thing does.
+     * The first name $node->typeParameters declares that $signature doesn't also derive for itself, or null if every
+     * declared name is put to use. A binder is written, not inferred, so a name that appears in it has to earn its
+     * place the same way any other written thing does.
      *
      * @param list<Identifier> $typeParameters
      */
-    private static function firstUnused(array $typeParameters, Type $funcType): Identifier|null
+    private static function firstUnused(array $typeParameters, Signature $signature): Identifier|null
     {
         if ($typeParameters === []) {
             return null;
         }
-        $signature = $funcType->asFunction();
-        assert($signature !== null);
         $derived = array_fill_keys($signature->typeVariables, true);
         foreach ($typeParameters as $parameter) {
             if (!array_key_exists($parameter->name, $derived)) {
@@ -245,17 +244,21 @@ final class TypeResolution
      * one place that rule is enforced: {@see Type::func()} takes no binder a caller could nest one into, so there is
      * nothing left for it to reject the same shape with.
      *
-     * $node->typeParameters is what's written, not what {@see Type::asFunction()} would later derive from how the
-     * result is actually used, so the two are checked against each other once the type is built: a name written here
-     * that doesn't appear in a parameter or the return type is declared for nothing, and rejected rather than quietly
-     * accepted -- see {@see self::firstUnused()}.
+     * $node->typeParameters is what's written, not what {@see Signature::__construct()} would derive from how the
+     * result is actually used, so the two are checked against each other once the signature is built: a name written
+     * here that doesn't appear in a parameter or the return type is declared for nothing, and rejected rather than
+     * quietly accepted -- see {@see self::firstUnused()}.
      */
     private function resolveSignature(FunctionTypeNode $node): Type|TypeError
     {
         if ($this->nestedInSignature && $node->typeParameters !== []) {
             $first = $node->typeParameters[0];
             $last = $node->typeParameters[array_key_last($node->typeParameters)];
-            return TypeError::create(Type::nestedBinderMessage(), $first->location->to($last->location));
+            return TypeError::create(
+                'A function type nested inside another one can\'t bind type variables of its own: a variable is '
+                    . 'quantified once, by whichever function type encloses it',
+                $first->location->to($last->location),
+            );
         }
         $typeVariables = $this->typeVariables;
         foreach ($node->typeParameters as $parameter) {
@@ -278,8 +281,8 @@ final class TypeResolution
         if ($returnType instanceof TypeError) {
             return $returnType;
         }
-        $funcType = Type::func($returnType, $argTypes);
-        $unused = self::firstUnused($node->typeParameters, $funcType);
+        $signature = new Signature($returnType, $argTypes);
+        $unused = self::firstUnused($node->typeParameters, $signature);
         if ($unused !== null) {
             return TypeError::create(
                 sprintf(
@@ -289,7 +292,7 @@ final class TypeResolution
                 $unused->location,
             );
         }
-        return $funcType;
+        return Type::func($returnType, $argTypes);
     }
 
     private function resolveStruct(StructTypeNode $node): Type|TypeError

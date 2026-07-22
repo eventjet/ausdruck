@@ -12,7 +12,6 @@ use function array_intersect_key;
 use function array_is_list;
 use function array_key_exists;
 use function array_key_first;
-use function array_keys;
 use function array_map;
 use function array_slice;
 use function count;
@@ -100,8 +99,8 @@ final class Type implements Stringable
      * `list<string>` is checked against `fn(list<string>) -> Option<string>`; see {@see Signature::instantiateForCall()}.
      *
      * Variables are quantified at the top of the signature they appear in, so there is no binder to build here and two
-     * variables of the same name in one signature are the same variable -- {@see self::asFunction()} derives that
-     * binder from where the variable turns out to be used, once the whole signature exists to look at.
+     * variables of the same name in one signature are the same variable -- {@see Signature::__construct()} derives
+     * that binder from where the variable turns out to be used, once the whole signature exists to look at.
      *
      * A name a type constructor already spells, like `int` or `list`, is rejected as a type variable when a signature
      * is written as a type string -- see {@see Parser\TypeResolution::checkTypeVariable()} -- because within that
@@ -120,8 +119,8 @@ final class Type implements Stringable
      * which is also the only thing {@see self::asFunction()} ever returns: nothing outside this class reads a
      * function type any other way. The binder itself is never taken as an argument here -- rank-1 polymorphism means
      * every {@see Type::var()} reachable from $return or $parameters, at any depth, belongs to this signature and no
-     * other, so {@see self::asFunction()} derives the binder from where those variables turn out to be, rather than
-     * this constructor validating a declared list against them; see that method's own docblock.
+     * other, so {@see Signature::__construct()} derives the binder from where those variables turn out to be, rather
+     * than this constructor validating a declared list against them; see that constructor's own docblock.
      *
      * @param list<Type> $parameters The types the PHP callable receives, in order. A function that is called as a
      *     receiver function -- `foo:string.substr:string(0, 3)` -- receives the expression it's called on as the first
@@ -129,7 +128,7 @@ final class Type implements Stringable
      */
     public static function func(self $return, array $parameters = []): self
     {
-        return new self('fn', kind: TypeKind::Func, signature: new Signature($return, $parameters));
+        return new self('fn', signature: new Signature($return, $parameters));
     }
 
     public static function fromValue(mixed $value): self
@@ -175,20 +174,39 @@ final class Type implements Stringable
     }
 
     /**
-     * The message {@see Parser\TypeResolution::resolveSignature()} rejects a function type nested inside another
-     * one's parameters or return type with -- the one place that rule is enforced: a nested `fn<...>` in written
-     * syntax is rejected before it is ever resolved to a {@see Type}, and {@see self::func()} has nothing of its own
-     * left to reject the same shape with, since it no longer takes a binder a caller could nest one into. Worded once
-     * here rather than inline in the parser so a future second enforcement site, should one exist, can't drift from
-     * this one.
+     * Every {@see self::var()} reachable from $type, at any depth, folded into $found in the order first seen. A
+     * nested function type's own parameters and return type are walked parameters-first-then-return, same as
+     * {@see Signature::__construct()} walks its own -- one order, so a variable used both directly and through a
+     * nested function type is still found in the same place either way.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
+     *
+     * @param array<string, true> $found
+     * @return array<string, true>
      */
-    public static function nestedBinderMessage(): string
+    public static function collectVariables(self $type, array $found): array
     {
-        return 'A function type nested inside another one can\'t bind type variables of its own: a variable is '
-            . 'quantified once, by whichever function type encloses it';
+        if ($type->kind === TypeKind::Variable) {
+            $found[$type->name] = true;
+            return $found;
+        }
+        if ($type->signature !== null) {
+            foreach ($type->signature->parameters as $parameter) {
+                $found = self::collectVariables($parameter, $found);
+            }
+            $found = self::collectVariables($type->signature->returnType, $found);
+        }
+        foreach ($type->args as $arg) {
+            $found = self::collectVariables($arg, $found);
+        }
+        foreach ($type->fields as $field) {
+            $found = self::collectVariables($field, $found);
+        }
+        if ($type->aliasFor !== null) {
+            $found = self::collectVariables($type->aliasFor, $found);
+        }
+        return $found;
     }
 
     private static function never(): self
@@ -239,51 +257,6 @@ final class Type implements Stringable
     }
 
     /**
-     * The names {@see self::var()} contributes to $signature's return type and parameters, receiver first then the
-     * rest of the parameters then the return type -- the same order {@see self::instantiateForCall()} decides them in
-     * -- kept in first-found order and without a duplicate, since one variable used twice is still one name.
-     *
-     * @return list<string>
-     */
-    private static function freeVariables(Signature $signature): array
-    {
-        $found = [];
-        foreach ($signature->parameters as $parameter) {
-            $found = self::collectVariables($parameter, $found);
-        }
-        $found = self::collectVariables($signature->returnType, $found);
-        return array_keys($found);
-    }
-
-    /**
-     * @param array<string, true> $found
-     * @return array<string, true>
-     */
-    private static function collectVariables(self $type, array $found): array
-    {
-        if ($type->kind === TypeKind::Variable) {
-            $found[$type->name] = true;
-            return $found;
-        }
-        if ($type->signature !== null) {
-            $found = self::collectVariables($type->signature->returnType, $found);
-            foreach ($type->signature->parameters as $parameter) {
-                $found = self::collectVariables($parameter, $found);
-            }
-        }
-        foreach ($type->args as $arg) {
-            $found = self::collectVariables($arg, $found);
-        }
-        foreach ($type->fields as $field) {
-            $found = self::collectVariables($field, $found);
-        }
-        if ($type->aliasFor !== null) {
-            $found = self::collectVariables($type->aliasFor, $found);
-        }
-        return $found;
-    }
-
-    /**
      * @param list<string> $typeVariables
      */
     private static function binderString(array $typeVariables): string
@@ -315,40 +288,41 @@ final class Type implements Stringable
 
     public function isOption(): bool
     {
-        $canonical = $this->canonical();
-        return $canonical->kind === TypeKind::Named && $canonical->name === 'Option';
+        return $this->canonical()->isNamed('Option');
     }
 
     public function isSubtypeOf(self $other): bool
     {
         $self = $this->canonical();
         $other = $other->canonical();
-        if ($self->name === 'None') {
-            return $other->name === 'None' || $other->name === 'Option';
+        if ($self->isNamed('None')) {
+            return $other->isNamed('None') || $other->isNamed('Option');
         }
-        if ($other->name === 'Option' && $self->name !== 'Option') {
+        if ($other->isNamed('Option') && !$self->isNamed('Option')) {
             return $self->isSubtypeOf($other->args[0]);
         }
-        if ($self->name === 'never') {
+        if ($self->isNamed('never')) {
             return true;
         }
-        if ($other->name === 'any') {
+        if ($other->isNamed('any')) {
             return true;
         }
-        if ($self->name === 'Option') {
-            return $other->name === 'Option' && $self->args[0]->isSubtypeOf($other->args[0]);
+        if ($self->isNamed('Option')) {
+            return $other->isNamed('Option') && $self->args[0]->isSubtypeOf($other->args[0]);
         }
-        if ($self->name === 'list' && $self->args[0]->isNever() && $other->name === 'map') {
+        if ($self->isNamed('list') && $self->args[0]->isNever() && $other->isNamed('map')) {
             return true;
         }
-        if ($self->name !== $other->name) {
+        // A name alone isn't enough: {@see self::var()} takes any name without complaint, so a variable can share a
+        // name with a type it isn't -- `Type::var('list')` is not a `list<T>`, no matter that both are named `list`.
+        // $kind is what actually tells them apart; see {@see self::isNamed()}.
+        if ($self->kind !== $other->kind || $self->name !== $other->name) {
             return false;
         }
-        if ($self->name === 'list') {
+        if ($self->isNamed('list')) {
             return $self->args[0]->isSubtypeOf($other->args[0]);
         }
-        // Equivalent to `$self->kind === TypeKind::Func`, which {@see self::func()} always sets together with a
-        // non-null signature -- checking the signature directly narrows it for the type checker without an assert.
+        // A function type is the one shape with a non-null $signature; see {@see self::func()}.
         if ($self->signature !== null) {
             $otherSignature = $other->signature;
             if ($otherSignature === null) {
@@ -384,22 +358,17 @@ final class Type implements Stringable
 
     /**
      * This type as a function's signature, or null if it isn't one: only {@see self::func()} builds a type with a
-     * {@see Signature} to return here. The binder is derived, not read back: every {@see self::var()} reachable from
-     * the return type or a parameter, at any depth, is quantified by this signature and no other -- rank-1
-     * polymorphism leaves nowhere else for it to belong, since a function type nested inside this one's return type or
-     * parameters can never carry a binder of its own (rejected in written syntax by
-     * {@see Parser\TypeResolution::resolveSignature()}, and unrepresentable through this API in the first place, since
-     * {@see self::func()} takes no binder a caller could nest one into). So the free variables of the return type and
-     * the parameters, walked in that order and kept in the order first found, are exactly the binder -- nothing to
-     * validate, only to collect.
+     * {@see Signature} to return here, and {@see Signature::__construct()} has already derived its binder by the time
+     * it's stored on {@see self::$signature} -- rank-1 polymorphism means every {@see self::var()} reachable from the
+     * return type or a parameter, at any depth, is quantified by this signature and no other, since a function type
+     * nested inside this one's return type or parameters can never carry a binder of its own (rejected in written
+     * syntax by {@see Parser\TypeResolution::resolveSignature()}, and unrepresentable through this API in the first
+     * place, since {@see self::func()} takes no binder a caller could nest one into). So there is nothing left to do
+     * here but hand back what's already there.
      */
     public function asFunction(): Signature|null
     {
-        $signature = $this->canonical()->signature;
-        if ($signature === null) {
-            return null;
-        }
-        return new Signature($signature->returnType, $signature->parameters, self::freeVariables($signature));
+        return $this->canonical()->signature;
     }
 
     public function isStruct(): bool
@@ -459,7 +428,7 @@ final class Type implements Stringable
         if ($self->name !== $actual->name) {
             return $bindings;
         }
-        // Equivalent to `$self->kind === TypeKind::Func`; see the same check in {@see self::isSubtypeOf()}.
+        // A function type is the one shape with a non-null $signature; see {@see self::func()}.
         if ($self->signature !== null) {
             return $self->bindFunction($actual, $bindings);
         }
@@ -477,9 +446,10 @@ final class Type implements Stringable
 
     /**
      * This type with every variable replaced by what it was bound to, and every variable nothing bound replaced by
-     * `any`. A function type's own binder is never carried on {@see self::$signature} in the first place -- only a
-     * derived {@see Signature}, returned by {@see self::asFunction()} or built while printing, ever has one -- so
-     * there is nothing here to drop it from.
+     * `any`. A function type is rebuilt with a fresh {@see Signature} over the substituted return type and
+     * parameters rather than reusing the old one, so its binder is re-derived rather than carried over -- and comes
+     * back empty, since substitution replaces every variable, bound or not, leaving none for
+     * {@see Signature::__construct()} to find.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -495,7 +465,6 @@ final class Type implements Stringable
             return new self(
                 $this->name,
                 aliasFor: $this->aliasFor?->substitute($bindings),
-                kind: TypeKind::Func,
                 signature: new Signature(
                     $this->signature->returnType->substitute($bindings),
                     array_map(
@@ -553,15 +522,15 @@ final class Type implements Stringable
             }
             return '{ ' . implode(', ', $fields) . ' }';
         }
-        // Equivalent to `$this->kind === TypeKind::Func`; see the same check in {@see self::isSubtypeOf()}.
+        // A function type is the one shape with a non-null $signature; see {@see self::func()}.
         if ($this->signature !== null) {
             $signature = $this->signature;
             // A function type already inside another one's own return type or parameters can't have a binder of its
-            // own -- see {@see self::asFunction()} -- so there is nothing of its own left to derive or print here;
-            // its variables print bare, referring to whichever binder encloses this whole printout instead.
+            // own -- see {@see self::asFunction()} -- so there is nothing of its own left to print here; its
+            // variables print bare, referring to whichever binder encloses this whole printout instead.
             $binder = $insideSignatureScope
                 ? ''
-                : self::binderString(self::freeVariables($signature));
+                : self::binderString($signature->typeVariables);
             $params = array_map(static fn(self $arg): string => $arg->toString(true), $signature->parameters);
             return sprintf('fn%s(%s) -> %s', $binder, implode(', ', $params), $signature->returnType->toString(true));
         }
@@ -577,18 +546,31 @@ final class Type implements Stringable
         return $this->aliasFor ?? $this;
     }
 
+    /**
+     * Whether this type is $name, told apart from a variable or a struct that merely happens to share the name by
+     * $kind rather than by $name alone -- $name is not unique on its own: {@see self::var()} takes any name without
+     * checking it against what a real type of that name would be. Only meaningful for the handful of names
+     * {@see TypeConstructor} spells and that this class also builds directly, like `None` and `never`; a plain
+     * user-facing type is compared by identity through {@see self::isSubtypeOf()} instead, which needs more than a
+     * name match.
+     */
+    private function isNamed(string $name): bool
+    {
+        return $this->kind === TypeKind::Named && $this->name === $name;
+    }
+
     private function isNone(): bool
     {
-        return $this->name === 'None';
+        return $this->isNamed('None');
     }
 
     private function isNever(): bool
     {
-        return $this->name === 'never';
+        return $this->isNamed('never');
     }
 
     private function isAny(): bool
     {
-        return $this->name === 'any';
+        return $this->isNamed('any');
     }
 }

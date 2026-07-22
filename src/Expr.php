@@ -105,12 +105,10 @@ final class Expr
         Span|null $location = null,
     ): Call {
         $location ??= self::dummySpan();
-        if ($signature !== null) {
-            $signature = $signature->instantiateForCall(
-                $target->getType(),
-                array_map(static fn(Expression $argument): Type => $argument->getType(), $arguments),
-            );
-        }
+        $signature = $signature?->instantiateForCall(
+            $target->getType(),
+            array_map(static fn(Expression $argument): Type => $argument->getType(), $arguments),
+        );
         $type = self::returnType($name, $returnType, $signature, $nameLocation ?? self::dummySpan());
         if ($signature !== null) {
             self::checkReceiver($target, $name, $signature);
@@ -382,10 +380,13 @@ final class Expr
         Span $nameLocation,
     ): Type {
         if ($annotation === null) {
-            return $signature->returnType ?? throw TypeError::create(
-                sprintf('Function %s is not declared and has no inline type', $name),
-                $nameLocation,
-            );
+            if ($signature === null) {
+                throw TypeError::create(
+                    sprintf('Function %s is not declared and has no inline type', $name),
+                    $nameLocation,
+                );
+            }
+            return $signature->returnType;
         }
         if ($signature !== null && !$annotation->type->isSubtypeOf($signature->returnType)) {
             throw TypeError::create(
