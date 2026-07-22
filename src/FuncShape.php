@@ -72,22 +72,22 @@ final class FuncShape implements TypeShape
      * monomorphic `fn(T) -> T` over a `T` some enclosing signature owns are different types, even though structurally
      * their return type and parameters read the same -- {@see Signature::hasOwnBinder()} is what tells them apart.
      * Once that agrees, the return type has to accept what the other returns, and each parameter -- contravariantly,
-     * the same rule an ordinary function subtyping check follows -- has to accept what it's declared to. $other may
-     * be any shape, not just this one's own class; that mismatch is rejected the same way a quantification mismatch
-     * is.
+     * the same rule an ordinary function subtyping check follows -- has to accept what it's declared to. $supertype
+     * may be any shape, not just this one's own class; that mismatch is rejected the same way a quantification
+     * mismatch is.
      *
      * @todo Alpha-equivalence: `fn<T>(T) -> T` and `fn<U>(U) -> U` describe the same type but this doesn't say so,
      *     since neither side's binder is renamed to line up with the other's before the parameters and return type
      *     are compared -- both would need the same name for `isSubtypeOf()` to reach true here. Left open.
      */
     #[Override]
-    public function isSubtypeOf(TypeShape $other): bool
+    public function isSubtypeOf(TypeShape $supertype): bool
     {
-        if (!$other instanceof self) {
+        if (!$supertype instanceof self) {
             return false;
         }
         $signature = $this->signature;
-        $otherSignature = $other->signature;
+        $otherSignature = $supertype->signature;
         if ($signature->hasOwnBinder() !== $otherSignature->hasOwnBinder()) {
             return false;
         }
@@ -106,27 +106,28 @@ final class FuncShape implements TypeShape
     /**
      * A signature with its own binder is fixed as far as this walk is concerned -- see {@see Signature::hasOwnBinder()}.
      *
-     * Otherwise: the return type always binds, and a parameter binds unless $other's own parameter in that position
+     * Otherwise: the return type always binds, and a parameter binds unless $actual's own parameter in that position
      * is `any`, which is every {@see Lambda} parameter -- see {@see Type::bind()}'s own docblock for why that's the
      * rule rather than a position. Parameters are walked before the return type, the same order
      * {@see self::collectVariables()} walks a function type's own parts in, so a variable used both directly and
-     * through a nested function type is decided in the same place either way. $other may be any shape, not just this
-     * one's own class; there is nothing to learn if it isn't.
+     * through a nested function type is decided in the same place either way. $actual's shape may be any shape, not
+     * just this one's own class; there is nothing to learn if it isn't.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
      */
     #[Override]
-    public function bind(TypeShape $other, array $bindings): array
+    public function bind(Type $actual, array $bindings): array
     {
-        if (!$other instanceof self) {
+        $actualShape = $actual->shape();
+        if (!$actualShape instanceof self) {
             return $bindings;
         }
         $signature = $this->signature;
         if ($signature->hasOwnBinder()) {
             return $bindings;
         }
-        $otherSignature = $other->signature;
+        $otherSignature = $actualShape->signature;
         foreach ($signature->parameters as $index => $parameter) {
             $otherParameter = $otherSignature->parameters[$index] ?? null;
             if ($otherParameter === null || $otherParameter->isAny()) {

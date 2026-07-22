@@ -241,9 +241,12 @@ parameters or return type, like a lambda parameter the way `map`'s own is, or a 
 function. `Type::func()` itself never commits to a binder: declaring a function (`Declarations`) or aliasing one
 (`Type::alias()`) is what quantifies it, deriving its binder from wherever `Type::var()` turns out to be used in the
 return type and the parameters -- the same rule a written `fn<...>` binder is checked against. A function type nested
-inside another one shares its variables with whichever declaration or alias goes on to quantify them, rather than
-claiming any of its own, the same rule that makes a written `fn<T>(...)` nested inside another `fn<...>` a syntax
-error -- there's simply no second door here for that mistake to be made through.
+inside another one built with `Type::func()` and no binder of its own shares its variables with whichever declaration
+or alias goes on to quantify them, rather than claiming any of its own. Nothing stops a nested function type from
+being a self-contained, rank-1-polymorphic value instead -- one already quantified by its own `fn<...>` binder, the
+same way a written type string nests one -- and a signature like that is opaque to whatever encloses it: the outer
+one can pass it around, store it in a list or an `Option`, or return it, but never reach through it for a variable of
+its own.
 
 Because the call site decides them, the inline return type is rarely worth writing: `foo:list<string>.head()` is
 already an `Option<string>`. Writing one anyway is still allowed, and is then checked against the inferred one.

@@ -39,10 +39,15 @@ final class AliasShape implements TypeShape
         return $this->target->collectVariables($found);
     }
 
+    /**
+     * $this->name, and nothing else: an alias is a name for one complete type, printed as that name alone -- see this
+     * class's own docblock -- never as a name applied to arguments, since {@see Type::alias()} never lets $this->name
+     * carry any of its own.
+     */
     #[Override]
     public function toString(): string
     {
-        return TypeSyntax::application($this->name, []);
+        return $this->name;
     }
 
     /**
@@ -55,7 +60,7 @@ final class AliasShape implements TypeShape
     }
 
     #[Override]
-    public function isSubtypeOf(TypeShape $other): bool
+    public function isSubtypeOf(TypeShape $supertype): bool
     {
         throw new LogicException(
             'AliasShape::isSubtypeOf() is unreachable: Type::isSubtypeOf() sees through every alias first',
@@ -67,7 +72,7 @@ final class AliasShape implements TypeShape
      * @return array<string, Type>
      */
     #[Override]
-    public function bind(TypeShape $other, array $bindings): array
+    public function bind(Type $actual, array $bindings): array
     {
         throw new LogicException('AliasShape::bind() is unreachable: Type::bind() sees through every alias first');
     }

@@ -5,15 +5,17 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Test\Unit\Parser;
 
 use Eventjet\Ausdruck\Parser\Declarations;
-use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Signature;
+use Eventjet\Ausdruck\Test\Unit\ParsesTypeSyntax;
 use Eventjet\Ausdruck\Type;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 final class DeclarationsTest extends TestCase
 {
+    use ParsesTypeSyntax;
+
     public function testCanNotOverrideBuiltInFunctions(): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -78,11 +80,7 @@ final class DeclarationsTest extends TestCase
      */
     public function testDeclaringAParsedFunctionKeepsTheWrittenBinderOrder(): void
     {
-        /**
-         * @psalm-suppress InternalClass
-         * @psalm-suppress InternalMethod
-         */
-        $nodes = TypeParser::parseDeclarations('foo: fn<U, T>(list<T>, fn(T) -> U) -> list<U>');
+        $nodes = self::parseTypeDeclarations('foo: fn<U, T>(list<T>, fn(T) -> U) -> list<U>');
         $type = (new Types())->resolve($nodes['foo']);
         self::assertInstanceOf(Type::class, $type);
 

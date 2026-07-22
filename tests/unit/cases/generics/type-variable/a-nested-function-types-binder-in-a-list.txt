@@ -1,8 +1,0 @@
-foo:fn(list<fn<T>(T) -> T>) -> int
--- Type error --
-A function type nested inside another one can't bind type variables of its own: a variable is quantified once, by whichever function type encloses it
--- Note --
-The sibling case next to this one (its-own-binder-survives-nesting-in-a-list) shows a `fn<T>` inside a list is fine on
-its own. Here the list itself sits inside another function type's parameter, so the rank-1 rule reaches through the
-list the same way it would if `fn<T>` sat there directly: $nestedInSignature stays set through every constructor below
-the enclosing `fn`, not just a directly-nested function type.

@@ -10,7 +10,6 @@ use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeNode;
-use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\StructLiteral;
 use Eventjet\Ausdruck\Type;
@@ -56,6 +55,8 @@ use const DIRECTORY_SEPARATOR;
  */
 final readonly class E2eCase
 {
+    use ParsesTypeSyntax;
+
     private const ROOT = __DIR__ . DIRECTORY_SEPARATOR . 'cases/';
     /**
      * The sections that say the source is rejected, and what each of them expects it to be rejected with.
@@ -234,7 +235,7 @@ final readonly class E2eCase
     private static function parseTypes(string $src): array
     {
         $aliases = [];
-        foreach (self::parseDeclarations($src) as $name => $node) {
+        foreach (self::parseTypeDeclarations($src) as $name => $node) {
             $aliases[$name] = self::resolve($node, new Types($aliases));
         }
         return $aliases;
@@ -250,22 +251,10 @@ final readonly class E2eCase
     private static function parseFunctions(string $src, Types $types): array
     {
         $functions = [];
-        foreach (self::parseDeclarations($src) as $name => $node) {
+        foreach (self::parseTypeDeclarations($src) as $name => $node) {
             $functions[$name] = self::resolve($node, $types);
         }
         return $functions;
-    }
-
-    /**
-     * @return array<string, TypeNode>
-     */
-    private static function parseDeclarations(string $src): array
-    {
-        /**
-         * @psalm-suppress InternalClass
-         * @psalm-suppress InternalMethod
-         */
-        return TypeParser::parseDeclarations($src);
     }
 
     private static function resolve(TypeNode $node, Types $types): Type

@@ -1,0 +1,8 @@
+foo:fn(fn<T>(T) -> T) -> int
+-- Expression type --
+fn(fn<T>(T) -> T) -> int
+-- Note --
+The outer fn has no binder of its own here, so the inner fn<T> is a self-contained, rank-1-polymorphic value in its
+own right rather than something the outer signature could quantify for itself: it is opaque to the outer one the same
+way its-own-binder-survives-nesting-in-a-list is, just nested one door deeper -- inside another function type's own
+parameter instead of a list.

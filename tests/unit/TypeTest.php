@@ -11,7 +11,6 @@ use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
-use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Type;
@@ -28,6 +27,8 @@ use function sprintf;
 
 final class TypeTest extends TestCase
 {
+    use ParsesTypeSyntax;
+
     /**
      * @return iterable<string, array{mixed}>
      */
@@ -144,16 +145,8 @@ final class TypeTest extends TestCase
             ['any', 'string'],
         ];
         foreach ($cases as [$a, $b]) {
-            /**
-             * @psalm-suppress InternalMethod
-             * @psalm-suppress InternalClass
-             */
-            $nodeA = TypeParser::parseString($a);
-            /**
-             * @psalm-suppress InternalMethod
-             * @psalm-suppress InternalClass
-             */
-            $nodeB = TypeParser::parseString($b);
+            $nodeA = self::parseTypeString($a);
+            $nodeB = self::parseTypeString($b);
             assert(!$nodeA instanceof SyntaxError);
             assert(!$nodeB instanceof SyntaxError);
             $types = new Types();
@@ -456,11 +449,7 @@ final class TypeTest extends TestCase
         self::assertNotNull($quantified);
         self::assertSame('fn<T, U>(list<T>, fn(T) -> U) -> list<U>', (string)$quantified);
 
-        /**
-         * @psalm-suppress InternalMethod
-         * @psalm-suppress InternalClass
-         */
-        $node = TypeParser::parseString((string)$quantified);
+        $node = self::parseTypeString((string)$quantified);
         self::assertNotInstanceOf(SyntaxError::class, $node);
         $reParsed = (new Types())->resolve($node);
         self::assertNotInstanceOf(TypeError::class, $reParsed);
@@ -489,8 +478,9 @@ final class TypeTest extends TestCase
 
     /**
      * `fn` isn't a {@see \Eventjet\Ausdruck\TypeConstructor} case -- a function type is its own node shape -- but
-     * it's still the one bare word {@see TypeParser::parse()} always reads as introducing a function type, so a
-     * variable named `fn` would print as a bare `fn` no parser could ever read back as a variable reference.
+     * it's still the one bare word {@see \Eventjet\Ausdruck\Parser\TypeParser::parse()} always reads as introducing a
+     * function type, so a variable named `fn` would print as a bare `fn` no parser could ever read back as a variable
+     * reference.
      */
     public function testVarRejectsFn(): void
     {
@@ -685,22 +675,22 @@ final class TypeTest extends TestCase
     public function testAliasShapeBindThrows(): void
     {
         $alias = new AliasShape('Foo', Type::int());
-        $int = new ApplicationShape('int');
 
         $this->expectException(LogicException::class);
-        self::assertSame([], $alias->bind($int, []));
+        self::assertSame([], $alias->bind(Type::int(), []));
     }
 
     /**
-     * {@see VariableShape::bind()} is never reached through {@see Type::bind()}, which asks whether $this is a
-     * variable and binds it directly before ever comparing shapes -- so it throws rather than answer $bindings
-     * unchanged for a call that can't happen.
+     * {@see VariableShape::bind()} is what actually records a variable's binding -- {@see Type::bind()} no longer
+     * special-cases a variable before dispatching to it, so this is the one implementation of the five that isn't
+     * unreachable: the first type it's matched against is the one that's kept, unconditionally, since a variable's
+     * own shape has nothing to compare $actual against.
      */
-    public function testVariableShapeBindThrows(): void
+    public function testVariableShapeBindRecordsTheFirstBindingDirectly(): void
     {
         $variable = new VariableShape('T');
 
-        $this->expectException(LogicException::class);
-        self::assertSame([], $variable->bind(new VariableShape('T'), []));
+        self::assertEquals(['T' => Type::int()], $variable->bind(Type::int(), []));
+        self::assertEquals(['T' => Type::int()], $variable->bind(Type::string(), ['T' => Type::int()]));
     }
 }

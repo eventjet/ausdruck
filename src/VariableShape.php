@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use LogicException;
 use Override;
+
+use function array_key_exists;
 
 /**
  * A type variable -- see {@see Type::var()}: a placeholder a generic signature's call site decides, not a type with
@@ -32,10 +33,14 @@ final class VariableShape implements TypeShape
         return $found;
     }
 
+    /**
+     * $this->name, and nothing else: a variable is a placeholder with no arguments of its own to print -- see
+     * {@see Type::var()}.
+     */
     #[Override]
     public function toString(): string
     {
-        return TypeSyntax::application($this->name, []);
+        return $this->name;
     }
 
     /**
@@ -55,24 +60,23 @@ final class VariableShape implements TypeShape
      * Two variables of the same name are the same variable -- see {@see Type::var()}.
      */
     #[Override]
-    public function isSubtypeOf(TypeShape $other): bool
+    public function isSubtypeOf(TypeShape $supertype): bool
     {
-        return $other instanceof self && $this->name === $other->name;
+        return $supertype instanceof self && $this->name === $supertype->name;
     }
 
     /**
-     * Unreachable: {@see Type::bind()} asks whether $this is a variable, and binds it directly, before it ever
-     * reaches a shape comparison.
+     * This variable's own binding: $actual, unless something has already bound this name, in which case the first
+     * binding is the one that's kept -- see {@see Type::bind()} for why first-wins is the rule. Unlike every other
+     * shape's {@see TypeShape::bind()}, this doesn't compare $actual's own shape against anything: a variable binds
+     * to whatever it's matched against, not just another value of the same shape.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
      */
     #[Override]
-    public function bind(TypeShape $other, array $bindings): array
+    public function bind(Type $actual, array $bindings): array
     {
-        throw new LogicException(
-            'VariableShape::bind() is unreachable: Type::bind() binds a variable directly, before it ever reaches a '
-                . 'shape comparison',
-        );
+        return array_key_exists($this->name, $bindings) ? $bindings : [...$bindings, $this->name => $actual];
     }
 }

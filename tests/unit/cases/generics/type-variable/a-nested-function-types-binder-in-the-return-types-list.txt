@@ -1,6 +1,0 @@
-foo:fn(int) -> list<fn<T>(T) -> T>
--- Type error --
-A function type nested inside another one can't bind type variables of its own: a variable is quantified once, by whichever function type encloses it
--- Note --
-The rule isn't specific to parameters: a function type's return type is the same enclosing scope, so a binder nested
-inside it -- even through a list -- is rejected the same way a nested parameter is.

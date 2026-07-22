@@ -65,51 +65,39 @@ final class BuiltinFunctions
         // A lambda parameter's own binder belongs to the built-in that takes it, not to the lambda type itself --
         // Type::func() leaves it that way, the same door a parsed `fn<T>(..., fn(T) -> bool, ...)` resolves its own
         // lambda parameter through, and the same door this built-in's own top-level signature is written with too;
-        // only self::signature(), deriving a binder via Signature::over(), tells the two positions apart.
+        // only Signature::over(), deriving a binder from what $return and $parameters reach, tells the two positions
+        // apart.
         $predicate = Type::func(Type::bool(), [$item]);
         $mapped = Type::var('U');
         return [
-            'contains' => ['impl' => self::contains(...), 'signature' => self::signature(Type::bool(), [$items, $item])],
+            'contains' => ['impl' => self::contains(...), 'signature' => Signature::over(Type::bool(), [$items, $item])],
             // Not generic: count and isSome answer the same thing whatever the list or Option holds, so the element
             // type their receiver could have named would go unused. list<any> and Option<any> say that directly,
             // rather than naming a T that nothing but the receiver would ever read.
             'count' => [
                 'impl' => self::count(...),
-                'signature' => self::signature(Type::int(), [Type::listOf(Type::any())]),
+                'signature' => Signature::over(Type::int(), [Type::listOf(Type::any())]),
             ],
-            'filter' => ['impl' => self::filter(...), 'signature' => self::signature($items, [$items, $predicate])],
-            'head' => ['impl' => self::head(...), 'signature' => self::signature(Type::option($item), [$items])],
+            'filter' => ['impl' => self::filter(...), 'signature' => Signature::over($items, [$items, $predicate])],
+            'head' => ['impl' => self::head(...), 'signature' => Signature::over(Type::option($item), [$items])],
             'isSome' => [
                 'impl' => self::isSome(...),
-                'signature' => self::signature(Type::bool(), [Type::option(Type::any())]),
+                'signature' => Signature::over(Type::bool(), [Type::option(Type::any())]),
             ],
             'map' => [
                 'impl' => self::map(...),
-                'signature' => self::signature(Type::listOf($mapped), [$items, Type::func($mapped, [$item])]),
+                'signature' => Signature::over(Type::listOf($mapped), [$items, Type::func($mapped, [$item])]),
             ],
-            'some' => ['impl' => self::some(...), 'signature' => self::signature(Type::bool(), [$items, $predicate])],
+            'some' => ['impl' => self::some(...), 'signature' => Signature::over(Type::bool(), [$items, $predicate])],
             'substr' => [
                 'impl' => substr(...),
-                'signature' => self::signature(Type::string(), [Type::string(), Type::int(), Type::int()]),
+                'signature' => Signature::over(Type::string(), [Type::string(), Type::int(), Type::int()]),
             ],
-            'tail' => ['impl' => self::tail(...), 'signature' => self::signature($items, [$items])],
-            'take' => ['impl' => self::take(...), 'signature' => self::signature($items, [$items, Type::int()])],
-            'unique' => ['impl' => self::unique(...), 'signature' => self::signature($items, [$items])],
-            'unwrap' => ['impl' => self::identity(...), 'signature' => self::signature($item, [Type::option($item)])],
+            'tail' => ['impl' => self::tail(...), 'signature' => Signature::over($items, [$items])],
+            'take' => ['impl' => self::take(...), 'signature' => Signature::over($items, [$items, Type::int()])],
+            'unique' => ['impl' => self::unique(...), 'signature' => Signature::over($items, [$items])],
+            'unwrap' => ['impl' => self::identity(...), 'signature' => Signature::over($item, [Type::option($item)])],
         ];
-    }
-
-    /**
-     * A built-in's own, top-level {@see Signature}, with its binder derived from what $return and $parameters reach
-     * -- {@see Signature::over()}, the same derivation {@see Signature::quantified()} runs a consumer's own declared
-     * function through -- so whether a built-in's binder ends up the way a call site or {@see Type::__toString()}
-     * expects is decided in one place, not once per built-in.
-     *
-     * @param list<Type> $parameters
-     */
-    private static function signature(Type $return, array $parameters = []): Signature
-    {
-        return Signature::over($return, $parameters);
     }
 
     /**

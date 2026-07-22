@@ -6,9 +6,9 @@ namespace Eventjet\Ausdruck\Test\Unit\Parser;
 
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeNode;
-use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Signature;
+use Eventjet\Ausdruck\Test\Unit\ParsesTypeSyntax;
 use Eventjet\Ausdruck\Type;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -18,6 +18,8 @@ use function assert;
 
 final class TypesTest extends TestCase
 {
+    use ParsesTypeSyntax;
+
     /**
      * @return iterable<string, array{string, string}>
      */
@@ -34,11 +36,7 @@ final class TypesTest extends TestCase
     #[DataProvider('resolveTypeErrorsCases')]
     public function testResolveTypeErrors(string $type, string $expectedMessage): void
     {
-        /**
-         * @psalm-suppress InternalClass
-         * @psalm-suppress InternalMethod
-         */
-        $node = TypeParser::parseString($type);
+        $node = self::parseTypeString($type);
         assert($node instanceof TypeNode);
         $error = (new Types())->resolve($node);
 
@@ -56,11 +54,7 @@ final class TypesTest extends TestCase
     {
         $types = new Types(['Mapper' => Type::func(Type::bool(), [Type::var('T')])]);
 
-        /**
-         * @psalm-suppress InternalClass
-         * @psalm-suppress InternalMethod
-         */
-        $node = TypeParser::parseString('Mapper');
+        $node = self::parseTypeString('Mapper');
         assert($node instanceof TypeNode);
         $resolved = $types->resolve($node);
 

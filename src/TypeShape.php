@@ -52,27 +52,31 @@ interface TypeShape
     public function substitute(array $bindings): Type;
 
     /**
-     * Whether $this is a subtype of $other, called from {@see Type::isSubtypeOf()} once both sides are already known
-     * to be concrete shapes -- aliases seen through, the None/any/Option/never/map coercions all handled. $other may
-     * be any shape, not necessarily this one's own class, so telling that mismatch apart from a real comparison is
-     * this method's own first step rather than a gate {@see Type} runs before calling it -- most implementations
-     * reject it before recovering $other's own class for the real comparison that follows: name, args, signature, or
-     * fields, whichever is this shape's own. {@see AliasShape} is the one implementation that never runs at all:
+     * Whether $this -- the actual value's shape -- is a subtype of $supertype -- the declared one it's checked
+     * against -- called from {@see Type::isSubtypeOf()} once both sides are already known to be concrete shapes --
+     * aliases seen through, the None/any/Option/never/map coercions all handled. $supertype may be any shape, not
+     * necessarily this one's own class, so telling that mismatch apart from a real comparison is this method's own
+     * first step rather than a gate {@see Type} runs before calling it -- most implementations reject it before
+     * recovering $supertype's own class for the real comparison that follows: name, args, signature, or fields,
+     * whichever is this shape's own. {@see AliasShape} is the one implementation that never runs at all:
      * {@see Type::isSubtypeOf()} canonicalizes both sides -- seeing through every alias -- before it ever reaches a
      * shape class, so a {@see AliasShape} can never be either side of that match, and its own implementation throws
      * rather than pretend to answer one.
      */
-    public function isSubtypeOf(self $other): bool;
+    public function isSubtypeOf(self $supertype): bool;
 
     /**
-     * What $other, matched structurally against $this, teaches about the variables $this reaches -- {@see
+     * What $actual, matched structurally against $this, teaches about the variables $this reaches -- {@see
      * Type::bind()}'s shape-comparison half, called on the same terms {@see self::isSubtypeOf()} is, with the same
-     * mismatch check this side of it. {@see VariableShape} answers a different question before ever reaching this
-     * comparison -- see {@see Type::bind()} -- so its own implementation here is as unreachable as
-     * {@see AliasShape}'s, and both throw rather than answer $bindings unchanged for a call that can't happen.
+     * mismatch check this side of it. $actual is a {@see Type}, not a {@see self}, unlike {@see self::isSubtypeOf()}'s
+     * $other: {@see VariableShape::bind()} needs to record it whole, as the type its own variable is bound to, rather
+     * than a shape to compare against -- every other implementation reaches the shape it does need to compare through
+     * {@see Type::shape()}. {@see AliasShape} is the one implementation that never runs at all, for the same reason
+     * {@see self::isSubtypeOf()}'s does not -- see there -- so its own implementation here throws rather than answer
+     * $bindings unchanged for a call that can't happen.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
      */
-    public function bind(self $other, array $bindings): array;
+    public function bind(Type $actual, array $bindings): array;
 }

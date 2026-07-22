@@ -6,7 +6,6 @@ namespace Eventjet\Ausdruck\Test\Unit;
 
 use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
-use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -14,6 +13,8 @@ use PHPUnit\Framework\TestCase;
 
 final class TypeEqualityTest extends TestCase
 {
+    use ParsesTypeSyntax;
+
     /**
      * @return iterable<int, array{string, string}>
      */
@@ -33,11 +34,7 @@ final class TypeEqualityTest extends TestCase
 
     private static function fromString(string $str, Types|null $types = null): Type
     {
-        /**
-         * @psalm-suppress InternalClass
-         * @psalm-suppress InternalMethod
-         */
-        $node = TypeParser::parseString($str);
+        $node = self::parseTypeString($str);
         if ($node instanceof SyntaxError) {
             throw $node;
         }

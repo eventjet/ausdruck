@@ -60,17 +60,17 @@ final class StructShape implements TypeShape
 
     /**
      * A struct is a subtype of another if it has at least the fields the other does, each of a subtype of the
-     * other's -- it may have more, which is what makes a struct type structural rather than nominal. $other may be
-     * any shape, not just this one's own class; that mismatch is rejected the same way a missing or wrong-typed
+     * other's -- it may have more, which is what makes a struct type structural rather than nominal. $supertype may
+     * be any shape, not just this one's own class; that mismatch is rejected the same way a missing or wrong-typed
      * field is.
      */
     #[Override]
-    public function isSubtypeOf(TypeShape $other): bool
+    public function isSubtypeOf(TypeShape $supertype): bool
     {
-        if (!$other instanceof self) {
+        if (!$supertype instanceof self) {
             return false;
         }
-        foreach ($other->fields as $name => $fieldType) {
+        foreach ($supertype->fields as $name => $fieldType) {
             if (!array_key_exists($name, $this->fields)) {
                 return false;
             }
@@ -83,19 +83,20 @@ final class StructShape implements TypeShape
 
     /**
      * A struct can be written with fewer fields than one reaches into. What the two have in common is what there is
-     * to learn from -- nothing, if $other isn't this shape's own class either.
+     * to learn from -- nothing, if $actual's shape isn't this shape's own class either.
      *
      * @param array<string, Type> $bindings
      * @return array<string, Type>
      */
     #[Override]
-    public function bind(TypeShape $other, array $bindings): array
+    public function bind(Type $actual, array $bindings): array
     {
-        if (!$other instanceof self) {
+        $actualShape = $actual->shape();
+        if (!$actualShape instanceof self) {
             return $bindings;
         }
-        foreach (array_intersect_key($this->fields, $other->fields) as $name => $field) {
-            $bindings = $field->bind($other->fields[$name], $bindings);
+        foreach (array_intersect_key($this->fields, $actualShape->fields) as $name => $field) {
+            $bindings = $field->bind($actualShape->fields[$name], $bindings);
         }
         return $bindings;
     }

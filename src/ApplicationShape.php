@@ -61,18 +61,18 @@ final class ApplicationShape implements TypeShape
     }
 
     /**
-     * $other may be any shape, not just this one's own class -- that mismatch is rejected the same way a name or
+     * $supertype may be any shape, not just this one's own class -- that mismatch is rejected the same way a name or
      * argument mismatch is: two `ApplicationShape`s can still differ by name, or by argument even when the name
      * agrees -- `map<int, string>` is not a subtype of `map<int, int>`, even though both are named `map`.
      */
     #[Override]
-    public function isSubtypeOf(TypeShape $other): bool
+    public function isSubtypeOf(TypeShape $supertype): bool
     {
-        if (!$other instanceof self || $this->name !== $other->name) {
+        if (!$supertype instanceof self || $this->name !== $supertype->name) {
             return false;
         }
         foreach ($this->args as $index => $arg) {
-            $otherArg = $other->args[$index] ?? null;
+            $otherArg = $supertype->args[$index] ?? null;
             if ($otherArg === null || !$arg->isSubtypeOf($otherArg)) {
                 return false;
             }
@@ -81,9 +81,9 @@ final class ApplicationShape implements TypeShape
     }
 
     /**
-     * There is nothing to learn from $other if it isn't this shape's own class, or if the names don't even agree.
-     * Where they do, both sides have exactly as many arguments as {@see TypeConstructor::typeArgumentCount()} fixes
-     * for that name -- an `ApplicationShape` is never built any other way, see {@see Type::listOf()},
+     * There is nothing to learn from $actual if its shape isn't this shape's own class, or if the names don't even
+     * agree. Where they do, both sides have exactly as many arguments as {@see TypeConstructor::typeArgumentCount()}
+     * fixes for that name -- an `ApplicationShape` is never built any other way, see {@see Type::listOf()},
      * {@see Type::mapOf()} and the other scalar factories -- so unlike {@see FuncShape::bind()}'s parameters, one
      * side is never shorter than the other.
      *
@@ -91,13 +91,14 @@ final class ApplicationShape implements TypeShape
      * @return array<string, Type>
      */
     #[Override]
-    public function bind(TypeShape $other, array $bindings): array
+    public function bind(Type $actual, array $bindings): array
     {
-        if (!$other instanceof self || $this->name !== $other->name) {
+        $actualShape = $actual->shape();
+        if (!$actualShape instanceof self || $this->name !== $actualShape->name) {
             return $bindings;
         }
         foreach ($this->args as $index => $arg) {
-            $bindings = $arg->bind($other->args[$index], $bindings);
+            $bindings = $arg->bind($actualShape->args[$index], $bindings);
         }
         return $bindings;
     }

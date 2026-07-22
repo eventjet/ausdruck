@@ -7,7 +7,6 @@ namespace Eventjet\Ausdruck\Test\Unit;
 use Eventjet\Ausdruck\BuiltinFunctions;
 use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\TypeNode;
-use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Scope;
 use Eventjet\Ausdruck\Type;
@@ -31,6 +30,8 @@ use function trim;
  */
 final class BuiltinFunctionsTest extends TestCase
 {
+    use ParsesTypeSyntax;
+
     /**
      * The "Built-In Functions" table in the README, read from its first two columns as name => signature.
      *
@@ -71,11 +72,7 @@ final class BuiltinFunctionsTest extends TestCase
      */
     private static function resolveSignature(string $signature): Type
     {
-        /**
-         * @psalm-suppress InternalClass
-         * @psalm-suppress InternalMethod
-         */
-        $node = TypeParser::parseString($signature);
+        $node = self::parseTypeString($signature);
         assert($node instanceof TypeNode);
         $type = (new Types())->resolve($node);
         assert($type instanceof Type);

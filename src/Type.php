@@ -9,7 +9,6 @@ use Override;
 use Stringable;
 
 use function array_is_list;
-use function array_key_exists;
 use function array_key_first;
 use function array_map;
 use function get_object_vars;
@@ -272,6 +271,21 @@ final class Type implements Stringable
     }
 
     /**
+     * $this's own {@see TypeShape}, not seen through {@see self::canonical()} first -- the reverse of {@see self::of()},
+     * for the same reason: {@see self::$shape} is private and no shape class can read it directly. Every
+     * {@see TypeShape::bind()} implementation that needs to know whether $actual -- the {@see Type} it was handed,
+     * already canonicalized by {@see self::bind()} before it ever reaches a shape -- is its own kind of shape uses
+     * this to reach it, rather than {@see self::bind()} unwrapping $actual on every implementation's behalf.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     */
+    public function shape(): TypeShape
+    {
+        return $this->shape;
+    }
+
+    /**
      * @throws Parser\TypeError
      */
     public function assert(mixed $value): mixed
@@ -404,18 +418,15 @@ final class Type implements Stringable
     {
         $self = $this->canonical();
         $actual = $actual->canonical();
-        $selfShape = $self->shape;
-        if ($selfShape instanceof VariableShape) {
-            $name = $selfShape->name;
-            return array_key_exists($name, $bindings) ? $bindings : [...$bindings, $name => $actual];
-        }
         $selfOption = $self->optionArg();
         if ($selfOption !== null && !$actual->isNamed('Option') && !$actual->isNamed('None')) {
             return $selfOption->bind($actual, $bindings);
         }
         // What's left, or nothing to learn if $actual isn't even the same kind of shape -- {@see TypeShape::bind()}'s
-        // own to decide; see {@see self::isSubtypeOf()} for the same question asked there.
-        return $selfShape->bind($actual->shape, $bindings);
+        // own to decide, $actual (still a {@see self}, not unwrapped here) and all; see {@see self::isSubtypeOf()}
+        // for the same question asked there. {@see VariableShape::bind()} is what actually records a binding -- this
+        // method no longer special-cases it before dispatching.
+        return $self->shape->bind($actual, $bindings);
     }
 
     /**
