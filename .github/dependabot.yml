@@ -4,9 +4,9 @@ updates:
     directory: /
     schedule:
       interval: daily
-    target-branch: 0.2.x
+    target-branch: master
   - package-ecosystem: github-actions
     directory: .github/workflows
     schedule:
       interval: daily
-    target-branch: 0.2.x
+    target-branch: master
