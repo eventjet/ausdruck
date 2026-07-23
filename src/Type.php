@@ -213,11 +213,6 @@ final class Type implements Stringable
         return new self(new ApplicationShape(TypeConstructor::Option->value, [$some]));
     }
 
-    public static function some(self $some): self
-    {
-        return $some;
-    }
-
     public static function none(): self
     {
         return new self(new ApplicationShape(TypeConstructor::None->value));
