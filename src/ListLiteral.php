@@ -12,6 +12,10 @@ use function array_map;
 use function implode;
 use function sprintf;
 
+/**
+ * @internal
+ * @psalm-internal Eventjet\Ausdruck
+ */
 final class ListLiteral extends AbstractLiteral
 {
     /**
