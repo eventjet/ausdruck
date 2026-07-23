@@ -9,11 +9,16 @@ use Eventjet\Ausdruck\Parser\TypeAnnotation;
 use Stringable;
 
 /**
+ * The public builder surface for expressions. Every combinator here returns {@see self}: the concrete node each one
+ * builds ({@see Add}, {@see Comparison}, {@see Call}, and the rest) is @internal, and this class is @api, so naming one
+ * as a return type would leak an internal symbol into the public surface. Returning self keeps the surface honest and
+ * lets the builders chain uniformly, whatever node is underneath.
+ *
  * @api
  */
 abstract class Expression implements Stringable
 {
-    final public function eq(self $other): Eq
+    final public function eq(self $other): self
     {
         return Expr::eq($this, $other);
     }
@@ -23,17 +28,17 @@ abstract class Expression implements Stringable
         return Expr::neq($this, $other);
     }
 
-    final public function subtract(self $subtrahend): Subtract
+    final public function subtract(self $subtrahend): self
     {
         return Expr::subtract($this, $subtrahend);
     }
 
-    final public function add(self $addend): Add
+    final public function add(self $addend): self
     {
         return Expr::add($this, $addend);
     }
 
-    final public function multiply(self $multiplier): Multiply
+    final public function multiply(self $multiplier): self
     {
         return Expr::multiply($this, $multiplier);
     }
@@ -41,7 +46,7 @@ abstract class Expression implements Stringable
     /**
      * The quotient is an option of the operands' type: none when the divisor evaluates to zero. See {@see Divide}.
      */
-    final public function divide(self $divisor): Divide
+    final public function divide(self $divisor): self
     {
         return Expr::divide($this, $divisor);
     }
@@ -49,12 +54,12 @@ abstract class Expression implements Stringable
     /**
      * The remainder is an option of the operands' type: none when the divisor evaluates to zero. See {@see Modulo}.
      */
-    final public function modulo(self $divisor): Modulo
+    final public function modulo(self $divisor): self
     {
         return Expr::modulo($this, $divisor);
     }
 
-    final public function gt(self $right): Gt
+    final public function gt(self $right): self
     {
         return Expr::gt($this, $right);
     }
@@ -74,7 +79,7 @@ abstract class Expression implements Stringable
         return Expr::lte($this, $right);
     }
 
-    final public function or_(self $other): Or_
+    final public function or_(self $other): self
     {
         return Expr::or_($this, $other);
     }
@@ -84,11 +89,6 @@ abstract class Expression implements Stringable
         return Expr::and_($this, $other);
     }
 
-    /**
-     * Returns self rather than the concrete {@see Not}: Not is internal, so this method, being @api, can't name it as
-     * its return type. Returning self is the shape every builder here is headed for, not a rule this one is the
-     * exception to.
-     */
     final public function not(): self
     {
         return Expr::not($this);
@@ -103,7 +103,7 @@ abstract class Expression implements Stringable
      * @param Type $type The function's return type. There's no declaration here to contradict, so it's taken as given.
      * @param list<Expression> $arguments
      */
-    final public function call(string $name, Type $type, array $arguments, Span|null $location = null): Call
+    final public function call(string $name, Type $type, array $arguments, Span|null $location = null): self
     {
         return Expr::call(
             $this,

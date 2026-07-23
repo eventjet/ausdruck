@@ -369,8 +369,12 @@ final class ExpressionTest extends TestCase
             [$expr, $scope, $expected] = $tuple;
             $declarations = $tuple[3] ?? null;
             $expectedStr = (string)Expr::literal($expected);
-            $exprStr = is_callable($expr) ? $expr() : $expr;
-            $name = sprintf('%s equals %s with %s', (string)$exprStr, $expectedStr, $scope->debug());
+            $exprStr = match (true) {
+                $expr instanceof Expression => (string)$expr,
+                is_string($expr) => $expr,
+                is_callable($expr) => (string)$expr(),
+            };
+            $name = sprintf('%s equals %s with %s', $exprStr, $expectedStr, $scope->debug());
             yield $name => [$expr, $scope, $declarations, $expected];
         }
     }

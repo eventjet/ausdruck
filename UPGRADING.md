@@ -96,6 +96,24 @@ and `isSubtypeOf` — are now `final`. They are fixed algorithms that assemble t
 node set, so a subclass has no reason to override them. If you did override one, move that
 logic out of the subclass; nothing else needs to change.
 
+#### `Expression`'s builder combinators all return `self`
+
+In 0.2, nine of the combinators declared a concrete node as their return type — `eq`
+returned `Eq`, `add` returned `Add`, `call` returned `Call`, and so on — while the rest
+returned `self`. Those node classes are `@internal`, so the surface both leaked internal
+symbols and disagreed with itself (`eq` returned `Eq` but its sibling `neq` returned
+`self`). In 0.3 every combinator returns `self`.
+
+If you typed a variable or property against one of those concrete returns
+(`$c = $a->eq($b);` inferring `Eq`), widen the declaration to `Expression`. The value is
+unchanged — only the declared type narrows — so code that already treated the result as an
+`Expression` needs no change.
+
+As part of this, the `Eq` and `Gt` classes are removed. They were `@internal` subclasses of
+`Comparison` that existed only to be named by `eq()` and `gt()`; now that those return
+`self`, they fold into `Comparison`. An `eq(...)` value already compared equal to the
+matching `Comparison`, so `equals()` is unaffected.
+
 #### Rendered form of some expressions and types changed
 
 Printing follows precedence, so an expression that mixes `&&` and `||` may render with
