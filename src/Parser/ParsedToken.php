@@ -7,6 +7,10 @@ namespace Eventjet\Ausdruck\Parser;
 use function assert;
 use function strlen;
 
+/**
+ * @internal
+ * @psalm-internal Eventjet\Ausdruck
+ */
 final class ParsedToken
 {
     /**
