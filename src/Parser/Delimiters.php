@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Parser;
 
 /**
+ * @internal
  * @psalm-internal Eventjet\Ausdruck\Parser
  */
 enum Delimiters
