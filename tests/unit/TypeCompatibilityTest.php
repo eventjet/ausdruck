@@ -105,6 +105,10 @@ final class TypeCompatibilityTest extends TestCase
             // Lists
             ['list<string>', 'list<int>'],
             ['list<any>', 'list<string>'],
+
+            // A struct is not a subtype of a type that isn't a struct at all
+            ['{ name: string }', 'int'],
+            ['{ name: string }', 'string'],
         ];
         foreach ($cases as $case) {
             yield sprintf('%s is not a subtype of %s', ...$case) => $case;

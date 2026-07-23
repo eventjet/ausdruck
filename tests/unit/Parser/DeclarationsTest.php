@@ -131,4 +131,22 @@ final class DeclarationsTest extends TestCase
         $types = new Types(['Foo' => Type::int()]);
         new Declarations(types: $types, functions: ['f' => Type::func(Type::var('Foo'), [Type::var('Foo')])]);
     }
+
+    /**
+     * The alias-shadowing check reaches every name the derived binder introduces, not just the first: a variable that
+     * doesn't name a type is passed over so the walk can go on to one that does, rather than the walk stopping at it.
+     * Here `T` names no alias and comes first in the binder derived from `fn(T, Foo) -> int`, while `Foo` -- which
+     * does -- comes second, so a check that gave up at `T` would never reach the collision `Foo` is.
+     */
+    public function testADerivedBinderIsCheckedForAliasShadowingPastItsFirstName(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'f is declared as fn(T, Foo) -> int, whose binder would have to introduce Foo -- but Foo already names a '
+                . 'type, so a call could never tell the two apart',
+        );
+
+        $types = new Types(['Foo' => Type::int()]);
+        new Declarations(types: $types, functions: ['f' => Type::func(Type::int(), [Type::var('T'), Type::var('Foo')])]);
+    }
 }

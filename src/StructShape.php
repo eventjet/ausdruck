@@ -9,6 +9,7 @@ use Override;
 use function array_intersect_key;
 use function array_key_exists;
 use function array_map;
+use function sprintf;
 
 /**
  * A struct, written as its fields between `{ }` rather than as a name -- see {@see Type::struct()}.
@@ -57,7 +58,7 @@ final class StructShape implements TypeShape
     {
         $fields = [];
         foreach ($this->fields as $name => $fieldType) {
-            $fields[] = $name . ': ' . (string)$fieldType;
+            $fields[] = sprintf('%s: %s', $name, $fieldType);
         }
         return TypeSyntax::struct($fields);
     }

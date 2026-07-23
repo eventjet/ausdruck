@@ -459,6 +459,70 @@ final class TypeTest extends TestCase
     }
 
     /**
+     * A signature with no binder of its own reaches no variable a call could decide -- see
+     * {@see Signature::hasOwnBinder()} -- so instantiating it for a call hands back the very instance it started
+     * from, not an equal one rebuilt from a walk that could only ever bind nothing and substitute nothing. Every
+     * monomorphic call, like `substr`'s, takes this door, and the identity is what says the walk was skipped rather
+     * than run to no effect.
+     */
+    public function testInstantiatingAMonomorphicSignatureForACallHandsBackTheSameInstance(): void
+    {
+        $monomorphic = Signature::quantified(Type::func(Type::string(), [Type::string(), Type::int()]));
+        self::assertNotNull($monomorphic);
+
+        self::assertSame($monomorphic, $monomorphic->instantiateForCall(Type::string(), [Type::int()]));
+    }
+
+    /**
+     * Substituting into a self-contained generic signature leaves it untouched: its own binder is what quantifies its
+     * variables, so an enclosing substitution -- even one that happens to carry a binding for the very name `X` the
+     * signature quantifies -- has nothing to rewrite inside it. Without that opacity the binder would be dropped and
+     * `X` replaced wholesale, turning `fn<X>(X) -> X` into `fn(int) -> int`.
+     */
+    public function testSubstitutingIntoASelfContainedGenericSignatureLeavesItUntouched(): void
+    {
+        $generic = Signature::quantified(Type::func(Type::var('X'), [Type::var('X')]));
+        self::assertNotNull($generic);
+
+        self::assertSame('fn<X>(X) -> X', (string)$generic->substitute(['X' => Type::int()]));
+    }
+
+    /**
+     * The bind() counterpart to {@see self::testSubstitutingIntoASelfContainedGenericSignatureLeavesItUntouched()}: a
+     * self-contained generic signature learns nothing from whatever function type faces it, since binding into it
+     * would decide the variables its own binder already owns. Faced with `fn(string) -> int`, `fn<X>(X) -> X` binds
+     * `X` to neither -- the bindings come back exactly as empty as they went in, rather than picking up `X => string`
+     * from a walk that treated the opaque signature as one to learn from.
+     */
+    public function testASelfContainedGenericSignatureLearnsNothingFromWhatFacesIt(): void
+    {
+        $generic = Signature::quantified(Type::func(Type::var('X'), [Type::var('X')]));
+        self::assertNotNull($generic);
+
+        self::assertSame([], $generic->bind(Type::func(Type::int(), [Type::string()]), []));
+    }
+
+    /**
+     * A signature-typed parameter faced with an actual that isn't a function type at all learns nothing from it --
+     * {@see Signature::bind()} answers back the bindings it was given, whole. `A` and `B`, decided by the receiver and
+     * the first argument before the third parameter's `fn(int) -> bool` meets a plain `int`, both survive into the
+     * substituted return type; a truncated copy keeping only the first would leave `B` undecided and print `any` in
+     * its place.
+     */
+    public function testASignatureParameterFacingANonFunctionActualKeepsEveryEarlierBinding(): void
+    {
+        $outer = Signature::quantified(Type::func(
+            Type::struct(['a' => Type::var('A'), 'b' => Type::var('B')]),
+            [Type::var('A'), Type::var('B'), Type::func(Type::bool(), [Type::int()])],
+        ));
+        self::assertNotNull($outer);
+
+        $instantiated = $outer->instantiateForCall(Type::int(), [Type::string(), Type::int()]);
+
+        self::assertSame('{ a: int, b: string }', (string)$instantiated->returnType);
+    }
+
+    /**
      * A consumer's own generic higher-order function -- one whose parameter is itself a generic function type, the
      * way {@see \Eventjet\Ausdruck\BuiltinFunctions}' own `map` is -- builds that parameter through
      * {@see Type::func()} too, the same door as the outer signature: the inner function type's `T` and `U` are the
