@@ -86,6 +86,16 @@ $params = $type->asFunction()?->argumentTypes();     // list<Type>
 - `Parser\Delimiters` is removed. It was an internal token detail with no role in the
   public API.
 
+#### `Expression`'s builder combinators are now `final`
+
+`Expression` stays an open extension point: subclass it and implement `location()`,
+`evaluate()`, `equals()`, and `getType()` to add a node, exactly as before. What changed is
+that its concrete builder combinators — `eq`, `neq`, `add`, `subtract`, `multiply`,
+`divide`, `modulo`, `gt`, `lt`, `gte`, `lte`, `or_`, `and_`, `not`, `call`, `matchesType`,
+and `isSubtypeOf` — are now `final`. They are fixed algorithms that assemble the internal
+node set, so a subclass has no reason to override them. If you did override one, move that
+logic out of the subclass; nothing else needs to change.
+
 #### Rendered form of some expressions and types changed
 
 Printing follows precedence, so an expression that mixes `&&` and `||` may render with
