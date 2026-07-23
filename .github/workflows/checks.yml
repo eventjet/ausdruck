@@ -253,4 +253,8 @@ jobs:
         run: composer update --no-progress --no-interaction
 
       - name: "Check for BC breaks"
+        # Blocking on maintenance branches (e.g. 0.3.x), which promise backward
+        # compatibility; informational on master and feature branches, where the trunk
+        # intentionally accumulates the next minor's breaks. See docs/BACKWARD-COMPATIBILITY.md.
+        continue-on-error: ${{ !endsWith(github.base_ref, '.x') }}
         run: vendor/bin/roave-backward-compatibility-check

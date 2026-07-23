@@ -12,6 +12,7 @@ use function str_split;
 
 /**
  * @phpstan-type AnyToken Token | string | Literal<string | int | float>
+ * @internal
  * @psalm-internal Eventjet\Ausdruck\Parser
  */
 final class TypeParser
