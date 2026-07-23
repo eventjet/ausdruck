@@ -10,6 +10,10 @@ use Stringable;
 
 use function sprintf;
 
+/**
+ * @internal
+ * @psalm-internal Eventjet\Ausdruck
+ */
 final class TypeHint implements Stringable
 {
     public function __construct(public readonly Type $type, public readonly bool $explicit)
