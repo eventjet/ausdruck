@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
-use LogicException;
 use Override;
 
 /**
@@ -15,8 +14,9 @@ use Override;
  * $target can never itself reach a free variable -- {@see Type::alias()} rejects one that does -- so
  * {@see self::collectVariables()} and {@see self::substitute()}, real delegations to $target though they are, can
  * only ever answer $found unchanged and a $target that reads the same, respectively. {@see Type::isSubtypeOf()} and
- * {@see Type::bind()} both canonicalize $target away before ever comparing shapes, so {@see self::isSubtypeOf()} and
- * {@see self::bind()} below are never called at all; both throw rather than answer either question quietly wrong.
+ * {@see Type::bind()} both canonicalize $target away before ever comparing shapes, so this class never implements
+ * {@see ComparableShape} at all -- unlike every other {@see TypeShape} -- rather than answering either question with
+ * a throw for a call that can never happen; see {@see ComparableShape} for where that guarantee comes from.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -72,23 +72,5 @@ final class AliasShape implements TypeShape
     public function substitute(array $bindings): Type
     {
         return Type::of(new self($this->name, $this->target->substitute($bindings)));
-    }
-
-    #[Override]
-    public function isSubtypeOf(TypeShape $supertype): bool
-    {
-        throw new LogicException(
-            'AliasShape::isSubtypeOf() is unreachable: Type::isSubtypeOf() sees through every alias first',
-        );
-    }
-
-    /**
-     * @param array<string, Type> $bindings
-     * @return array<string, Type>
-     */
-    #[Override]
-    public function bind(Type $actual, array $bindings): array
-    {
-        throw new LogicException('AliasShape::bind() is unreachable: Type::bind() sees through every alias first');
     }
 }

@@ -16,7 +16,7 @@ use function array_map;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class ApplicationShape implements TypeShape
+final class ApplicationShape implements ComparableShape
 {
     /**
      * @param list<Type> $args
@@ -82,7 +82,7 @@ final class ApplicationShape implements TypeShape
      * same way {@see self::bind()} trusts it, rather than guarded a second time.
      */
     #[Override]
-    public function isSubtypeOf(TypeShape $supertype): bool
+    public function isSubtypeOf(ComparableShape $supertype): bool
     {
         if (!$supertype instanceof self || $this->name !== $supertype->name) {
             return false;

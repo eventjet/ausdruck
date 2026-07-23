@@ -17,13 +17,13 @@ use function sprintf;
 /**
  * A function type read as what it's for: a return type, a receiver, and the arguments a call passes in parentheses --
  * and, since a function type is one of the shapes a {@see Type} can hold, this class is also its own
- * {@see TypeShape}: {@see self::collectVariables()} through {@see self::bind()} below are that interface's, called
- * the way every other shape's are, from {@see Type} once it already holds a {@see self} rather than from a consumer
- * of this @api class directly.
+ * {@see ComparableShape}: {@see self::collectVariables()} through {@see self::bind()} below are that interface's
+ * (by way of {@see TypeShape}, which it extends), called the way every other shape's are, from {@see Type} once it
+ * already holds a {@see self} rather than from a consumer of this @api class directly.
  *
  * @api
  */
-final class Signature implements Stringable, TypeShape
+final class Signature implements Stringable, ComparableShape
 {
     /**
      * @param list<Type> $parameters The types the PHP callable receives, in order, receiver first -- `substr` is
@@ -340,7 +340,7 @@ final class Signature implements Stringable, TypeShape
      *     are compared -- both would need the same name for `isSubtypeOf()` to reach true here. Left open.
      */
     #[Override]
-    public function isSubtypeOf(TypeShape $supertype): bool
+    public function isSubtypeOf(ComparableShape $supertype): bool
     {
         if (!$supertype instanceof self) {
             return false;

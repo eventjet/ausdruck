@@ -17,7 +17,7 @@ use function sprintf;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class StructShape implements TypeShape
+final class StructShape implements ComparableShape
 {
     /**
      * @param array<string, Type> $fields
@@ -79,7 +79,7 @@ final class StructShape implements TypeShape
      * field is.
      */
     #[Override]
-    public function isSubtypeOf(TypeShape $supertype): bool
+    public function isSubtypeOf(ComparableShape $supertype): bool
     {
         if (!$supertype instanceof self) {
             return false;

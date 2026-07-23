@@ -11,6 +11,7 @@ use Stringable;
 use function array_is_list;
 use function array_key_first;
 use function array_map;
+use function assert;
 use function get_object_vars;
 use function gettype;
 use function is_array;
@@ -293,7 +294,7 @@ final class Type implements Stringable
     /**
      * $this's own {@see TypeShape}, not seen through {@see self::canonical()} first -- the reverse of {@see self::of()},
      * for the same reason: {@see self::$shape} is private and no shape class can read it directly. Every
-     * {@see TypeShape::bind()} implementation that needs to know whether $actual -- the {@see Type} it was handed,
+     * {@see ComparableShape::bind()} implementation that needs to know whether $actual -- the {@see Type} it was handed,
      * already canonicalized by {@see self::bind()} before it ever reaches a shape -- is its own kind of shape uses
      * this to reach it, rather than {@see self::bind()} unwrapping $actual on every implementation's behalf.
      *
@@ -363,12 +364,17 @@ final class Type implements Stringable
             return true;
         }
         // The rest of the comparison -- name, args, signature, fields, and whether $other is even the same kind of
-        // shape at all -- is {@see TypeShape::isSubtypeOf()}'s own to make. A {@see AliasShape} never reaches here,
-        // having already been seen through by {@see self::canonical()} above -- this is also why `Option<X>` needs
-        // no case of its own above: once $self and $other are both Options, they're both ApplicationShapes of that
-        // name, and the pairwise-argument comparison below is the same recursive `X.isSubtypeOf(Y)` a dedicated case
-        // would run.
-        return $self->shape->isSubtypeOf($other->shape);
+        // shape at all -- is {@see ComparableShape::isSubtypeOf()}'s own to make. A {@see AliasShape} never reaches
+        // here, having already been seen through by {@see self::canonical()} above -- which is exactly what
+        // {@see ComparableShape} guarantees to its only caller, so the narrowing below is asserted rather than
+        // re-checked -- this is also why `Option<X>` needs no case of its own above: once $self and $other are both
+        // Options, they're both ApplicationShapes of that name, and the pairwise-argument comparison below is the
+        // same recursive `X.isSubtypeOf(Y)` a dedicated case would run.
+        $selfShape = $self->shape;
+        $otherShape = $other->shape;
+        assert($selfShape instanceof ComparableShape);
+        assert($otherShape instanceof ComparableShape);
+        return $selfShape->isSubtypeOf($otherShape);
     }
 
     /**
@@ -446,11 +452,14 @@ final class Type implements Stringable
         ) {
             return $selfOption->bind($actual, $bindings);
         }
-        // What's left, or nothing to learn if $actual isn't even the same kind of shape -- {@see TypeShape::bind()}'s
+        // What's left, or nothing to learn if $actual isn't even the same kind of shape -- {@see ComparableShape::bind()}'s
         // own to decide, $actual (still a {@see self}, not unwrapped here) and all; see {@see self::isSubtypeOf()}
-        // for the same question asked there. {@see VariableShape::bind()} is what actually records a binding -- this
-        // method no longer special-cases it before dispatching.
-        return $self->shape->bind($actual, $bindings);
+        // for the same question asked there, including why the narrowing below is asserted rather than re-checked.
+        // {@see VariableShape::bind()} is what actually records a binding -- this method no longer special-cases it
+        // before dispatching.
+        $selfShape = $self->shape;
+        assert($selfShape instanceof ComparableShape);
+        return $selfShape->bind($actual, $bindings);
     }
 
     /**

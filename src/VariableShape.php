@@ -15,7 +15,7 @@ use function array_key_exists;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class VariableShape implements TypeShape
+final class VariableShape implements ComparableShape
 {
     public function __construct(
         public readonly string $name,
@@ -72,7 +72,7 @@ final class VariableShape implements TypeShape
      * Two variables of the same name are the same variable -- see {@see Type::var()}.
      */
     #[Override]
-    public function isSubtypeOf(TypeShape $supertype): bool
+    public function isSubtypeOf(ComparableShape $supertype): bool
     {
         return $supertype instanceof self && $this->name === $supertype->name;
     }
@@ -80,7 +80,7 @@ final class VariableShape implements TypeShape
     /**
      * This variable's own binding: $actual, unless something has already bound this name, in which case the first
      * binding is the one that's kept -- see {@see Type::bind()} for why first-wins is the rule. Unlike every other
-     * shape's {@see TypeShape::bind()}, this doesn't compare $actual's own shape against anything: a variable binds
+     * shape's {@see ComparableShape::bind()}, this doesn't compare $actual's own shape against anything: a variable binds
      * to whatever it's matched against, not just another value of the same shape.
      *
      * @param array<string, Type> $bindings

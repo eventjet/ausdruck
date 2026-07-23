@@ -6,6 +6,7 @@ namespace Eventjet\Ausdruck\Test\Unit;
 
 use Eventjet\Ausdruck\AliasShape;
 use Eventjet\Ausdruck\ApplicationShape;
+use Eventjet\Ausdruck\ComparableShape;
 use Eventjet\Ausdruck\Get;
 use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
@@ -13,12 +14,14 @@ use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Signature;
+use Eventjet\Ausdruck\StructShape;
 use Eventjet\Ausdruck\Type;
 use Eventjet\Ausdruck\VariableShape;
 use InvalidArgumentException;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 
 use function assert;
 use function fopen;
@@ -439,7 +442,7 @@ final class TypeTest extends TestCase
 
     /**
      * A struct can be written with fewer fields than the value actually reaching it has --
-     * {@see \Eventjet\Ausdruck\StructShape::bind()} learns only from the fields the two have in common; field types
+     * {@see StructShape::bind()} learns only from the fields the two have in common; field types
      * the declared side doesn't mention are neither read nor allowed to decide a variable declared elsewhere.
      */
     public function testBindLearnsOnlyFromTheStructFieldsBothSidesHave(): void
@@ -750,26 +753,21 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * {@see AliasShape::isSubtypeOf()} and {@see AliasShape::bind()} are never reached through {@see Type} --
-     * {@see Type::isSubtypeOf()} and {@see Type::bind()} both see through an alias before ever comparing shapes --
-     * so both throw rather than answer either question quietly wrong. Pinned here directly against the shape, since
-     * nothing reachable through {@see Type} could ever exercise either method to begin with.
+     * An {@see AliasShape} is never reached by {@see Type::isSubtypeOf()} or {@see Type::bind()} -- both see through
+     * every alias before ever comparing shapes -- so it doesn't implement {@see ComparableShape} at all, unlike every
+     * other {@see TypeShape}: the invariant is enforced by the type system rather than by a throw for a call that
+     * could never happen. Asked through {@see ReflectionClass::implementsInterface()} rather than
+     * `assertInstanceOf()`: every one of these is already statically known to answer the same way, which is exactly
+     * the point, but that also makes `assertInstanceOf()` itself flagged as redundant by static analysis --
+     * reflection is what keeps the assertion runtime rather than compile-time.
      */
-    public function testAliasShapeIsSubtypeOfAndBindAreUnreachable(): void
+    public function testOnlyAliasShapeIsNotComparable(): void
     {
-        $alias = new AliasShape('Foo', Type::int());
-        $int = new ApplicationShape('int');
-
-        $this->expectException(LogicException::class);
-        self::assertFalse($alias->isSubtypeOf($int));
-    }
-
-    public function testAliasShapeBindThrows(): void
-    {
-        $alias = new AliasShape('Foo', Type::int());
-
-        $this->expectException(LogicException::class);
-        self::assertSame([], $alias->bind(Type::int(), []));
+        self::assertFalse((new ReflectionClass(AliasShape::class))->implementsInterface(ComparableShape::class));
+        self::assertTrue((new ReflectionClass(ApplicationShape::class))->implementsInterface(ComparableShape::class));
+        self::assertTrue((new ReflectionClass(VariableShape::class))->implementsInterface(ComparableShape::class));
+        self::assertTrue((new ReflectionClass(StructShape::class))->implementsInterface(ComparableShape::class));
+        self::assertTrue((new ReflectionClass(Signature::class))->implementsInterface(ComparableShape::class));
     }
 
     /**
