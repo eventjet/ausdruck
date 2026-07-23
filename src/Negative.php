@@ -9,6 +9,9 @@ use Override;
 
 /**
  * Never wraps a {@see Literal}: {@see Expr::negative()} folds a negated number literal into a negative one.
+ *
+ * @internal
+ * @psalm-internal Eventjet\Ausdruck
  */
 final class Negative extends UnaryOperator
 {
