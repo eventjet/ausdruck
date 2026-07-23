@@ -13,27 +13,27 @@ use Stringable;
  */
 abstract class Expression implements Stringable
 {
-    public function eq(self $other): Eq
+    final public function eq(self $other): Eq
     {
         return Expr::eq($this, $other);
     }
 
-    public function neq(self $other): self
+    final public function neq(self $other): self
     {
         return Expr::neq($this, $other);
     }
 
-    public function subtract(self $subtrahend): Subtract
+    final public function subtract(self $subtrahend): Subtract
     {
         return Expr::subtract($this, $subtrahend);
     }
 
-    public function add(self $addend): Add
+    final public function add(self $addend): Add
     {
         return Expr::add($this, $addend);
     }
 
-    public function multiply(self $multiplier): Multiply
+    final public function multiply(self $multiplier): Multiply
     {
         return Expr::multiply($this, $multiplier);
     }
@@ -41,7 +41,7 @@ abstract class Expression implements Stringable
     /**
      * The quotient is an option of the operands' type: none when the divisor evaluates to zero. See {@see Divide}.
      */
-    public function divide(self $divisor): Divide
+    final public function divide(self $divisor): Divide
     {
         return Expr::divide($this, $divisor);
     }
@@ -49,37 +49,37 @@ abstract class Expression implements Stringable
     /**
      * The remainder is an option of the operands' type: none when the divisor evaluates to zero. See {@see Modulo}.
      */
-    public function modulo(self $divisor): Modulo
+    final public function modulo(self $divisor): Modulo
     {
         return Expr::modulo($this, $divisor);
     }
 
-    public function gt(self $right): Gt
+    final public function gt(self $right): Gt
     {
         return Expr::gt($this, $right);
     }
 
-    public function lt(self $right): self
+    final public function lt(self $right): self
     {
         return Expr::lt($this, $right);
     }
 
-    public function gte(self $right): self
+    final public function gte(self $right): self
     {
         return Expr::gte($this, $right);
     }
 
-    public function lte(self $right): self
+    final public function lte(self $right): self
     {
         return Expr::lte($this, $right);
     }
 
-    public function or_(self $other): Or_
+    final public function or_(self $other): Or_
     {
         return Expr::or_($this, $other);
     }
 
-    public function and_(self $other): self
+    final public function and_(self $other): self
     {
         return Expr::and_($this, $other);
     }
@@ -89,7 +89,7 @@ abstract class Expression implements Stringable
      * its return type. Returning self is the shape every builder here is headed for, not a rule this one is the
      * exception to.
      */
-    public function not(): self
+    final public function not(): self
     {
         return Expr::not($this);
     }
@@ -103,7 +103,7 @@ abstract class Expression implements Stringable
      * @param Type $type The function's return type. There's no declaration here to contradict, so it's taken as given.
      * @param list<Expression> $arguments
      */
-    public function call(string $name, Type $type, array $arguments, Span|null $location = null): Call
+    final public function call(string $name, Type $type, array $arguments, Span|null $location = null): Call
     {
         return Expr::call(
             $this,
@@ -115,12 +115,12 @@ abstract class Expression implements Stringable
         );
     }
 
-    public function matchesType(Type $type): bool
+    final public function matchesType(Type $type): bool
     {
         return $this->getType()->equals($type);
     }
 
-    public function isSubtypeOf(Type $type): bool
+    final public function isSubtypeOf(Type $type): bool
     {
         return $this->getType()->isSubtypeOf($type);
     }
