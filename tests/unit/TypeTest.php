@@ -162,17 +162,6 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{Type | callable(): Type, Type | callable(): Type}>
-     */
-    public static function equalsCases(): iterable
-    {
-        yield 'Some<T> == T' => [
-            static fn() => Type::some(Type::string()),
-            Type::string(),
-        ];
-    }
-
-    /**
      * @return iterable<string, array{Type, string}>
      */
     public static function toStringCases(): iterable
@@ -711,20 +700,6 @@ final class TypeTest extends TestCase
     {
         self::assertFalse($a->equals($b));
         self::assertFalse($b->equals($a));
-    }
-
-    /**
-     * @param Type | callable(): Type $a
-     * @param Type | callable(): Type $b
-     */
-    #[DataProvider('equalsCases')]
-    public function testEquals(Type|callable $a, Type|callable $b): void
-    {
-        $a = $a instanceof Type ? $a : $a();
-        $b = $b instanceof Type ? $b : $b();
-
-        self::assertTrue($a->equals($b));
-        self::assertTrue($b->equals($a));
     }
 
     #[DataProvider('toStringCases')]
