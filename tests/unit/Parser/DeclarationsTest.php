@@ -6,7 +6,6 @@ namespace Eventjet\Ausdruck\Test\Unit\Parser;
 
 use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
-use Eventjet\Ausdruck\Parser\TypeNode;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Test\Unit\ParsesTypeSyntax;
@@ -92,24 +91,26 @@ final class DeclarationsTest extends TestCase
     }
 
     /**
-     * $g already owns a binder of its own -- parsed from written `fn<T>(T) -> T` syntax -- so it is opaque to
-     * whatever binder {@see Signature::quantified()} derives for `f` around it: the derivation is free to reuse the
-     * same name T, the same way {@see \Eventjet\Ausdruck\Parser\TypeResolution::resolveSignature()} lets a nested,
-     * self-contained `fn<...>` reuse an enclosing binder's name (see
-     * generics/type-variable/reusing-an-enclosing-binders-name). Printing `f` back has to produce text the parser
-     * accepts again, not one that rejects T as already declared.
+     * $g already owns a binder of its own -- parsed from written `fn<T>(T) -> T` syntax -- but the binder
+     * {@see Signature::quantified()} derives for `f` around it still may not reuse the same name T: `f`'s derived
+     * binder encloses $g, so a shared T would shadow $g's own, and shadowing an enclosing variable is not allowed --
+     * the same rule {@see \Eventjet\Ausdruck\Parser\TypeResolution::checkTypeVariable()} enforces for a written
+     * `fn<...>` (see generics/type-variable/reusing-an-enclosing-binders-name). `f` would otherwise print as
+     * `fn<T>(fn<T>(T) -> T, T) -> T`, which the parser reads back as a redeclared variable, so it is rejected as it
+     * is built rather than handed back as a signature that can't round-trip.
      */
-    public function testADerivedBinderMayReuseANestedSignaturesOwnBinderName(): void
+    public function testADerivedBinderMayNotReuseANestedSignaturesOwnBinderName(): void
     {
         $g = ExpressionParser::parse('x:fn<T>(T) -> T')->getType();
 
-        $declarations = new Declarations(functions: ['f' => Type::func(Type::var('T'), [$g, Type::var('T')])]);
-        $printed = (string)$declarations->functions['f'];
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'The binder derived for fn<T>(fn<T>(T) -> T, T) -> T would introduce T, which a nested function type '
+                . 'already declares -- the inner one would shadow the outer variable, so the type could never be read '
+                . 'back the way it prints',
+        );
 
-        self::assertSame('fn<T>(fn<T>(T) -> T, T) -> T', $printed);
-        $node = self::parseTypeString($printed);
-        self::assertInstanceOf(TypeNode::class, $node);
-        self::assertInstanceOf(Type::class, (new Types())->resolve($node));
+        new Declarations(functions: ['f' => Type::func(Type::var('T'), [$g, Type::var('T')])]);
     }
 
     /**

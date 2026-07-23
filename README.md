@@ -246,7 +246,11 @@ or alias goes on to quantify them, rather than claiming any of its own. Nothing 
 being a self-contained, rank-1-polymorphic value instead -- one already quantified by its own `fn<...>` binder, the
 same way a written type string nests one -- and a signature like that is opaque to whatever encloses it: the outer
 one can pass it around, store it in a list or an `Option`, or return it, but never reach through it for a variable of
-its own.
+its own. A nested binder may not reuse a name a binder further out already declares, though: the inner variable would
+shadow the outer one, and shadowing is not allowed -- `fn<T>(fn<T>(T) -> T) -> T` is rejected, `fn<T>(fn<U>(U) -> U) -> T`
+is fine. That holds whichever door builds the binder: a written `fn<...>` is rejected as it's parsed, and a binder
+derived by `Declarations`, `Type::alias()`, or `Signature::quantified()` is rejected as it's derived, rather than
+minting a value that would print as text the parser reads back as a redeclared variable.
 
 Until it's quantified, a value built with `Type::func()` is open: printing it before declaring or aliasing it prints a
 variable's bare name, or a `fn<...>` missing the binder that would make it valid syntax again. `Signature::quantified($t)->toType()`

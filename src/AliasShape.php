@@ -40,6 +40,21 @@ final class AliasShape implements TypeShape
     }
 
     /**
+     * $found unchanged: an alias prints as $this->name alone -- never as $target -- so a `fn<...>` binder inside
+     * $target never surfaces in the text an enclosing binder could shadow, and there is nothing here for
+     * {@see Signature::over()} to reject a derived binder against. Unlike {@see self::collectVariables()}, which has to
+     * see through $target to answer for the variables it reaches, this stops at the name.
+     *
+     * @param array<string, true> $found
+     * @return array<string, true>
+     */
+    #[Override]
+    public function collectBinderNames(array $found): array
+    {
+        return $found;
+    }
+
+    /**
      * $this->name, and nothing else: an alias is a name for one complete type, printed as that name alone -- see this
      * class's own docblock -- never as a name applied to arguments, since {@see Type::alias()} never lets $this->name
      * carry any of its own.

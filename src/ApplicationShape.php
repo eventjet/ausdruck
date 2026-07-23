@@ -40,6 +40,19 @@ final class ApplicationShape implements TypeShape
         return $found;
     }
 
+    /**
+     * @param array<string, true> $found
+     * @return array<string, true>
+     */
+    #[Override]
+    public function collectBinderNames(array $found): array
+    {
+        foreach ($this->args as $arg) {
+            $found = $arg->collectBinderNames($found);
+        }
+        return $found;
+    }
+
     #[Override]
     public function toString(): string
     {

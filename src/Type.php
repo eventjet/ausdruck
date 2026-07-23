@@ -470,6 +470,25 @@ final class Type implements Stringable
     }
 
     /**
+     * Every name a `fn<...>` binder declares anywhere this type reaches, folded into $found -- delegated to
+     * {@see TypeShape::collectBinderNames()}. The counterpart to {@see self::collectVariables()} that
+     * {@see Signature::over()} needs: a derived binder may not reuse a name a nested signature already declares, since
+     * the inner one would then shadow the outer variable. Unlike {@see self::collectVariables()}, this sees through a
+     * nested signature's own binder rather than stopping at it, and stops at an alias's name rather than seeing
+     * through it -- see the two shapes for why.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     *
+     * @param array<string, true> $found
+     * @return array<string, true>
+     */
+    public function collectBinderNames(array $found): array
+    {
+        return $this->shape->collectBinderNames($found);
+    }
+
+    /**
      * Whether $this reaches a {@see self::var()} with no enclosing binder to capture it -- true for a bare variable
      * used on its own, for a function type built through {@see self::func()} that nothing has quantified, and for
      * either one reached through a list, an `Option`, a struct field, or an alias, since {@see self::collectVariables()}

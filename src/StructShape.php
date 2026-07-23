@@ -39,6 +39,19 @@ final class StructShape implements TypeShape
         return $found;
     }
 
+    /**
+     * @param array<string, true> $found
+     * @return array<string, true>
+     */
+    #[Override]
+    public function collectBinderNames(array $found): array
+    {
+        foreach ($this->fields as $field) {
+            $found = $field->collectBinderNames($found);
+        }
+        return $found;
+    }
+
     #[Override]
     public function toString(): string
     {

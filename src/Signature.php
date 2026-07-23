@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use InvalidArgumentException;
 use Override;
 use Stringable;
 
@@ -11,6 +12,7 @@ use function array_keys;
 use function array_map;
 use function array_slice;
 use function count;
+use function sprintf;
 
 /**
  * A function type read as what it's for: a return type, a receiver, and the arguments a call passes in parentheses --
@@ -97,14 +99,40 @@ final class Signature implements Stringable, TypeShape
      * there, and {@see BuiltinFunctions::signature()} has nothing else to give a built-in's own top-level signature
      * in the first place.
      *
+     * A derived name may not be one a `fn<...>` binder nested inside $returnType or $parameters already declares:
+     * that binder is enclosed by the one derived here, so the shared name would shadow it, and shadowing an enclosing
+     * variable is not allowed -- the same rule {@see Parser\TypeResolution::checkTypeVariable()} enforces for a
+     * written binder, applied here to a derived one. A nested signature is opaque, so its own name never reaches
+     * {@see self::freeVariables()} on its own; this asks {@see Type::collectBinderNames()} the separate question of
+     * which names it does declare, and rejects a collision rather than print a signature that could never be read
+     * back -- see {@see Type::__toString()} and this project's `parse(str($type)) === $type` invariant.
+     *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
      *
      * @param list<Type> $parameters
+     * @throws InvalidArgumentException if a derived binder name shadows one a nested signature already declares.
      */
     public static function over(Type $returnType, array $parameters): self
     {
-        return new self($returnType, $parameters, self::freeVariables($returnType, $parameters));
+        $binder = self::freeVariables($returnType, $parameters);
+        $nestedBinderNames = $returnType->collectBinderNames([]);
+        foreach ($parameters as $parameter) {
+            $nestedBinderNames = $parameter->collectBinderNames($nestedBinderNames);
+        }
+        foreach ($binder as $name) {
+            if (!isset($nestedBinderNames[$name])) {
+                continue;
+            }
+            throw new InvalidArgumentException(sprintf(
+                'The binder derived for %s would introduce %s, which a nested function type already declares -- the '
+                    . 'inner one would shadow the outer variable, so the type could never be read back the way it '
+                    . 'prints',
+                (string)new self($returnType, $parameters, $binder),
+                $name,
+            ));
+        }
+        return new self($returnType, $parameters, $binder);
     }
 
     /**
@@ -249,6 +277,27 @@ final class Signature implements Stringable, TypeShape
             $found = $parameter->collectVariables($found);
         }
         return $this->returnType->collectVariables($found);
+    }
+
+    /**
+     * This signature's own binder names, then every binder name reachable below it -- the opposite of
+     * {@see self::collectVariables()}, which stops at a signature that owns its binder. Here that binder's names are
+     * exactly what has to be added, and the walk continues into the parameters and return type regardless, since a
+     * binder further out encloses every one of them and {@see self::over()} may not derive a name any of them uses.
+     *
+     * @param array<string, true> $found
+     * @return array<string, true>
+     */
+    #[Override]
+    public function collectBinderNames(array $found): array
+    {
+        foreach ($this->binder as $name) {
+            $found[$name] = true;
+        }
+        foreach ($this->parameters as $parameter) {
+            $found = $parameter->collectBinderNames($found);
+        }
+        return $this->returnType->collectBinderNames($found);
     }
 
     /**

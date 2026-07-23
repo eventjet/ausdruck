@@ -34,6 +34,18 @@ final class VariableShape implements TypeShape
     }
 
     /**
+     * A variable is a placeholder, not a binder, so it declares no name of its own -- $found is handed back unchanged.
+     *
+     * @param array<string, true> $found
+     * @return array<string, true>
+     */
+    #[Override]
+    public function collectBinderNames(array $found): array
+    {
+        return $found;
+    }
+
+    /**
      * $this->name, and nothing else: a variable is a placeholder with no arguments of its own to print -- see
      * {@see Type::var()}.
      */

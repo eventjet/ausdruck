@@ -37,6 +37,19 @@ interface TypeShape
     public function collectVariables(array $found): array;
 
     /**
+     * Every name a `fn<...>` binder declares anywhere this shape reaches, folded into $found -- see
+     * {@see Type::collectBinderNames()}. Unlike {@see self::collectVariables()}, this doesn't stop at a nested
+     * signature that owns its binder: it adds that binder's own names and keeps descending, since a binder further out
+     * encloses them all and may not reuse any of their names -- see {@see Signature::over()}. An {@see AliasShape} is
+     * the one shape that doesn't recurse: an alias prints as its name alone, so a binder inside its target never
+     * surfaces in the text an enclosing binder would shadow.
+     *
+     * @param array<string, true> $found
+     * @return array<string, true>
+     */
+    public function collectBinderNames(array $found): array;
+
+    /**
      * This shape's own syntax, in the grammar {@see TypeSyntax} spells -- see {@see Type::__toString()}.
      */
     public function toString(): string;

@@ -316,30 +316,58 @@ final class TypeTest extends TestCase
     }
 
     /**
-     * {@see Signature::bind()}'s own-binder guard is the call-site-inference counterpart to
-     * {@see self::testQuantifiedDoesNotBorrowABinderFromAFixedParameterThatIsAlreadyGeneric()}'s
-     * {@see Signature::collectVariables()} guard: a fixed parameter that is itself an already-quantified generic
-     * function type reaches no variable of the enclosing signature's own scope -- not even one that happens to share
-     * a name with a variable Mapper's own binder captures, since `U` here names two different variables, Mapper's
-     * own and this signature's own, and only the latter may be decided by matching a call's arguments against it.
-     *
-     * Built through {@see Signature::quantified()} and {@see Signature::toType()} directly, rather than through
-     * {@see Type::alias()}: this is a test of {@see Signature::bind()}'s own guard, so the
-     * parameter is given to it as the generic function type it already is, without an alias's name in front of it
-     * that this test has no reason to ask about.
+     * The builder-door counterpart to generics/type-variable/reusing-an-enclosing-binders-name, which rejects the
+     * same shadowing in a written `fn<...>`: an enclosing signature may not derive for itself a binder name that a
+     * nested, already-quantified generic function type inside it already declares. Here the derived outer binder
+     * would be `U` -- the second parameter and the return type are a bare `U` nothing above them binds -- while the
+     * first parameter, `fn<U>(U) -> U`, is a self-contained signature that binds its own `U`
+     * ({@see Signature::hasOwnBinder()}). Printed, the two would collide as `fn<U>(fn<U>(U) -> U, U) -> U`, which the
+     * parser rejects as a redeclared variable, so {@see Signature::over()} rejects deriving it in the first place
+     * rather than mint a value that violates the `parse(str($type)) === $type` invariant. A distinct name for either
+     * side has no such conflict -- see {@see self::testBindKeepsEarlierBindingsWhenALaterParameterIsAlreadyGeneric()},
+     * whose enclosing binder is `A`, `B`.
      */
-    public function testBindDoesNotReachIntoAFixedParameterThatIsAlreadyGeneric(): void
+    public function testADerivedBinderThatWouldShadowANestedGenericSignatureIsRejected(): void
     {
         $mapperSignature = Signature::quantified(Type::func(Type::var('U'), [Type::var('U')]));
         self::assertNotNull($mapperSignature);
         $mapper = $mapperSignature->toType();
 
-        $outer = Signature::quantified(Type::func(Type::var('U'), [$mapper, Type::var('U')]));
-        self::assertNotNull($outer);
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'The binder derived for fn<U>(fn<U>(U) -> U, U) -> U would introduce U, which a nested function type '
+                . 'already declares -- the inner one would shadow the outer variable, so the type could never be read '
+                . 'back the way it prints',
+        );
 
-        $instantiated = $outer->instantiateForCall(Type::func(Type::string(), [Type::string()]), [Type::int()]);
+        Signature::quantified(Type::func(Type::var('U'), [$mapper, Type::var('U')]));
+    }
 
-        self::assertSame('int', (string)$instantiated->returnType);
+    /**
+     * The shadowing check {@see self::testADerivedBinderThatWouldShadowANestedGenericSignatureIsRejected()} pins holds
+     * however deep, and through whatever kind of type, the colliding binder name is buried:
+     * {@see Signature::over()} gathers every name a nested `fn<...>` declares -- via {@see Type::collectBinderNames()}
+     * across each shape -- before comparing them against the binder it derives, and here the collision is on `U`,
+     * which is found only after `T` is already gathered and then carried, untouched, through a plain variable, a
+     * `list<...>`, a struct field, and an alias in turn. If any of those shapes dropped a name it was merely passing
+     * along, or the check stopped at the first binder name that happened not to collide (`A` here, derived before
+     * `U`), the `U` collision would go unseen and the signature would be built rather than rejected.
+     */
+    public function testADerivedBinderShadowingANestedSignatureIsRejectedWhateverElseTheBodyThreadsThrough(): void
+    {
+        $bindsT = Signature::quantified(Type::func(Type::var('T'), [Type::var('T')]))?->toType();
+        $bindsU = Signature::quantified(Type::func(Type::var('U'), [Type::var('U')]))?->toType();
+        self::assertInstanceOf(Type::class, $bindsT);
+        self::assertInstanceOf(Type::class, $bindsU);
+        $mapper = Type::alias('Mapper', Type::func(Type::var('W'), [Type::var('W')]));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/would introduce U, which a nested function type already declares/');
+
+        Signature::quantified(Type::func(
+            Type::var('U'),
+            [$bindsT, $bindsU, Type::var('A'), Type::listOf(Type::int()), Type::struct(['x' => Type::int()]), $mapper],
+        ));
     }
 
     /**
