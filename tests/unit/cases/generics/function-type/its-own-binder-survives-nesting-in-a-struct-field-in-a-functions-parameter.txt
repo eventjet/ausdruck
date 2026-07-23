@@ -1,0 +1,6 @@
+foo:fn({ a: fn<T>(T) -> T }) -> int
+-- Expression type --
+fn({ a: fn<T>(T) -> T }) -> int
+-- Note --
+Same rule as the list case next to this one: a struct field nested inside an enclosing function type's own parameter
+still keeps the fn<T> written there its own binder.

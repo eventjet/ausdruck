@@ -1,0 +1,7 @@
+foo:fn(int) -> list<fn<T>(T) -> T>
+-- Expression type --
+fn(int) -> list<fn<T>(T) -> T>
+-- Note --
+The rule isn't specific to parameters: a function type's return type is nested the same way a parameter is, so a
+fn<T> reached through a list there keeps its own binder too, the same as
+its-own-binder-survives-nesting-in-a-list-in-a-functions-parameter does for a parameter.

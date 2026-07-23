@@ -1,0 +1,5 @@
+foo:fn<T>(map<T, int>) -> T
+-- Type error --
+Invalid type "map<T, int>": map expects the key type to be int or string, got T
+-- Note --
+A map key is an int or a string, whatever else a signature is free to leave open.

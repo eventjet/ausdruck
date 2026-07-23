@@ -6,7 +6,6 @@ namespace Eventjet\Ausdruck\Test\Unit;
 
 use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
-use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -16,6 +15,8 @@ use function sprintf;
 
 final class TypeCompatibilityTest extends TestCase
 {
+    use ParsesTypeSyntax;
+
     /**
      * @return iterable<string, array{string, string}>
      */
@@ -104,6 +105,10 @@ final class TypeCompatibilityTest extends TestCase
             // Lists
             ['list<string>', 'list<int>'],
             ['list<any>', 'list<string>'],
+
+            // A struct is not a subtype of a type that isn't a struct at all
+            ['{ name: string }', 'int'],
+            ['{ name: string }', 'string'],
         ];
         foreach ($cases as $case) {
             yield sprintf('%s is not a subtype of %s', ...$case) => $case;
@@ -112,11 +117,7 @@ final class TypeCompatibilityTest extends TestCase
 
     private static function fromString(string $str, Types|null $types = null): Type
     {
-        /**
-         * @psalm-suppress InternalClass
-         * @psalm-suppress InternalMethod
-         */
-        $node = TypeParser::parseString($str);
+        $node = self::parseTypeString($str);
         if ($node instanceof SyntaxError) {
             throw $node;
         }

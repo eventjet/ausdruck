@@ -1,0 +1,3 @@
+foo:fn<T>(fn(T) -> bool) -> T
+-- Expression type --
+fn<T>(fn(T) -> bool) -> T

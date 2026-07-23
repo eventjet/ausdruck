@@ -1,0 +1,3 @@
+foo:fn<T>({value: T}) -> T
+-- Expression type --
+fn<T>({ value: T }) -> T

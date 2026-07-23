@@ -6,8 +6,11 @@ namespace Eventjet\Ausdruck\Test\Unit\Parser;
 
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeNode;
-use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
+use Eventjet\Ausdruck\Signature;
+use Eventjet\Ausdruck\Test\Unit\ParsesTypeSyntax;
+use Eventjet\Ausdruck\Type;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -15,6 +18,8 @@ use function assert;
 
 final class TypesTest extends TestCase
 {
+    use ParsesTypeSyntax;
+
     /**
      * @return iterable<string, array{string, string}>
      */
@@ -22,20 +27,55 @@ final class TypesTest extends TestCase
     {
         yield 'Unknown function return type' => ['fn() -> Nope', 'Unknown type Nope'];
         yield 'Unknown function parameter' => ['fn(Nope) -> string', 'Unknown type Nope'];
+        // Nope isn't a registered alias, so it's unknown regardless of the arguments written after it -- not the
+        // "does not accept arguments" arity error a real alias's own name gets for the same written syntax, see
+        // ExpressionParserErrorTest's own "generic syntax on an alias" case.
+        yield 'Unknown type with type arguments' => ['Nope<string>', 'Unknown type Nope'];
     }
 
     #[DataProvider('resolveTypeErrorsCases')]
     public function testResolveTypeErrors(string $type, string $expectedMessage): void
     {
-        /**
-         * @psalm-suppress InternalClass
-         * @psalm-suppress InternalMethod
-         */
-        $node = TypeParser::parseString($type);
+        $node = self::parseTypeString($type);
         assert($node instanceof TypeNode);
         $error = (new Types())->resolve($node);
 
         self::assertInstanceOf(TypeError::class, $error);
         self::assertSame($expectedMessage, $error->getMessage());
+    }
+
+    /**
+     * {@see Type::func()} never claims a binder of its own, so an alias's own target -- built the same way any
+     * other function type is -- is quantified by {@see Type::alias()} itself, the way {@see Types::__construct()}
+     * pre-wraps every entry through it: a bare, unquantified `fn(T) -> bool` reaching a variable nothing else
+     * captures is accepted here instead of being rejected, the way anything that isn't a function type still is.
+     */
+    public function testAnAliasedFunctionTypeIsQuantified(): void
+    {
+        $types = new Types(['Mapper' => Type::func(Type::bool(), [Type::var('T')])]);
+
+        $node = self::parseTypeString('Mapper');
+        assert($node instanceof TypeNode);
+        $resolved = $types->resolve($node);
+
+        self::assertNotInstanceOf(TypeError::class, $resolved);
+        self::assertSame(['T'], $resolved->asFunction()?->binder());
+    }
+
+    /**
+     * The same free-variable check {@see Type::alias()} runs for anything that isn't a function type: aliasing
+     * doesn't quantify a list, so a variable reaching through one is still nothing captures it -- caught here, when
+     * the alias is registered, rather than crashing deep inside {@see Signature::quantified()} once a reference to
+     * it is resolved.
+     */
+    public function testAnAliasOfANonFunctionTypeReachingAFreeVariableIsRejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'Numbers is declared as list<T>, which reaches a type variable nothing captures -- aliasing only '
+                . 'derives a binder for a function type, and this isn\'t one',
+        );
+
+        new Types(['Numbers' => Type::listOf(Type::var('T'))]);
     }
 }

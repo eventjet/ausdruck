@@ -1,0 +1,8 @@
+foo:fn<never>(never) -> never
+-- Expression type --
+fn<never>(never) -> never
+-- Note --
+never isn't reserved: it's the type Type::fromValue() infers for an empty list or map, but nothing ever writes it as
+a type -- there is no syntax for it at all -- so a variable named never can't collide with it in written source, and
+Type itself tells the two apart by a field of its own rather than by name. A variable can be named never like any
+other name the language doesn't spell.

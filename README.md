@@ -197,6 +197,7 @@ The following types are supported:
 - `float`: Floating point number
 - `list<T>`: List of type T
 - `map<K, V>`: Map with key type K and value type V
+- `fn(A, B) -> R`: Function taking an A and a B and returning an R
 - Any other type will be treated as an alias that you will have to provide when parsing the expression:
   ```php
   use Eventjet\Ausdruck\Parser\ExpressionParser;
@@ -215,22 +216,92 @@ The target can be any expression. It will be passed as the first argument to the
 
 `haystack:list<string>.contains:bool(needle:string)`
 
+#### Generic Signatures
+
+A signature can leave a type open instead of naming it, by binding a type variable in front of the parameter list:
+
+```
+fn<T, U>(list<T>, fn(T) -> U) -> list<U>
+```
+
+That is the signature of `map`. `T` and `U` are not types; they are decided per call, from the types of the target and
+the arguments. So `numbers:list<int>.map(|n| n:int > 2)` is a `list<bool>` while `names:list<string>.map(|n| n:string)`
+is a `list<string>` — the same function, two return types, neither of them written down.
+
+A binder is the whole of a variable's scope, so a variable is a type anywhere below the `fn` that binds it, and a name
+no binder declares is not a variable: it is an alias, or an error. That's enforced for a signature written as a type
+string, where only a `fn<...>` binder can introduce a name that resolves to a variable. The binder itself is checked
+against, not just declared: it has to be exactly the variables that turn out to be used in the parameters and the
+return type, so a written `fn<T, U>(int) -> int` where neither `T` nor `U` appears anywhere is rejected -- a name in
+the binder has to earn its place.
+
+In PHP, a type variable is `Type::var()`, and a function type is always `Type::func()`, whichever position it ends up
+in -- the outermost signature of a declaration, an alias target, or a fixed parameter nested inside another one's own
+parameters or return type, like a lambda parameter the way `map`'s own is, or a generic callback taken by a custom
+function. `Type::func()` itself never commits to a binder: declaring a function (`Declarations`) or aliasing one
+(`Type::alias()`) is what quantifies it, deriving its binder from wherever `Type::var()` turns out to be used in the
+return type and the parameters -- the same rule a written `fn<...>` binder is checked against. A function type nested
+inside another one built with `Type::func()` and no binder of its own shares its variables with whichever declaration
+or alias goes on to quantify them, rather than claiming any of its own. Nothing stops a nested function type from
+being a self-contained, rank-1-polymorphic value instead -- one already quantified by its own `fn<...>` binder, the
+same way a written type string nests one -- and a signature like that is opaque to whatever encloses it: the outer
+one can pass it around, store it in a list or an `Option`, or return it, but never reach through it for a variable of
+its own. A nested binder may not reuse a name a binder further out already declares, though: the inner variable would
+shadow the outer one, and shadowing is not allowed -- `fn<T>(fn<T>(T) -> T) -> T` is rejected, `fn<T>(fn<U>(U) -> U) -> T`
+is fine. That holds whichever door builds the binder: a written `fn<...>` is rejected as it's parsed, and a binder
+derived by `Declarations`, `Type::alias()`, or `Signature::quantified()` is rejected as it's derived, rather than
+minting a value that would print as text the parser reads back as a redeclared variable.
+
+Until it's quantified, a value built with `Type::func()` is open: printing it before declaring or aliasing it prints a
+variable's bare name, or a `fn<...>` missing the binder that would make it valid syntax again. `Signature::quantified($t)->toType()`
+promotes one directly, the same way `Declarations` and `Type::alias()` do, for the rarer case where neither fits.
+
+Because the call site decides them, the inline return type is rarely worth writing: `foo:list<string>.head()` is
+already an `Option<string>`. Writing one anyway is still allowed, and is then checked against the inferred one.
+
+```php
+use Eventjet\Ausdruck\Parser\Declarations;
+use Eventjet\Ausdruck\Type;
+
+// zip: fn<T, U>(list<T>, list<U>) -> list<{ a: T, b: U }>
+$zip = Type::func(
+    Type::listOf(Type::struct(['a' => Type::var('T'), 'b' => Type::var('U')])),
+    [Type::listOf(Type::var('T')), Type::listOf(Type::var('U'))],
+);
+$declarations = new Declarations(functions: ['zip' => $zip]);
+```
+
+A generic higher-order function -- one that itself takes a generic function as a parameter, the way `map` does --
+nests a `Type::var()` from the outer signature inside a `Type::func()` for the inner one, built exactly the same way
+as the outer one:
+
+```php
+// myMap: fn<T, U>(list<T>, fn(T) -> U) -> list<U>
+$myMap = Type::func(
+    Type::listOf(Type::var('U')),
+    [Type::listOf(Type::var('T')), Type::func(Type::var('U'), [Type::var('T')])],
+);
+$declarations = new Declarations(functions: ['myMap' => $myMap]);
+```
+
 #### Built-In Functions
 
-| Function   | Description                                                            | Example                                          |
-|------------|------------------------------------------------------------------------|--------------------------------------------------|
-| `count`    | Returns the number of elements in a list                               | `foo:list<string>.count:int()`                   |
-| `contains` | Returns whether a list contains a value                                | `foo:list<string>.contains:bool("bar")`          |
-| `filter`   | Returns a new list of the elements matching a [predicate](#lambdas)    | `foo:list<int>.filter:list<int>(\|i\| i:int > 2)`|
-| `head`     | Returns the first element of a list as an `Option`                     | `foo:list<string>.head:Option<string>()`         |
-| `isSome`   | Takes an Option and returns whether it is `Some`                       | `foo:Option<int>.isSome:bool()`                  |
-| `map`      | Returns a new list with the results of applying a [function](#lambdas) | `foo:list<int>.map:list<int>(\|i\| i:int - 2)`   |
-| `some`     | Returns whether any element matches a [predicate](#lambdas)            | `foo:list<int>.some:bool(\|item\| item:int > 5)` |
-| `substr`   | Returns a substring of a string                                        | `foo:string.substr:string(0, 5)`                 |
-| `tail`     | Returns all elements of a list except the first                        | `foo:list<string>.tail:list<string>()`           |
-| `take`     | Returns the first n elements of a list                                 | `foo:list<string>.take:list<string>(5)`          |
-| `unique`   | Returns a list with duplicate elements removed                         | `foo:list<string>.unique:list<string>()`         |
-| `unwrap`   | Returns the value contained in an `Option`                             | `foo:Option<int>.unwrap:int()`                   |
+| Function   | Signature                                  | Description                                                            | Example                                   |
+|------------|--------------------------------------------|------------------------------------------------------------------------|-------------------------------------------|
+| `count`    | `fn(list<any>) -> int`                     | Returns the number of elements in a list                               | `foo:list<string>.count()`                |
+| `contains` | `fn<T>(list<T>, T) -> bool`                | Returns whether a list contains a value                                | `foo:list<string>.contains("bar")`        |
+| `filter`   | `fn<T>(list<T>, fn(T) -> bool) -> list<T>` | Returns a new list of the elements matching a [predicate](#lambdas)    | `foo:list<int>.filter(\|i\| i:int > 2)`   |
+| `head`     | `fn<T>(list<T>) -> Option<T>`              | Returns the first element of a list as an `Option`                     | `foo:list<string>.head()`                 |
+| `isSome`   | `fn(Option<any>) -> bool`                  | Takes an Option and returns whether it is `Some`                       | `foo:Option<int>.isSome()`                |
+| `map`      | `fn<T, U>(list<T>, fn(T) -> U) -> list<U>` | Returns a new list with the results of applying a [function](#lambdas) | `foo:list<int>.map(\|i\| i:int - 2)`      |
+| `some`     | `fn<T>(list<T>, fn(T) -> bool) -> bool`    | Returns whether any element matches a [predicate](#lambdas)            | `foo:list<int>.some(\|item\| item:int > 5)`|
+| `substr`   | `fn(string, int, int) -> string`           | Returns a substring of a string                                        | `foo:string.substr(0, 5)`                 |
+| `tail`     | `fn<T>(list<T>) -> list<T>`                | Returns all elements of a list except the first                        | `foo:list<string>.tail()`                 |
+| `take`     | `fn<T>(list<T>, int) -> list<T>`           | Returns the first n elements of a list                                 | `foo:list<string>.take(5)`                |
+| `unique`   | `fn<T>(list<T>) -> list<T>`                | Returns a list with duplicate elements removed                         | `foo:list<string>.unique()`               |
+| `unwrap`   | `fn<T>(Option<T>) -> T`                    | Returns the value contained in an `Option`                             | `foo:Option<int>.unwrap()`                |
+
+The signatures are the ones the parser checks calls against; the target is the first parameter.
 
 #### Custom Functions
 

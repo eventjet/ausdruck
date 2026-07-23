@@ -10,6 +10,7 @@ use Eventjet\Ausdruck\Parser\TypeAnnotation;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeHint;
 
+use function array_map;
 use function count;
 use function sprintf;
 
@@ -83,11 +84,14 @@ final class Expr
      * @param TypeAnnotation|null $returnType The return type the call site spells out, or null if it doesn't spell one
      *     out. What the call evaluates to is resolved from this and the declaration; see {@see self::returnType()}.
      * @param list<Expression> $arguments
-     * @param Type|null $signature The declared type of the function, or null if it has no declaration. Only a
+     * @param Signature|null $signature The function's declared signature, or null if it has no declaration. Only a
      *     declaration says which receiver and arguments a function accepts, so a call to an undeclared function has
      *     nothing to check its operands against. That's the case for functions that are used with nothing but an
      *     inline return type, and for every call built through {@see Expression::call()}, which has no declarations to
-     *     consult.
+     *     consult. {@see Parser\Declarations::$functions} is never anything but a function's signature, so there is no
+     *     second, non-function shape here to fail null-safely into "undeclared" against. A declaration may be
+     *     generic, in which case it says what this call accepts only once {@see Signature::instantiateForCall()} has
+     *     resolved its type variables against the types at hand.
      * @param Span|null $nameLocation Where the function is named, which is what an error about the function itself
      *     rather than about one of its operands points at.
      */
@@ -96,15 +100,19 @@ final class Expr
         string $name,
         TypeAnnotation|null $returnType,
         array $arguments,
-        Type|null $signature,
+        Signature|null $signature,
         Span|null $nameLocation = null,
         Span|null $location = null,
     ): Call {
         $location ??= self::dummySpan();
-        $type = self::returnType($name, $returnType, $signature, $nameLocation ?? self::dummySpan());
-        if ($signature !== null) {
-            self::checkReceiver($target, $name, $signature);
-            self::checkArguments($arguments, $name, $signature, $location);
+        $instantiated = $signature?->instantiateForCall(
+            $target->getType(),
+            array_map(static fn(Expression $argument): Type => $argument->getType(), $arguments),
+        );
+        $type = self::returnType($name, $returnType, $instantiated, $nameLocation ?? self::dummySpan());
+        if ($instantiated !== null) {
+            self::checkReceiver($target, $name, $instantiated);
+            self::checkArguments($arguments, $name, $instantiated, $location);
         }
         return new Call($target, $name, $type, $arguments, $location);
     }
@@ -368,22 +376,22 @@ final class Expr
     private static function returnType(
         string $name,
         TypeAnnotation|null $annotation,
-        Type|null $signature,
+        Signature|null $signature,
         Span $nameLocation,
     ): Type {
         if ($annotation === null) {
-            return $signature?->returnType() ?? throw TypeError::create(
+            return $signature !== null ? $signature->returnType : throw TypeError::create(
                 sprintf('Function %s is not declared and has no inline type', $name),
                 $nameLocation,
             );
         }
-        if ($signature !== null && !$annotation->type->isSubtypeOf($signature->returnType())) {
+        if ($signature !== null && !$annotation->type->isSubtypeOf($signature->returnType)) {
             throw TypeError::create(
                 sprintf(
                     'Inline return type %s of function %s does not match declared return type %s',
                     $annotation->type,
                     $name,
-                    $signature->returnType(),
+                    $signature->returnType,
                 ),
                 $annotation->location,
             );
@@ -393,9 +401,9 @@ final class Expr
 
     /**
      * A receiver function takes the expression it's called on as its first argument: `substr` is declared as
-     * func(string, [string, int, int]) and called as `foo:string.substr:string(0, 3)`, so `foo` has to be a string.
+     * `fn(string, int, int) -> string` and called as `foo:string.substr:string(0, 3)`, so `foo` has to be a string.
      */
-    private static function checkReceiver(Expression $target, string $name, Type $signature): void
+    private static function checkReceiver(Expression $target, string $name, Signature $signature): void
     {
         $receiverType = $signature->receiverType();
         if ($receiverType === null) {
@@ -424,7 +432,7 @@ final class Expr
      * @param Span $location The location of the whole call, which is the best we can do to point at an argument that
      *     isn't there.
      */
-    private static function checkArguments(array $arguments, string $name, Type $signature, Span $location): void
+    private static function checkArguments(array $arguments, string $name, Signature $signature, Span $location): void
     {
         $argumentTypes = $signature->argumentTypes();
         if (count($arguments) !== count($argumentTypes)) {

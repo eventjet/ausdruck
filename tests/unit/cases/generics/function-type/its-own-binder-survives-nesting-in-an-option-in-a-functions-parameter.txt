@@ -1,0 +1,5 @@
+foo:fn(Option<fn<T>(T) -> T>) -> int
+-- Expression type --
+fn(Option<fn<T>(T) -> T>) -> int
+-- Note --
+Same rule as the list and struct field cases next to this one, for Option.

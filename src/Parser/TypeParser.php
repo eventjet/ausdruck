@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
-use function array_merge;
+use Eventjet\Ausdruck\TypeConstructor;
+
 use function assert;
 use function is_string;
 use function sprintf;
@@ -103,7 +104,7 @@ final class TypeParser
             return self::parseFunction($tokens, $parsedToken->location());
         }
         if ($tokens->peek()?->token !== Token::OpenAngle) {
-            return new TypeNode($name, [], $parsedToken->location());
+            return new ApplicationTypeNode($name, [], $parsedToken->location());
         }
         // Only a name with a declared arity of its own can commit to reading a type argument list. A name that isn't a
         // built-in constructor has none, and neither has one that is never written `name<...>` in the first place —
@@ -121,11 +122,11 @@ final class TypeParser
             // (`int<string>`) is read as a type on purpose, so the resolver can reject it by name.
             $args = self::tryTypeArguments($tokens);
             if ($args === null) {
-                return new TypeNode($name, [], $parsedToken->location());
+                return new ApplicationTypeNode($name, [], $parsedToken->location());
             }
         }
         $closeAngle = self::expect($tokens, Token::CloseAngle);
-        return new TypeNode($name, $args, $parsedToken->location()->to($closeAngle->location()));
+        return new ApplicationTypeNode($name, $args, $parsedToken->location()->to($closeAngle->location()));
     }
 
     /**
@@ -184,10 +185,10 @@ final class TypeParser
     {
         $actual = $tokens->peek();
         if ($actual === null) {
-            $previousToken = $tokens->previous();
-            assert($previousToken !== null);
-            $span = Span::char($previousToken->line, $previousToken->column + 1);
-            throw SyntaxError::create(sprintf('Expected %s, got end of input', Token::print($expected)), $span);
+            throw SyntaxError::create(
+                sprintf('Expected %s, got end of input', Token::print($expected)),
+                self::endOfInput($tokens),
+            );
         }
         if ($actual->token === $expected) {
             $tokens->next();
@@ -204,6 +205,7 @@ final class TypeParser
      */
     private static function parseFunction(Peekable $tokens, Span $fnLocation): TypeNode
     {
+        $typeParameters = self::parseTypeParameters($tokens);
         self::expect($tokens, Token::OpenParen);
         $params = self::parseTypeList($tokens);
         self::expect($tokens, Token::CloseParen);
@@ -218,7 +220,65 @@ final class TypeParser
                 $returnType->location(),
             );
         }
-        return new TypeNode('fn', array_merge($params, [$returnType]), $fnLocation->to($returnType->location));
+        return new FunctionTypeNode($params, $returnType, $typeParameters, $fnLocation->to($returnType->location));
+    }
+
+    /**
+     * fn<T, U>(list<T>, fn(T) -> U) -> list<U>
+     *   ======
+     *
+     * The names a generic function's signature writes where the call site decides the type. Unlike the `<` after any
+     * other name, this one can only be a binder—`fn` is never an operand—so it commits, and a name is expected after
+     * it rather than a type. Nothing here says what a name may be: a name that a type constructor already spells is
+     * rejected by {@see TypeResolution::checkTypeVariable()}, which is where the rest of what a type variable means
+     * lives too.
+     *
+     * @param Peekable<ParsedToken> $tokens
+     * @return list<Identifier>
+     */
+    private static function parseTypeParameters(Peekable $tokens): array
+    {
+        if ($tokens->peek()?->token !== Token::OpenAngle) {
+            return [];
+        }
+        $tokens->next();
+        $parameters = [];
+        while (true) {
+            $parsedToken = $tokens->peek();
+            if ($parsedToken === null) {
+                throw SyntaxError::create(
+                    'Expected type variable name, got end of input',
+                    self::endOfInput($tokens),
+                );
+            }
+            $name = $parsedToken->token;
+            if (!is_string($name)) {
+                throw SyntaxError::create(
+                    sprintf('Expected type variable name, got %s', Token::print($name)),
+                    $parsedToken->location(),
+                );
+            }
+            $tokens->next();
+            $parameters[] = new Identifier($name, $parsedToken->location());
+            if ($tokens->peek()?->token !== Token::Comma) {
+                break;
+            }
+            $tokens->next();
+        }
+        self::expect($tokens, Token::CloseAngle);
+        return $parameters;
+    }
+
+    /**
+     * One column past the last token there was, which is where the token that isn't there would have started.
+     *
+     * @param Peekable<ParsedToken> $tokens
+     */
+    private static function endOfInput(Peekable $tokens): Span
+    {
+        $previousToken = $tokens->previous();
+        assert($previousToken !== null);
+        return Span::char($previousToken->line, $previousToken->column + 1);
     }
 
     /**
@@ -258,7 +318,7 @@ final class TypeParser
                     $type->location(),
                 );
             }
-            $fields[] = TypeNode::keyValue(new TypeNode($name, [], $nameToken->location()), $type);
+            $fields[] = new FieldTypeNode(new Identifier($name, $nameToken->location()), $type);
             $token = $tokens->peek();
             if ($token?->token !== Token::Comma) {
                 break;
@@ -266,6 +326,6 @@ final class TypeParser
             $tokens->next();
         }
         $end = self::expect($tokens, Token::CloseBrace)->location();
-        return TypeNode::struct($fields, $start->to($end));
+        return new StructTypeNode($fields, $start->to($end));
     }
 }

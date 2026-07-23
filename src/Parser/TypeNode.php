@@ -4,51 +4,35 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Eventjet\Ausdruck\Type;
 use Override;
 use Stringable;
 
-use function implode;
-use function sprintf;
-
 /**
+ * A resolvable unit of parsed type syntax, told apart by which of its three subclasses it actually is: a name
+ * applied to arguments ({@see ApplicationTypeNode}), a function type ({@see FunctionTypeNode}), or a struct type
+ * ({@see StructTypeNode}). Carries only what's common to all three: the span it was written at, how to print it
+ * back, and how to resolve it, which is why this doesn't also declare a $name or an $args a subclass would
+ * otherwise have to invent to fill.
+ *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class TypeNode implements Stringable
+abstract class TypeNode implements Stringable
 {
-    /**
-     * @param list<self> $args
-     * @param Delimiters | 'kv' $delimiters
-     */
     public function __construct(
-        public readonly string $name,
-        public readonly array $args,
         public readonly Span $location,
-        public readonly Delimiters|string $delimiters = Delimiters::AngleBrackets,
     ) {
     }
 
-    /**
-     * @param list<self> $fields
-     */
-    public static function struct(array $fields, Span $location): self
-    {
-        return new self('', $fields, $location, Delimiters::CurlyBraces);
-    }
-
-    public static function keyValue(self $key, self $value): self
-    {
-        return new self('', [$key, $value], $key->location->to($value->location), 'kv');
-    }
-
     #[Override]
-    public function __toString(): string
-    {
-        if ($this->delimiters === 'kv') {
-            return sprintf('%s: %s', $this->args[0], $this->args[1]);
-        }
-        return $this->args === []
-            ? $this->name
-            : sprintf('%s%s%s%s', $this->name, $this->delimiters->start(), implode(', ', $this->args), $this->delimiters->end());
-    }
+    abstract public function __toString(): string;
+
+    /**
+     * Resolves $this against $resolution -- see {@see TypeResolution::resolve()}, which does nothing but call back
+     * here: one method per subclass, rather than an `instanceof` chain on {@see TypeResolution} repeated for every
+     * shape of node, so a fourth subclass has to implement this to exist at all, which the compiler enforces, rather
+     * than compiling fine and only failing at runtime.
+     */
+    abstract public function resolveWith(TypeResolution $resolution): Type|TypeError;
 }

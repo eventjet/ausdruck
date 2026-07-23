@@ -1,0 +1,8 @@
+n:int.tag()
+-- Functions --
+tag: fn<T>(int) -> T
+-- Expression type --
+any
+-- Note --
+Nothing on this call mentions T, so nothing decides it. A variable no operand reaches stands for anything rather than
+for nothing, so the call is typed rather than rejected.

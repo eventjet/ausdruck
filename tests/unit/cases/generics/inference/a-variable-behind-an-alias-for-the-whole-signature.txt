@@ -1,0 +1,13 @@
+x:int.apply()
+-- Types --
+Mapper: fn<U>(U) -> U
+-- Functions --
+apply: Mapper
+-- Expression type --
+int
+-- Note --
+a-signature-that-names-an-alias-still-accepts-it pins the variable-free case: an alias that names a concrete signature
+comes out of instantiation unchanged. This is its variable-carrying sibling: Mapper names a signature that is itself
+generic, so instantiating it has to substitute inside what the alias stands for, not just around it. A substitute()
+that left the aliased type untouched would leave U unbound, and the receiver check would then compare x:int against
+the raw variable U and reject a call that is exactly right.

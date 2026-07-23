@@ -1,0 +1,8 @@
+thing:{ b: string }.unpack()
+-- Functions --
+unpack: fn<T>({ a: int, b: T }) -> T
+-- Type error --
+unpack must be called on an expression of type { a: int, b: string }, but thing:{ b: string } is of type { b: string }
+-- Note --
+The field that is there still decides T, so the receiver the call is checked against is a struct of an int and a
+string—the mistake is the missing a, and the message says so rather than blaming an unresolved b.

@@ -1,0 +1,5 @@
+foo:fn<int>(int) -> int
+-- Type error --
+int can't be a type variable: it is a type of its own
+-- Note --
+A binder introduces a name, so the name has to be free to introduce.

@@ -5,209 +5,77 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Parser;
 
 use Eventjet\Ausdruck\Type;
+use InvalidArgumentException;
 
-use function array_key_last;
-use function array_pop;
-use function assert;
-use function count;
-use function sprintf;
+use function array_key_exists;
 
 /**
+ * The public entry point for resolving a {@see TypeNode} against a set of aliases. Resolution itself is
+ * {@see TypeResolution}'s job: a `fn<...>` binder adds type variables to the scope a node is resolved in, and that
+ * scope is a second thing to carry alongside the aliases, not a parameter to thread through every method here.
+ *
  * @api
  */
 final class Types
 {
     /**
+     * @var array<string, Type>
+     */
+    private readonly array $aliases;
+
+    /**
+     * An alias stands for one complete type -- see {@see Type::alias()}, which is what actually promotes every entry
+     * here: each is wrapped through it exactly the way a consumer calling {@see Type::alias()} directly would wrap
+     * one, so a function type is quantified and anything else that reaches a type variable nothing captures is
+     * rejected with {@see Type::alias()}'s own message, rather than this constructor keeping a second copy of that
+     * check.
+     *
      * @param array<string, Type> $aliases
-     */
-    public function __construct(private readonly array $aliases = [])
-    {
-    }
-
-    /**
-     * The one place a type argument count is checked. {@see TypeConstructor::typeArgumentCount()} says what each
-     * constructor takes, and an alias takes none, so every wrong count is worded here rather than restated per
-     * constructor. A surplus blames the arguments past the count that was wanted—the ones before it are what was asked
-     * for—while too few blames all of them, because none of them is individually the mistake.
      *
-     * @param int<0, max> $expected
+     * @throws InvalidArgumentException {@see Type::alias()}
      */
-    private static function checkArity(TypeNode $node, int $expected): TypeError|null
+    public function __construct(array $aliases = [])
     {
-        $args = $node->args;
-        $given = count($args);
-        if ($given === $expected) {
-            return null;
+        $wrapped = [];
+        foreach ($aliases as $name => $type) {
+            $wrapped[$name] = Type::alias($name, $type);
         }
-        if ($args === []) {
-            assert($expected > 0);
-            return TypeError::create(
-                sprintf('The %s type requires %s, none given', $node->name, self::spellArguments($expected)),
-                $node->location,
-            );
-        }
-        $last = $args[array_key_last($args)];
-        if ($expected === 0) {
-            return TypeError::create(
-                sprintf('Invalid type "%s": %s does not accept arguments', $node, $node->name),
-                $args[0]->location->to($last->location),
-            );
-        }
-        return TypeError::create(
-            sprintf(
-                'Invalid type "%s": %s expects exactly %s, got %d',
-                $node,
-                $node->name,
-                self::spellArguments($expected),
-                $given,
-            ),
-            ($args[$expected] ?? $args[0])->location->to($last->location),
-        );
+        $this->aliases = $wrapped;
     }
 
     /**
-     * How many arguments a message asks for. Arities are small and fixed—no constructor takes more than two—so the
-     * counts are spelled out rather than printed as digits, which is how these messages have always read, and the
-     * number and its plural are chosen together rather than agreed on by two separate expressions.
+     * Delegates outright: resolving $node is entirely {@see TypeResolution}'s job, started here with an empty type
+     * variable scope because a fresh, top-level $node has no enclosing `fn<...>` binder to have added any. This method
+     * exists only so a caller resolving against a set of aliases -- what {@see Types} is @api for -- gets to do that
+     * without also being handed {@see TypeResolution}'s own, @internal, binder-scope parameter.
      *
-     * @param positive-int $count
-     */
-    private static function spellArguments(int $count): string
-    {
-        return match ($count) {
-            1 => 'one argument',
-            2 => 'two arguments',
-            default => sprintf('%d arguments', $count),
-        };
-    }
-
-    /**
-     * A name the language spells itself is one of the {@see TypeConstructor}s; anything else is a consumer's alias, or
-     * nothing at all.
+     * $node itself is what keeps this @internal despite {@see self} being @api: a {@see TypeNode} is only ever built
+     * by {@see TypeParser}, which is @internal too, so no consumer outside this package could ever construct one to
+     * call this with in the first place. Scoped to {@see Eventjet\Ausdruck}, not just this namespace, the same as
+     * the rest of the type system's own internals -- this test suite is the one thing throughout that namespace that
+     * does build a {@see TypeNode} itself, through {@see TypeParser} directly, to exercise resolution with.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
      */
     public function resolve(TypeNode $node): Type|TypeError
     {
-        $constructor = TypeConstructor::tryFrom($node->name);
-        if ($constructor === null) {
-            return $this->resolveAlias($node) ?? TypeError::create(
-                sprintf('Unknown type %s', $node->name),
-                $node->location,
-            );
-        }
-        $arity = $constructor->typeArgumentCount();
-        $arityError = $arity === null ? null : self::checkArity($node, $arity);
-        if ($arityError !== null) {
-            return $arityError;
-        }
-        return match ($constructor) {
-            TypeConstructor::Fn => $this->resolveFunction($node),
-            TypeConstructor::String => Type::string(),
-            TypeConstructor::Int => Type::int(),
-            TypeConstructor::Float => Type::float(),
-            TypeConstructor::Bool => Type::bool(),
-            TypeConstructor::Any => Type::any(),
-            TypeConstructor::Map => $this->resolveMap($node),
-            TypeConstructor::List => $this->resolveList($node),
-            TypeConstructor::Option => $this->resolveOption($node),
-            TypeConstructor::Some => $this->resolveSome($node),
-            TypeConstructor::None => Type::none(),
-            TypeConstructor::Struct => $this->resolveStruct($node),
-        };
-    }
-
-    private function resolveList(TypeNode $node): Type|TypeError
-    {
-        assert(count($node->args) === 1);
-        $valueType = $this->resolve($node->args[0]);
-        return $valueType instanceof TypeError ? $valueType : Type::listOf($valueType);
-    }
-
-    private function resolveMap(TypeNode $node): Type|TypeError
-    {
-        assert(count($node->args) === 2);
-        $args = $node->args;
-        $keyType = $this->resolve($args[0]);
-        if ($keyType instanceof TypeError) {
-            return $keyType;
-        }
-        if (!$keyType->equals(Type::int()) && !$keyType->equals(Type::string())) {
-            return TypeError::create(
-                sprintf(
-                    'Invalid type "%s": map expects the key type to be int or string, got %s',
-                    $node,
-                    $keyType,
-                ),
-                $args[0]->location,
-            );
-        }
-        $valueType = $this->resolve($args[1]);
-        return $valueType instanceof TypeError ? $valueType : Type::mapOf($keyType, $valueType);
+        return (new TypeResolution($this->aliases))->resolve($node);
     }
 
     /**
-     * An alias is a name for one complete type, so like the argument-less built-ins, it rejects type arguments instead
-     * of silently dropping them—`Foo<int>` is as invalid as `int<string>`. {@see TypeParser::parse()} counts on that:
-     * it reads a closed argument list after any name and leaves rejecting it to this resolver.
+     * Whether $name is one of the aliases this scope resolves a reference to -- the same question
+     * {@see TypeResolution::checkTypeVariable()} asks of a written `fn<...>` binder's own names, from outside the one
+     * door that builds a {@see TypeResolution} in the first place. {@see Declarations::__construct()} is the other
+     * place a name has to clear that same restriction: the binder {@see \Eventjet\Ausdruck\Signature::quantified()}
+     * derives for a builder-constructed function declaration is never written text a parser could reject, so this is
+     * what it asks instead.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck\Parser
      */
-    private function resolveAlias(TypeNode $node): Type|TypeError|null
+    public function hasAlias(string $name): bool
     {
-        $type = $this->aliases[$node->name] ?? null;
-        if ($type === null) {
-            return null;
-        }
-        return self::checkArity($node, 0) ?? Type::alias($node->name, $type);
-    }
-
-    /**
-     * An Option is a Some that may be absent, so it is the type of its argument and nothing more—which is what
-     * {@see self::resolveSome()} already resolves.
-     */
-    private function resolveOption(TypeNode $node): Type|TypeError
-    {
-        $some = $this->resolveSome($node);
-        return $some instanceof TypeError ? $some : Type::option($some);
-    }
-
-    private function resolveSome(TypeNode $node): Type|TypeError
-    {
-        assert(count($node->args) === 1);
-        return $this->resolve($node->args[0]);
-    }
-
-    private function resolveFunction(TypeNode $node): Type|TypeError
-    {
-        $args = $node->args;
-        if ($args === []) {
-            return TypeError::create('The func type requires at least one argument, none given', $node->location);
-        }
-        $returnType = array_pop($args);
-        $argTypes = [];
-        foreach ($args as $arg) {
-            $argType = $this->resolve($arg);
-            if ($argType instanceof TypeError) {
-                return $argType;
-            }
-            $argTypes[] = $argType;
-        }
-        $returnType = $this->resolve($returnType);
-        if ($returnType instanceof TypeError) {
-            return $returnType;
-        }
-        return Type::func($returnType, $argTypes);
-    }
-
-    private function resolveStruct(TypeNode $node): Type|TypeError
-    {
-        $fields = [];
-        foreach ($node->args as $field) {
-            assert(count($field->args) === 2);
-            [$nameNode, $typeNode] = $field->args;
-            $type = $this->resolve($typeNode);
-            if ($type instanceof TypeError) {
-                return $type;
-            }
-            $fields[$nameNode->name] = $type;
-        }
-        return Type::struct($fields);
+        return array_key_exists($name, $this->aliases);
     }
 }

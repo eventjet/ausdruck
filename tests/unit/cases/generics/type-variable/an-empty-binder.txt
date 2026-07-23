@@ -1,0 +1,6 @@
+foo:fn<>(int) -> int
+-- Syntax error --
+Expected type variable name, got >
+-- Note --
+The < after fn can only be a type parameter binder—fn is a type constructor, never an operand—so it commits, and what
+follows has to be a name rather than a type.

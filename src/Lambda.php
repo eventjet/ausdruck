@@ -60,9 +60,18 @@ final class Lambda extends Expression
             && $this->body->equals($other->body);
     }
 
+    /**
+     * A lambda is always an argument -- never the outermost signature of a declaration -- so its variables, if its
+     * body's type has any, belong to whatever encloses it rather than to the lambda itself: {@see Type::func()}
+     * never claims a binder of its own, so building the lambda's type through it, the same door every function type
+     * is built through, already leaves those variables shared with whatever goes on to quantify them.
+     */
     #[Override]
     public function getType(): Type
     {
-        return Type::func($this->body->getType(), array_map(static fn(string $_name) => Type::any(), $this->parameters));
+        return Type::func(
+            $this->body->getType(),
+            array_map(static fn(string $_name) => Type::any(), $this->parameters),
+        );
     }
 }

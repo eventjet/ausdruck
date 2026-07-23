@@ -1,0 +1,9 @@
+foo:fn<T>(fn<T>(T) -> T) -> T
+-- Type error --
+Type variable T is already declared
+-- Note --
+A nested function type is free to write a binder of its own -- see
+function-type/its-own-binder-survives-nesting-in-a-functions-parameter -- but not to reuse a name an enclosing binder
+already declared: the inner fn<T> would otherwise shadow the outer T rather than naming a fresh variable, so it is
+rejected exactly like reusing a name within one binder is (declared-twice-in-one-binder). A fresh name instead, e.g.
+fn<T>(fn<U>(U) -> U) -> T, has no such conflict and resolves fine.

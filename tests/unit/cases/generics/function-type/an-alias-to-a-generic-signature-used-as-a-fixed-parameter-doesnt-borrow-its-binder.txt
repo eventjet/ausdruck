@@ -1,0 +1,12 @@
+foo:fn(Mapper) -> int
+-- Types --
+Mapper: fn<U>(U) -> U
+-- Expression type --
+fn(Mapper) -> int
+-- Note --
+fn(Mapper) -> int declares no binder of its own -- Mapper is a fixed parameter type, not a type variable -- so it has
+to print back exactly as written, with no <U> in front, even though Mapper itself stands for a generic signature.
+Mapper's own U is quantified by Mapper, not by whatever fixed parameter position it's used in; collectVariables()
+stops at a nested signature that owns a binder of its own rather than seeing through the alias and absorbing U into
+this one. See a-fixed-parameter-that-happens-to-be-generic-isnt-a-generic-parameter for what a wrongly-derived binder
+here would let through at a call site.

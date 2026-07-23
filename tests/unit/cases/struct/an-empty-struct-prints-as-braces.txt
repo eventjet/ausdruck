@@ -1,0 +1,6 @@
+foo:map<{}, int>
+-- Type error --
+Invalid type "map<{}, int>": map expects the key type to be int or string, got {}
+-- Note --
+An empty struct has no fields to list between its braces, but it still has braces: `{}`, not nothing. Both the
+rejected type and the key type in the message name it that way.

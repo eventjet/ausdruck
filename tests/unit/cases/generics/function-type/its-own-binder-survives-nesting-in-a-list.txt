@@ -1,0 +1,7 @@
+foo:list<fn<T>(T) -> T>
+-- Expression type --
+list<fn<T>(T) -> T>
+-- Note --
+The fn<T> here isn't nested inside another function type's parameters or return type -- it's nested inside a list,
+which is allowed -- so it keeps a binder of its own, and printing it back has to include one or the printed form
+wouldn't parse: nothing outside this fn declares T.

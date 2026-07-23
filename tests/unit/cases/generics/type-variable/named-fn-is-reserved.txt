@@ -1,0 +1,9 @@
+foo:fn<fn>(int) -> int
+-- Type error --
+fn can't be a type variable: it is a type of its own
+-- Note --
+fn has no TypeConstructor case of its own -- a function type is its own node shape, not a name looked up there -- so
+a binder-position check that only asks TypeConstructor::tryFrom() misses it and lets a variable named fn through,
+where it's then rejected as unused instead, since nothing after `<fn>` could ever write fn back as anything but the
+function-type keyword. TypeConstructor::isReservedName() already accounts for fn precisely so this check can ask it
+instead of reimplementing half of it.

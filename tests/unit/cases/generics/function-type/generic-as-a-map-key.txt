@@ -1,0 +1,5 @@
+foo:map<fn<T>(T) -> T, string>
+-- Type error --
+Invalid type "map<fn<T>(T) -> T, string>": map expects the key type to be int or string, got fn<T>(T) -> T
+-- Note --
+The binder is part of how a generic function type is written, so it is part of how one is printed back.

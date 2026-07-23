@@ -1,0 +1,3 @@
+foo:fn<T>(map<string, T>) -> T
+-- Expression type --
+fn<T>(map<string, T>) -> T

@@ -318,19 +318,30 @@ final class ExpressionParserErrorTest extends TestCase
         ];
         yield 'lambda returning the wrong type' => [
             'x:list<string>.some(|i| i:string)',
-            'Argument 1 of some must be of type func(any): bool, got func(any): string',
+            'Argument 1 of some must be of type fn(string) -> bool, got fn(any) -> string',
         ];
         yield 'passing a string to a function expecting a lambda' => [
             'x:list<string>.some("foo")',
-            'Argument 1 of some must be of type func(any): bool, got string',
+            'Argument 1 of some must be of type fn(string) -> bool, got string',
         ];
         yield 'passing a lambda to a function expecting an int' => [
             'x:string.substr(|i| i:int, 3)',
-            'Argument 1 of substr must be of type int, got func(any): int',
+            'Argument 1 of substr must be of type int, got fn(any) -> int',
         ];
+        // The receiver is what a generic signature normally learns its type variable from, so where the receiver is
+        // the mistake, the variable is decided by the argument instead: `contains` is declared over `list<T>` and `T`,
+        // and 42 is what makes the expected receiver a list of ints rather than a list of anything.
         yield 'calling contains on an int' => [
             'x:int.contains(42)',
-            'contains must be called on an expression of type list<any>, but x:int is of type int',
+            'contains must be called on an expression of type list<int>, but x:int is of type int',
+        ];
+        // filter, like every other list built-in, is declared over list<T>. A map has keys to preserve, which no
+        // signature here can express, so filtering one is a type error rather than a quietly different return type.
+        // Nothing says what the elements are here—a lambda's parameters are typed any—so the list it asks for is a
+        // list of anything.
+        yield 'filtering a map' => [
+            'x:map<string, int>.filter(|i| i:int > 23)',
+            'filter must be called on an expression of type list<any>, but x:map<string, int> is of type map<string, int>',
         ];
         yield 'call to undeclared function without an inline type' => [
             'x:string.foo()',

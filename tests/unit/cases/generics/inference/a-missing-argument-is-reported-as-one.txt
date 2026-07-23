@@ -1,0 +1,6 @@
+nums:list<int>.map()
+-- Type error --
+map expects 1 arguments, got 0
+-- Note --
+The argument that would have decided U isn't there, so the missing argument is what's reported—not a return type that
+couldn't be worked out because of it.

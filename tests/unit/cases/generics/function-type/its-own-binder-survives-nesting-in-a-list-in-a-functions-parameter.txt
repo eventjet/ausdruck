@@ -1,0 +1,8 @@
+foo:fn(list<fn<T>(T) -> T>) -> int
+-- Expression type --
+fn(list<fn<T>(T) -> T>) -> int
+-- Note --
+The sibling case next to this one (its-own-binder-survives-nesting-in-a-functions-parameter) shows a fn<T> can sit
+directly in a function type's own parameter. Here it sits inside a list that itself sits there, and it keeps its own
+binder regardless of how many doors deep it's nested through -- the same way its-own-binder-survives-nesting-in-a-list
+shows for a list on its own, with no enclosing function type at all.

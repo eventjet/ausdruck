@@ -1,0 +1,10 @@
+nums:Numbers.size()
+-- Types --
+Numbers: list<int>
+-- Functions --
+size: fn(Numbers) -> int
+-- Expression type --
+int
+-- Note --
+A signature that mentions no variable at all still has to come out of instantiation unchanged, aliases and all: an
+alias that lost what it stands for would no longer accept the very type it names.

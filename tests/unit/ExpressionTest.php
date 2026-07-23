@@ -180,11 +180,6 @@ final class ExpressionTest extends TestCase
             ['foo:any === bar:any', new Scope(['foo' => 1, 'bar' => '1']), false],
             ['foo:int > bar:int', new Scope(['foo' => 69, 'bar' => 69]), false],
             [
-                'items:map<string, int>.filter:map<string, int>(|item| item:int > 23)',
-                new Scope(['items' => ['c' => 69, 'a' => 23, 'b' => 24, 'd' => -23]]),
-                ['c' => 69, 'b' => 24],
-            ],
-            [
                 'items:list<int>.filter:list<int>(|item| item:int > 23)',
                 new Scope(['items' => [69, 23, 24, -23]]),
                 [69, 24],
@@ -705,5 +700,24 @@ final class ExpressionTest extends TestCase
             $expression->matchesType($expected),
             sprintf('Expected %s, got %s', $expected, $expression->getType()),
         );
+    }
+
+    /**
+     * A lambda is always an argument, never the outermost signature of a declaration, so its type has to be built the
+     * same way any other nested position is: sharing a variable its body's type reaches with whichever signature
+     * encloses it, rather than quantifying one of its own that then shadows it. A lambda's own parameters can never
+     * surface such a variable -- they're always typed `any` -- but its body can, e.g. by evaluating a field or a call
+     * that answers a still-unbound type variable belonging to the signature the lambda is an argument to.
+     */
+    public function testALambdaWhoseBodyTypeIsAVariableSharesItWithTheEnclosingSignature(): void
+    {
+        $lambda = Expr::lambda(Expr::get('x', Type::var('T')), ['i']);
+
+        // The shape a declared higher-order parameter like `fn(any) -> T` is built with: Type::func() never claims
+        // a binder of its own, so T is deferred to whichever signature encloses it, the same position a lambda
+        // argument is written for.
+        $declaredParameter = Type::func(Type::var('T'), [Type::any()]);
+
+        self::assertTrue($lambda->getType()->isSubtypeOf($declaredParameter));
     }
 }

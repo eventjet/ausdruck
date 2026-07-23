@@ -1,0 +1,8 @@
+thing:{ name: string }.unpack()
+-- Functions --
+unpack: fn<T>({ value: T }) -> T
+-- Type error --
+unpack must be called on an expression of type { value: any }, but thing:{ name: string } is of type { name: string }
+-- Note --
+No field faces T, so nothing decides it, and the receiver the call is checked against is one with a value field of any
+type at all.

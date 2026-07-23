@@ -1,0 +1,7 @@
+thing:{ value: string }.unpack()
+-- Functions --
+unpack: fn<T>({ value: T }) -> T
+-- Expression type --
+string
+-- Note --
+A variable inside a struct is decided by the field facing it.

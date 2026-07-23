@@ -1,0 +1,10 @@
+names:list<string>.head()
+-- Input --
+{ names: ["a", "b", "c"] }
+-- Expression type --
+Option<string>
+-- Output --
+"a"
+-- Note --
+head is declared as fn<T>(list<T>) -> Option<T>, so the element type of the list it is called on is what decides the
+Option it answers. Nothing in the source says string; the receiver does.

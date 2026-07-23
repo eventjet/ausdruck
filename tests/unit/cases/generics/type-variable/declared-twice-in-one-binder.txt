@@ -1,0 +1,3 @@
+foo:fn<T, T>(T) -> T
+-- Type error --
+Type variable T is already declared

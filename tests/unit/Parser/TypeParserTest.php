@@ -6,8 +6,8 @@ namespace Eventjet\Ausdruck\Test\Unit\Parser;
 
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\SyntaxError;
-use Eventjet\Ausdruck\Parser\TypeParser;
 use Eventjet\Ausdruck\Parser\Types;
+use Eventjet\Ausdruck\Test\Unit\ParsesTypeSyntax;
 use Eventjet\Ausdruck\Type;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -21,6 +21,8 @@ use function strlen;
 
 final class TypeParserTest extends TestCase
 {
+    use ParsesTypeSyntax;
+
     /**
      * @return iterable<string, array{string, string}>
      */
@@ -241,11 +243,7 @@ final class TypeParserTest extends TestCase
         }
         $type = implode("\n", $lines);
 
-        /**
-         * @psalm-suppress InternalClass
-         * @psalm-suppress InternalMethod
-         */
-        $error = TypeParser::parseString($type);
+        $error = self::parseTypeString($type);
 
         self::assertInstanceOf(SyntaxError::class, $error);
         self::assertSame($expectedMessage, $error->getMessage());
@@ -257,11 +255,7 @@ final class TypeParserTest extends TestCase
     #[DataProvider('parseStringCases')]
     public function testParseString(string $typeString, Type $expected): void
     {
-        /**
-         * @psalm-suppress InternalMethod
-         * @psalm-suppress InternalClass
-         */
-        $node = TypeParser::parseString($typeString);
+        $node = self::parseTypeString($typeString);
         if ($node instanceof SyntaxError) {
             self::fail($node->getMessage());
         }
@@ -273,11 +267,7 @@ final class TypeParserTest extends TestCase
 
     public function testParseDeclarationsReadsBackToBackTypesOffOneStream(): void
     {
-        /**
-         * @psalm-suppress InternalClass
-         * @psalm-suppress InternalMethod
-         */
-        $declarations = TypeParser::parseDeclarations(
+        $declarations = self::parseTypeDeclarations(
             <<<'AUSDRUCK'
                 Item: {
                     tags: list<string>,
@@ -295,11 +285,7 @@ final class TypeParserTest extends TestCase
 
     public function testParseDeclarationsAcceptsEmptyInput(): void
     {
-        /**
-         * @psalm-suppress InternalClass
-         * @psalm-suppress InternalMethod
-         */
-        self::assertSame([], TypeParser::parseDeclarations('   '));
+        self::assertSame([], self::parseTypeDeclarations('   '));
     }
 
     #[DataProvider('declarationErrorCases')]
@@ -308,10 +294,6 @@ final class TypeParserTest extends TestCase
         $this->expectException(SyntaxError::class);
         $this->expectExceptionMessage($expectedMessage);
 
-        /**
-         * @psalm-suppress InternalClass
-         * @psalm-suppress InternalMethod
-         */
-        TypeParser::parseDeclarations($src);
+        self::parseTypeDeclarations($src);
     }
 }

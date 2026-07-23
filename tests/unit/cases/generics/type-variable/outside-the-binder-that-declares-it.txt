@@ -1,0 +1,6 @@
+foo:list<T>
+-- Type error --
+Unknown type T
+-- Note --
+A binder is the whole of a type variable's scope, so the same name outside it is as unknown as any other. Nothing makes
+a name a variable except a binder above it—which is what keeps a misspelled alias an error rather than a variable.

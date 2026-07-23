@@ -1,0 +1,6 @@
+nums:list<int>.contains("foo")
+-- Type error --
+Argument 1 of contains must be of type int, got string
+-- Note --
+The needle is of the list's own element type, which is the whole point of declaring contains generically: before, the
+signature said any and this was accepted.
