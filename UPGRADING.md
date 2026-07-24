@@ -76,6 +76,21 @@ $return = $type->asFunction()?->returnType;          // Type|null
 $params = $type->asFunction()?->argumentTypes();     // list<Type>
 ```
 
+#### `Type::some()` is removed
+
+`Type::some()` is gone. It took a type and returned it unchanged — an identity function
+that never wrapped anything in an `Option`, despite its name. If you called it to build an
+option type, use `Type::option()`, which actually constructs `Option<T>`. If you relied on
+the identity behavior, drop the call and use the argument directly.
+
+```php
+# 0.2
+$t = Type::some(Type::int());   // returned Type::int() unchanged — not an option
+
+# 0.3
+$t = Type::option(Type::int()); // Option<int>, if that is what you meant
+```
+
 #### Some parser members are no longer public API
 
 - `Parser\TypeParser` is now `@internal`. Parse through `ExpressionParser` — its public
@@ -85,6 +100,17 @@ $params = $type->asFunction()?->argumentTypes();     // list<Type>
   `ExpressionParser::parse()` as before.
 - `Parser\Delimiters` is removed. It was an internal token detail with no role in the
   public API.
+- `Parser\TypeHint` and `Parser\ParsedToken` are now `@internal`. They are parser plumbing
+  the public API never handed out; parse through `ExpressionParser`.
+
+#### More node-level plumbing is now `@internal`
+
+Several classes that were technically public but only ever existed as internal machinery
+now carry `@internal`, so they sit outside the compatibility promise and may change or be
+removed in any release: `Negative`, `AbstractLiteral`, `ListLiteral`, and `LocationTrait`.
+Build nodes through the `Expression` builder combinators and parse through
+`ExpressionParser` rather than naming these directly. As part of sealing them, `Negative`'s
+`equals()` and `__toString()` are now `final`.
 
 #### `Expression`'s builder combinators are now `final`
 
