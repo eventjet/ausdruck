@@ -40,10 +40,9 @@ final class Expr
     {
     }
 
-    public static function eq(Expression $left, Expression $right): Eq
+    public static function eq(Expression $left, Expression $right): Comparison
     {
-        self::checkComparison(ComparisonOperator::Equals, $left, $right);
-        return new Eq($left, $right);
+        return self::comparison(ComparisonOperator::Equals, $left, $right);
     }
 
     public static function neq(Expression $left, Expression $right): Comparison
@@ -210,10 +209,9 @@ final class Expr
         return new Modulo($dividend, $divisor);
     }
 
-    public static function gt(Expression $left, Expression $right): Gt
+    public static function gt(Expression $left, Expression $right): Comparison
     {
-        self::checkComparison(ComparisonOperator::GreaterThan, $left, $right);
-        return new Gt($left, $right);
+        return self::comparison(ComparisonOperator::GreaterThan, $left, $right);
     }
 
     public static function lt(Expression $left, Expression $right): Comparison
