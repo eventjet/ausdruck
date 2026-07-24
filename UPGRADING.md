@@ -95,9 +95,10 @@ $t = Type::option(Type::int()); // Option<int>, if that is what you meant
 
 - `Parser\TypeParser` is now `@internal`. Parse through `ExpressionParser` — its public
   API is unchanged.
-- `Parser\Types::resolve()` is removed; resolving a type name against the declared aliases
-  is handled inside the parser. Construct `new Types([...])` and pass it to
-  `ExpressionParser::parse()` as before.
+- `Parser\Types::resolve()` is now `@internal`. It takes a `TypeNode`, which only the
+  `@internal` `TypeParser` constructs, so no outside caller could reach it anyway.
+  Constructing `new Types([...])` and passing it to `ExpressionParser::parse()` works as
+  before — the `Types` class itself stays part of the public API.
 - `Parser\Delimiters` is removed. It was an internal token detail with no role in the
   public API.
 - `Parser\TypeHint` and `Parser\ParsedToken` are now `@internal`. They are parser plumbing
@@ -135,10 +136,10 @@ If you typed a variable or property against one of those concrete returns
 unchanged — only the declared type narrows — so code that already treated the result as an
 `Expression` needs no change.
 
-As part of this, the `Eq` and `Gt` classes are removed. They were `@internal` subclasses of
-`Comparison` that existed only to be named by `eq()` and `gt()`; now that those return
-`self`, they fold into `Comparison`. An `eq(...)` value already compared equal to the
-matching `Comparison`, so `equals()` is unaffected.
+As part of this, the `Eq` and `Gt` classes are removed. They were the `@internal` node
+classes that `eq()` and `gt()` returned, existing only to be named by those builders; now
+that the builders return `self`, they fold into the `Comparison` node. An `eq(...)` value
+already compared equal to the matching `Comparison`, so `equals()` is unaffected.
 
 #### Rendered form of some expressions and types changed
 
@@ -166,6 +167,8 @@ available. The README documents each in full.
 - **Function types and generic signatures:** `fn(A, B) -> R` type syntax, `fn<T, U>(...)`
   generic signatures with call-site inference, and the PHP-side `Type::var()`, `Signature`,
   and `Declarations(functions: [...])` to declare them.
-- **New built-in functions:** `filter`, `unwrap`.
+- **Declared signatures for `filter` and `unwrap`:** both built-ins already existed but
+  could not be typed until generics; they now carry `Signature`s and are type-checked at
+  parse time.
 - **New `Expression` builder methods:** `add`, `multiply`, `divide`, `modulo`, `neq`, `lt`,
   `gte`, `lte`, `not`.
