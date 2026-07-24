@@ -10,7 +10,9 @@ changes; see [UPGRADING.md](UPGRADING.md) for the migration steps behind each on
 This changelog begins at 0.3.0. Earlier releases are recorded in the
 [git tags](https://github.com/eventjet/ausdruck/tags).
 
-## [0.3.0] - Unreleased
+## [Unreleased]
+
+## [0.3.0] - 2026-07-24
 
 A breaking release that rounds out the operator set and the type system. Most 0.2
 expressions and integrations keep working unchanged; the migration notes for the
@@ -70,4 +72,5 @@ cases that don't are in [UPGRADING.md](UPGRADING.md).
 - The `Eq` and `Gt` node classes — the `@internal` concrete nodes that `eq()` and `gt()`
   returned in 0.2; now that those builders return `self`, they fold into `Comparison`.
 
-[0.3.0]: https://github.com/eventjet/ausdruck/compare/0.2.4...HEAD
+[Unreleased]: https://github.com/eventjet/ausdruck/compare/0.3.0...HEAD
+[0.3.0]: https://github.com/eventjet/ausdruck/compare/0.2.4...0.3.0
