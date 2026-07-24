@@ -41,11 +41,9 @@ cases that don't are in [UPGRADING.md](UPGRADING.md).
 - `&&` now binds tighter than `||`, and each is left-associative. In 0.2 they shared
   one right-grouping precedence level, so `a && b || c` changes meaning from
   `a && (b || c)` to `(a && b) || c`. **Behavioral break.**
-- Integer arithmetic that leaves the `int` range is now an `EvaluationError` instead
-  of silently widening to `float`. An `int`-typed expression yields an `int` or fails.
-  **Behavioral break.**
-- Evaluated values are now compared strictly, including their PHP type. **Behavioral
-  break.**
+- `int` subtraction and negation that leave the `int` range are now an `EvaluationError`
+  instead of silently widening to `float`, so an `int`-typed expression yields an `int`
+  or fails. The new `+` and `*` apply the same rule. **Behavioral break.**
 - `Type`'s representation is private. The public readonly properties `$name`, `$args`,
   `$aliasFor`, and `$fields` are gone; use `isStruct()`, `getFieldType()`, `isOption()`,
   `asFunction()`, `equals()`, `isSubtypeOf()`, `assert()`, and `(string) $type` instead.
@@ -58,7 +56,9 @@ cases that don't are in [UPGRADING.md](UPGRADING.md).
   parentheses — always in a form the parser reads back to the same tree.
 - Marked internal-only machinery `@internal`, placing it outside the compatibility
   promise: `Parser\TypeParser`, `Parser\TypeHint`, `Parser\ParsedToken`, `Negative`,
-  `AbstractLiteral`, `ListLiteral`, and `LocationTrait`.
+  `AbstractLiteral`, `ListLiteral`, and `LocationTrait`. `Parser\Types::resolve()` is
+  `@internal` too (it takes a `TypeNode`, which only the `@internal` `TypeParser`
+  constructs); the `Types` class itself stays part of the public API.
 
 ### Removed
 
@@ -66,10 +66,8 @@ cases that don't are in [UPGRADING.md](UPGRADING.md).
   Use `Type::option()` to build `Option<T>`, or drop the call and use the argument.
 - `Type::returnType()` — read a function type through `Type::asFunction()`, which
   returns a `Signature` exposing the return type, receiver, and parameters.
-- `Parser\Types::resolve()` — resolving a type name against declared aliases is handled
-  inside the parser; construct `new Types([...])` and pass it to `ExpressionParser::parse()`.
 - `Parser\Delimiters` — an internal token detail with no role in the public API.
-- The `Eq` and `Gt` node classes — `@internal` subclasses of `Comparison` that folded
-  into it once `eq()` and `gt()` began returning `self`.
+- The `Eq` and `Gt` node classes — the `@internal` concrete nodes that `eq()` and `gt()`
+  returned in 0.2; now that those builders return `self`, they fold into `Comparison`.
 
 [0.3.0]: https://github.com/eventjet/ausdruck/compare/0.2.4...HEAD
