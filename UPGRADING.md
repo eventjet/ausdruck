@@ -166,6 +166,8 @@ available. The README documents each in full.
 - **Function types and generic signatures:** `fn(A, B) -> R` type syntax, `fn<T, U>(...)`
   generic signatures with call-site inference, and the PHP-side `Type::var()`, `Signature`,
   and `Declarations(functions: [...])` to declare them.
-- **New built-in functions:** `filter`, `unwrap`.
+- **Declared signatures for `filter` and `unwrap`:** both built-ins already existed but
+  could not be typed until generics; they now carry `Signature`s and are type-checked at
+  parse time.
 - **New `Expression` builder methods:** `add`, `multiply`, `divide`, `modulo`, `neq`, `lt`,
   `gte`, `lte`, `not`.

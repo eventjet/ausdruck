@@ -31,7 +31,8 @@ cases that don't are in [UPGRADING.md](UPGRADING.md).
   call-site inference.
 - PHP-side `Type::var()`, `Signature`, and `Declarations(functions: [...])` for
   declaring function and generic signatures.
-- New built-in functions `filter` and `unwrap`.
+- Declared signatures for the `filter` and `unwrap` built-ins: both already existed
+  but could not be typed until generics, and are now type-checked at parse time.
 - New `Expression` builder methods: `add`, `multiply`, `divide`, `modulo`, `neq`,
   `lt`, `gte`, `lte`, and `not`.
 
