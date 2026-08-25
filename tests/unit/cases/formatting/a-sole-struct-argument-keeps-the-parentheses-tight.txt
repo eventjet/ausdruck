@@ -1,0 +1,13 @@
+orders:list<Order>.map(|o| {id: o:Order.id, name: o:Order.name})
+-- Note --
+The struct is the call's only argument and already ends in a bracket of its own, so it breaks and the call doesn't.
+Breaking the argument list as well would spell one argument with two openings and two closings.
+-- Types --
+Order: { id: string, name: string }
+-- Width --
+70
+-- Formatted --
+orders:list<Order>.map:list<{ id: string, name: string }>(|o| {
+    id: o:Order.id,
+    name: o:Order.name,
+})

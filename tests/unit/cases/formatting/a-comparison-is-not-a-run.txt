@@ -1,0 +1,9 @@
+(a:int === b:int) === c:bool
+-- Note --
+The comparison level is the one that is not left-associative: a comparison over a comparison needs the parentheses that
+stop it from being a run, and keeps them however the line breaks.
+-- Width --
+20
+-- Formatted --
+(a:int === b:int)
+    === c:bool

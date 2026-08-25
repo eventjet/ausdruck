@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Test\Unit;
 
 use Eventjet\Ausdruck\AbstractLiteral;
+use Eventjet\Ausdruck\Formatter\ExpressionFormatter;
 use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\SyntaxError;
@@ -23,6 +24,7 @@ use function array_diff;
 use function array_key_exists;
 use function array_keys;
 use function array_map;
+use function ctype_digit;
 use function explode;
 use function file_get_contents;
 use function implode;
@@ -44,6 +46,8 @@ use const DIRECTORY_SEPARATOR;
  *
  * - `Output` — a literal the expression has to evaluate to, with `Input` supplying the variables it reads.
  * - `Expression type` — the type the expression has, printed. A case may write both, and then has to satisfy both.
+ * - `Formatted` — how the expression is spelled back out across lines, laid out to the `Width` section's columns or to
+ *   the formatter's default. A case that writes it also asserts that what comes out re-parses to the same expression.
  * - `Syntax error` / `Type error` — the message the source has to be rejected with. Which of the two sections is used
  *   is what says which error is expected, so only the message is written out.
  *
@@ -75,6 +79,8 @@ final readonly class E2eCase
         'Input',
         'Output',
         'Expression type',
+        'Formatted',
+        'Width',
         'Types',
         'Functions',
         'Syntax error',
@@ -92,6 +98,8 @@ final readonly class E2eCase
         public array $input = [],
         public string|null $expressionType = null,
         public E2eError|null $error = null,
+        public string|null $formatted = null,
+        public int $width = ExpressionFormatter::DEFAULT_WIDTH,
     ) {
     }
 
@@ -135,15 +143,23 @@ final readonly class E2eCase
             : [];
         $output = array_key_exists('Output', $sections) ? self::parseOutput($sections['Output']) : null;
         $expressionType = $sections['Expression type'] ?? null;
+        $formatted = $sections['Formatted'] ?? null;
         $error = self::parseError($sections);
-        if ($error !== null && ($output !== null || $expressionType !== null)) {
+        if ($error !== null && ($output !== null || $expressionType !== null || $formatted !== null)) {
             throw new RuntimeException(
-                'A case that expects an error can\'t expect an output or a type as well: a source that is rejected has '
-                    . 'neither',
+                'A case that expects an error can\'t expect an output, a type or a formatting as well: a source that '
+                    . 'is rejected has none of them',
             );
         }
-        if ($error === null && $output === null && $expressionType === null) {
-            throw new RuntimeException('A case must expect something: an Output, an Expression type, or an error');
+        if ($error === null && $output === null && $expressionType === null && $formatted === null) {
+            throw new RuntimeException(
+                'A case must expect something: an Output, an Expression type, a Formatted, or an error',
+            );
+        }
+        if ($formatted === null && array_key_exists('Width', $sections)) {
+            throw new RuntimeException(
+                'A Width is how wide the Formatted section was laid out to, so a case writing one writes both',
+            );
         }
         if ($output !== null && $functions !== []) {
             throw new RuntimeException(
@@ -158,7 +174,23 @@ final readonly class E2eCase
             array_key_exists('Input', $sections) ? self::parseInput($sections['Input']) : [],
             $expressionType,
             $error,
+            $formatted,
+            array_key_exists('Width', $sections)
+                ? self::parseWidth($sections['Width'])
+                : ExpressionFormatter::DEFAULT_WIDTH,
         );
+    }
+
+    /**
+     * The number of columns the Formatted section was laid out to. A case writes one so the shape it pins can be shown
+     * at the size that provokes it, rather than by padding an expression out to the formatter's default width.
+     */
+    private static function parseWidth(string $src): int
+    {
+        if (!ctype_digit($src)) {
+            throw new RuntimeException(sprintf('Width must be a number of columns, got %s', $src));
+        }
+        return (int)$src;
     }
 
     /**

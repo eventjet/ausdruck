@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Formatter\Doc;
+use Eventjet\Ausdruck\Formatter\HasDoc;
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
 use Throwable;
@@ -11,14 +13,13 @@ use Throwable;
 use function array_map;
 use function array_unshift;
 use function count;
-use function implode;
 use function sprintf;
 
 /**
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class Call extends Expression
+final class Call extends Expression implements HasDoc
 {
     use LocationTrait;
 
@@ -55,13 +56,13 @@ final class Call extends Expression
 
     public function __toString(): string
     {
-        return sprintf(
-            '%s.%s:%s(%s)',
-            Precedence::parenthesizeTarget($this->target),
-            $this->name,
-            $this->type,
-            implode(', ', $this->arguments),
-        );
+        return $this->doc()->flat();
+    }
+
+    #[Override]
+    public function doc(): Doc
+    {
+        return PostfixChain::doc($this);
     }
 
     #[Override]

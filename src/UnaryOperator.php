@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Formatter\Doc;
+use Eventjet\Ausdruck\Formatter\HasDoc;
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\Token;
 use Override;
@@ -25,7 +27,7 @@ use Override;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-abstract class UnaryOperator extends Expression
+abstract class UnaryOperator extends Expression implements HasDoc
 {
     use LocationTrait;
 
@@ -35,6 +37,12 @@ abstract class UnaryOperator extends Expression
     }
 
     final public function __toString(): string
+    {
+        return $this->doc()->flat();
+    }
+
+    #[Override]
+    final public function doc(): Doc
     {
         return Precedence::unary($this->token(), $this->expression);
     }

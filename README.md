@@ -332,6 +332,37 @@ To access an argument, you must specify its type, just like when accessing scope
 
 `|item| item:int > 5`
 
+### Formatting
+
+`ExpressionFormatter::format()` spells an expression back out across as many lines as it takes to stay within a column
+width, which defaults to 80. An expression that already fits comes back exactly as `(string) $expression` prints it;
+one that doesn't is broken at the places its parts offer.
+
+```php
+use Eventjet\Ausdruck\Formatter\ExpressionFormatter;
+use Eventjet\Ausdruck\Parser\ExpressionParser;
+
+$expression = ExpressionParser::parse($source, $declarations);
+echo ExpressionFormatter::format($expression);
+echo ExpressionFormatter::format($expression, 120);
+```
+
+A run of calls breaks at the dots, a bracket puts one item to a line and ends in a trailing comma, and a call whose only
+argument is a list or struct literal keeps its parentheses tight around it:
+
+```
+numbers:list<int>
+    .filter:list<int>(|n| n:int > 100 && n:int < 1000)
+    .map:list<{ value: int, half: Option<int> }>(|n| {
+        value: n:int,
+        half: n:int / 2,
+    })
+```
+
+The result always reads back as the same expression, so formatting a stored expression and saving what comes out is
+safe. Lines only end where a part of the expression offers to end one, so a long string literal or a long type
+annotation is spelled past the width rather than mangled.
+
 ## Releases
 
 Versions live in [CHANGELOG.md](CHANGELOG.md), and the migration steps behind each

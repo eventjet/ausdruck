@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Formatter\Doc;
+use Eventjet\Ausdruck\Formatter\HasDoc;
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
 use RuntimeException;
@@ -12,14 +14,13 @@ use stdClass;
 use function array_key_exists;
 use function array_map;
 use function count;
-use function implode;
 use function sprintf;
 
 /**
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class StructLiteral extends AbstractLiteral
+final class StructLiteral extends AbstractLiteral implements HasDoc
 {
     /**
      * @param array<string, Expression> $fields
@@ -30,11 +31,17 @@ final class StructLiteral extends AbstractLiteral
 
     public function __toString(): string
     {
-        $fieldStrings = [];
+        return $this->doc()->flat();
+    }
+
+    #[Override]
+    public function doc(): Doc
+    {
+        $fields = [];
         foreach ($this->fields as $name => $value) {
-            $fieldStrings[] = sprintf('%s: %s', $name, $value);
+            $fields[] = Doc::concat(Doc::text(sprintf('%s: ', $name)), Doc::of($value));
         }
-        return sprintf('{%s}', implode(', ', $fieldStrings));
+        return Doc::commaSeparated('{', $fields, '}');
     }
 
     #[Override]

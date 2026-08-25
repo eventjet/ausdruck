@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Formatter\Doc;
+use Eventjet\Ausdruck\Formatter\HasDoc;
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
 
@@ -14,7 +16,7 @@ use function sprintf;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class FieldAccess extends Expression
+final class FieldAccess extends Expression implements HasDoc
 {
     /**
      * @param Type $type The type {@see $field} is declared as on {@see $struct}. {@see Expr::fieldAccess()} resolves it,
@@ -30,7 +32,13 @@ final class FieldAccess extends Expression
 
     public function __toString(): string
     {
-        return sprintf('%s.%s', Precedence::parenthesizeTarget($this->struct), $this->field);
+        return $this->doc()->flat();
+    }
+
+    #[Override]
+    public function doc(): Doc
+    {
+        return PostfixChain::doc($this);
     }
 
     #[Override]

@@ -1,0 +1,5 @@
+a:int + b:int * c:int
+-- Width --
+40
+-- Formatted --
+a:int + b:int * c:int

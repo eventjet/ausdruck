@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Formatter\Doc;
+use Eventjet\Ausdruck\Formatter\HasDoc;
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
 
@@ -15,7 +17,7 @@ use function sprintf;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class Lambda extends Expression
+final class Lambda extends Expression implements HasDoc
 {
     use LocationTrait;
 
@@ -34,7 +36,20 @@ final class Lambda extends Expression
      */
     public function __toString(): string
     {
-        return sprintf('|%s| %s', implode(', ', $this->parameters), $this->body);
+        return $this->doc()->flat();
+    }
+
+    /**
+     * A lambda offers no line end of its own: the parameter list is short by nature and the body has to start on the
+     * same line as the closing `|`, so the only places a lambda breaks are the ones its body offers.
+     */
+    #[Override]
+    public function doc(): Doc
+    {
+        return Doc::concat(
+            Doc::text(sprintf('|%s| ', implode(', ', $this->parameters))),
+            Doc::of($this->body),
+        );
     }
 
     /**
