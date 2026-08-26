@@ -1,0 +1,11 @@
+xs:list<int>.merge([])
+-- Note --
+The exception is about the spelling, not about which node the argument is, and an empty list has only the one spelling.
+Breaking the argument list around it would spend two lines putting `[]` on a line of its own and still not reach the
+width, so the tight parentheses are all there is to offer.
+-- Functions --
+merge: fn(list<int>, list<any>) -> list<int>
+-- Width --
+20
+-- Formatted --
+xs:list<int>.merge:list<int>([])
