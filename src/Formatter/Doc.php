@@ -43,6 +43,7 @@ final class Doc
         private readonly DocKind $kind,
         private readonly string $text,
         private readonly array $children,
+        private readonly bool $isBracketedSequence = false,
     ) {
     }
 
@@ -61,9 +62,15 @@ final class Doc
         return new self(DocKind::Text, $text, []);
     }
 
+    /**
+     * $docs one after another. The concatenation is a bracketed sequence when the document it ends in is one, which is
+     * what carries the mark out of a lambda's body past the `|item| ` that introduces it: what a reader sees last is
+     * still the closing bracket of a sequence.
+     */
     public static function concat(self ...$docs): self
     {
-        return new self(DocKind::Concat, '', $docs);
+        $inherited = $docs !== [] && $docs[count($docs) - 1]->isBracketedSequence;
+        return new self(DocKind::Concat, '', $docs, $inherited);
     }
 
     public static function group(self ...$docs): self
@@ -118,12 +125,17 @@ final class Doc
      * An empty sequence is spelled as the two brackets and nothing between them, rather than as a bracket with no
      * content: there is nothing to put on a line of its own, so there is no reason to offer the break.
      *
+     * Both shapes are marked, which is what {@see self::isBracketedSequence()} goes on to answer. This is the only
+     * place a comma-separated sequence between brackets is built, so marking it here is what keeps the answer tied to
+     * the spelling. The empty shape is marked too: it is still a pair of brackets something can be laid out tight
+     * against, and the tight spelling is the only one it has.
+     *
      * @param list<self> $items
      */
     public static function commaSeparated(string $open, array $items, string $close): self
     {
         if ($items === []) {
-            return self::text($open . $close);
+            return new self(DocKind::Text, $open . $close, [], true);
         }
         $parts = [];
         foreach ($items as $item) {
@@ -134,7 +146,7 @@ final class Doc
             $parts[] = $item;
         }
         $parts[] = self::whenBroken(',');
-        return self::bracket($open, self::concat(...$parts), $close);
+        return self::bracket($open, self::concat(...$parts), $close)->asBracketedSequence();
     }
 
     /**
@@ -172,7 +184,7 @@ final class Doc
                 continue;
             }
             [$mode, $doc] = array_pop($commands);
-            if ($doc->children !== []) {
+            if ($doc->kind->hasChildren()) {
                 foreach (array_reverse($doc->children) as $child) {
                     $commands[] = [$mode, $child];
                 }
@@ -187,6 +199,18 @@ final class Doc
             $remaining -= strlen($doc->text);
         }
         return false;
+    }
+
+    /**
+     * Whether this document spells a comma-separated sequence between brackets — `[a, b]` flat, and an opening bracket
+     * on the line it starts on with the closing one on a line of its own when broken. A caller with something to lay
+     * out tight against such a spelling asks the document rather than asking what kind of node produced it: the mark
+     * is put on where the spelling is built, so it can't come to describe a node that spells itself some other way,
+     * which is what a list of node types drifts into.
+     */
+    public function isBracketedSequence(): bool
+    {
+        return $this->isBracketedSequence;
     }
 
     /**
@@ -209,10 +233,21 @@ final class Doc
     }
 
     /**
+     * This document with the mark on. {@see self::bracket()} can't put it there itself: it also spells the parentheses
+     * that go around an operand loose enough to need them, and those hold one expression rather than a sequence, so a
+     * caller laying something out tight against them would be reading a bracket that isn't the sequence's own.
+     */
+    private function asBracketedSequence(): self
+    {
+        return new self($this->kind, $this->text, $this->children, true);
+    }
+
+    /**
      * Walks the document with an explicit stack of commands — each of them a document to spell, the indentation to
-     * spell its line ends at, and the {@see DocMode} its group settled on — rather than by recursion, so a deeply
-     * nested expression can't run the interpreter out of stack. The mode the walk starts in is never read: every
-     * {@see DocKind::Line} this package builds is built inside a group, and a group settles its own mode.
+     * spell its line ends at, and the {@see DocMode} its group settled on — rather than by recursion, so rendering
+     * adds no stack depth of its own on top of what building the document already used. The mode the walk starts in
+     * is never read: every {@see DocKind::Line} this package builds is built inside a group, and a group settles its
+     * own mode.
      *
      * A null $width means no group is ever measured and every one of them stays flat, which is {@see self::flat()}.
      */
@@ -229,7 +264,7 @@ final class Doc
                     ? DocMode::Broken
                     : DocMode::Flat;
             }
-            if ($doc->children !== []) {
+            if ($doc->kind->hasChildren()) {
                 $childIndent = $doc->kind === DocKind::Indent ? $indent + self::INDENT : $indent;
                 foreach (array_reverse($doc->children) as $child) {
                     $commands[] = [$childIndent, $mode, $child];

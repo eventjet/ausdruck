@@ -9,7 +9,7 @@ use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\Token;
 use LogicException;
 
-use function array_unshift;
+use function array_reverse;
 use function sprintf;
 
 /**
@@ -98,9 +98,12 @@ enum Precedence: int
             && $first instanceof BinaryOperator
             && self::ofToken($first->token()) === $level
         ) {
-            array_unshift($rest, [$first->token(), $first->right]);
+            $rest[] = [$first->token(), $first->right];
             $first = $first->left;
         }
+        // The run is read from its outermost operator inwards, so it comes off backwards. Turning it around once is
+        // linear, where prepending each operator would copy everything collected so far every time.
+        $rest = array_reverse($rest);
         $parts = [];
         foreach ($rest as [$operator, $operand]) {
             $parts[] = Doc::line();

@@ -6,6 +6,7 @@ namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Formatter\Doc;
 use Eventjet\Ausdruck\Formatter\HasDoc;
+use Eventjet\Ausdruck\Formatter\PrintsItsDoc;
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
 use Throwable;
@@ -22,6 +23,7 @@ use function sprintf;
 final class Call extends Expression implements HasDoc
 {
     use LocationTrait;
+    use PrintsItsDoc;
 
     /**
      * @param list<Expression> $arguments
@@ -52,11 +54,6 @@ final class Call extends Expression implements HasDoc
             return false;
         }
         return true;
-    }
-
-    public function __toString(): string
-    {
-        return $this->doc()->flat();
     }
 
     #[Override]

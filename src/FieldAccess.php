@@ -6,6 +6,7 @@ namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Formatter\Doc;
 use Eventjet\Ausdruck\Formatter\HasDoc;
+use Eventjet\Ausdruck\Formatter\PrintsItsDoc;
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
 
@@ -18,6 +19,8 @@ use function sprintf;
  */
 final class FieldAccess extends Expression implements HasDoc
 {
+    use PrintsItsDoc;
+
     /**
      * @param Type $type The type {@see $field} is declared as on {@see $struct}. {@see Expr::fieldAccess()} resolves it,
      *     which is also where we know the field exists at all.
@@ -28,11 +31,6 @@ final class FieldAccess extends Expression implements HasDoc
         private readonly Type $type,
         private readonly Span $location,
     ) {
-    }
-
-    public function __toString(): string
-    {
-        return $this->doc()->flat();
     }
 
     #[Override]

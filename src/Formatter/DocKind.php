@@ -36,4 +36,22 @@ enum DocKind
      * struct literal end in a trailing comma that the flat spelling doesn't have.
      */
     case WhenBroken;
+
+    /**
+     * Whether a node of this kind carries children rather than spelling something of its own. Both walks in
+     * {@see Doc} ask this instead of looking at the children they were handed, so a kind that carries children is
+     * still read as one when it happens to carry none — an empty {@see self::Group} decides a mode over nothing
+     * rather than quietly turning into text.
+     *
+     * The answer is listed case by case rather than inferred, and there is no default arm, so a seventh kind added
+     * here is a match that no longer covers its subject: both walks are then made to say what to do with it, which is
+     * the only thing that keeps them from drifting apart.
+     */
+    public function hasChildren(): bool
+    {
+        return match ($this) {
+            self::Concat, self::Group, self::Indent => true,
+            self::Text, self::Line, self::WhenBroken => false,
+        };
+    }
 }

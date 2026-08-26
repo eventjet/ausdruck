@@ -6,6 +6,7 @@ namespace Eventjet\Ausdruck;
 
 use Eventjet\Ausdruck\Formatter\Doc;
 use Eventjet\Ausdruck\Formatter\HasDoc;
+use Eventjet\Ausdruck\Formatter\PrintsItsDoc;
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
 use RuntimeException;
@@ -19,16 +20,13 @@ use function sprintf;
  */
 final class ListLiteral extends AbstractLiteral implements HasDoc
 {
+    use PrintsItsDoc;
+
     /**
      * @param list<Expression> $elements
      */
     public function __construct(public readonly array $elements, public readonly Span $location)
     {
-    }
-
-    public function __toString(): string
-    {
-        return $this->doc()->flat();
     }
 
     #[Override]

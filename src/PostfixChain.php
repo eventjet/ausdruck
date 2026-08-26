@@ -7,7 +7,7 @@ namespace Eventjet\Ausdruck;
 use Eventjet\Ausdruck\Formatter\Doc;
 
 use function array_map;
-use function array_unshift;
+use function array_reverse;
 use function count;
 use function sprintf;
 
@@ -38,9 +38,12 @@ final class PostfixChain
         $links = [];
         $base = $link;
         while ($base instanceof Call || $base instanceof FieldAccess) {
-            array_unshift($links, $base);
+            $links[] = $base;
             $base = $base instanceof Call ? $base->target : $base->struct;
         }
+        // The run is read from its last link inwards, so it comes off backwards. Turning it around once is linear,
+        // where prepending each link would copy everything collected so far every time.
+        $links = array_reverse($links);
         $breakable = self::isBreakable($links);
         $parts = [];
         foreach ($links as $current) {
@@ -88,8 +91,8 @@ final class PostfixChain
 
     /**
      * A call's argument list. It is a comma-separated sequence like any other, with one exception: a sole argument that
-     * already ends in a bracket of its own keeps the parentheses tight around it, so the argument breaks and the call
-     * doesn't.
+     * already spells itself as a bracketed sequence keeps the parentheses tight around it, so the argument breaks and
+     * the call doesn't.
      *
      * ```
      * orders:list<Order>.map:list<Row>(|order| {
@@ -99,26 +102,21 @@ final class PostfixChain
      *
      * Breaking the argument list as well would spell the same expression with two openings and two closings for one
      * argument, and indent the struct a step further than it has to be. The exception is worth making only when the
-     * argument's own broken spelling starts with a bracket on the line the call opened and ends with one on a line of
-     * its own — a list or struct literal, or a lambda over either — because that is what makes the tight parentheses
-     * read as a single opening rather than a run-on.
+     * argument's own spelling starts with a bracket on the line the call opened and ends with one on a line of its
+     * own, because that is what makes the tight parentheses read as a single opening rather than a run-on.
+     *
+     * The argument's document is what answers that, by way of {@see Doc::isBracketedSequence()}, rather than a list
+     * of the node types that spell themselves that way. The two are not the same question — an empty list literal is
+     * a list literal, but it spells as `[]` and has no broken spelling to keep the parentheses tight around — and it
+     * is the document, not the node, that knows which spelling it gives. Asking it also lets a node a consumer wrote
+     * take the exception, which a list closed inside this class could never offer.
      */
     private static function arguments(Call $call): Doc
     {
-        $arguments = $call->arguments;
-        $sole = count($arguments) === 1 ? $arguments[0] : null;
-        if ($sole !== null && self::endsInABracket($sole)) {
-            return Doc::concat(Doc::text('('), Doc::of($sole), Doc::text(')'));
+        $arguments = array_map(Doc::of(...), $call->arguments);
+        if (count($arguments) === 1 && $arguments[0]->isBracketedSequence()) {
+            return Doc::concat(Doc::text('('), $arguments[0], Doc::text(')'));
         }
-        return Doc::commaSeparated('(', array_map(Doc::of(...), $arguments), ')');
-    }
-
-    private static function endsInABracket(Expression $argument): bool
-    {
-        return match (true) {
-            $argument instanceof ListLiteral, $argument instanceof StructLiteral => true,
-            $argument instanceof Lambda => self::endsInABracket($argument->body),
-            default => false,
-        };
+        return Doc::commaSeparated('(', $arguments, ')');
     }
 }
