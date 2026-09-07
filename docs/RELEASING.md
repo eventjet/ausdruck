@@ -106,6 +106,17 @@ GitHub put in the commit body. Two consequences:
 - Everything outside the block is ignored, so a review checklist or a test plan in
   the description cannot leak into the changelog.
 
+**The marker activates wherever it appears in a description, so write it only as
+the block itself.** release-please splits the description on the first occurrence of
+the string, with no requirement that it sit on its own line or outside a code span —
+inside backticks and inside a fenced block both count. Everything after that first
+occurrence becomes the commit message. A description that merely *mentions* the
+marker therefore hands release-please a fragment that does not parse, and the pull
+request is skipped: no changelog entry, no bump, and nothing on the pull request to
+say so. You find out only when no release pull request appears. When you need to
+discuss the mechanism in a description, call it "the commit-override block" instead
+of naming it.
+
 Mind the blank lines inside the block. release-please starts a new commit at any
 blank line followed by a `type: ` subject, so one block can deliberately carry two
 entries for a pull request that does two things — and can accidentally carry two if
