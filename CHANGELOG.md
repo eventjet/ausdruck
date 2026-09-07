@@ -1,18 +1,17 @@
 # Changelog
 
-All notable changes to this project are documented in this file.
+All notable changes to this project are documented in this file. It is generated from
+[Conventional Commits](https://www.conventionalcommits.org/) by
+[release-please](https://github.com/googleapis/release-please), and this project adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 While the version stays below `1.0.0`, a minor bump (`0.x`) may carry breaking
 changes; see [UPGRADING.md](UPGRADING.md) for the migration steps behind each one.
 
 This changelog begins at 0.3.0. Earlier releases are recorded in the
 [git tags](https://github.com/eventjet/ausdruck/tags).
 
-## [Unreleased]
-
-## [0.3.0] - 2026-07-24
+## [0.3.0](https://github.com/eventjet/ausdruck/compare/0.2.4...0.3.0) (2026-07-24)
 
 A breaking release that rounds out the operator set and the type system. Most 0.2
 expressions and integrations keep working unchanged; the migration notes for the
@@ -71,6 +70,3 @@ cases that don't are in [UPGRADING.md](UPGRADING.md).
 - `Parser\Delimiters` — an internal token detail with no role in the public API.
 - The `Eq` and `Gt` node classes — the `@internal` concrete nodes that `eq()` and `gt()`
   returned in 0.2; now that those builders return `self`, they fold into `Comparison`.
-
-[Unreleased]: https://github.com/eventjet/ausdruck/compare/0.3.0...HEAD
-[0.3.0]: https://github.com/eventjet/ausdruck/compare/0.2.4...0.3.0

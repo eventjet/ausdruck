@@ -67,7 +67,13 @@ still be direct breaks; every one is recorded in the upgrade notes.
 
 ## Choosing and recording the version
 
-The version bump is a **human decision**: the compatibility check and the record of
-behavioral changes inform it, and the maintainer sets the number. Every break and
-deprecation is recorded in the changelog / upgrade notes, and releases are cut as git
-tags (see `RELEASING.md` for the mechanics).
+The version number is **derived** from the pull request titles that landed, by
+release-please (see `RELEASING.md` for the mechanics). The human decision moves one step
+earlier: marking a change as breaking, with a `!` after the type in the pull request
+title, is what turns it into a minor bump. Nothing detects a break for you — the
+compatibility check reports signature changes, but a *behavioral* break has no signature
+to compare, so only the author can declare it. `Release-As:` overrides the derived number
+when the declaration was missed.
+
+Every break and deprecation is recorded in the changelog (generated) and the upgrade
+notes (hand-written), and releases are cut as git tags.
