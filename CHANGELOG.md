@@ -11,6 +11,18 @@ changes; see [UPGRADING.md](UPGRADING.md) for the migration steps behind each on
 This changelog begins at 0.3.0. Earlier releases are recorded in the
 [git tags](https://github.com/eventjet/ausdruck/tags).
 
+## [0.3.1](https://github.com/eventjet/ausdruck/compare/0.3.0...0.3.1) (2026-09-07)
+
+
+### Documentation
+
+* warn that the override marker activates anywhere in a description ([#112](https://github.com/eventjet/ausdruck/issues/112)) ([b6e84a3](https://github.com/eventjet/ausdruck/commit/b6e84a301779a7148c7402abf72931a3ecb2c52a))
+
+
+### Continuous Integration
+
+* automate releases with release-please ([#110](https://github.com/eventjet/ausdruck/issues/110)) ([ca0740c](https://github.com/eventjet/ausdruck/commit/ca0740cf7e1c8666e7035b3e1331be4d87b27cdf))
+
 ## [0.3.0](https://github.com/eventjet/ausdruck/compare/0.2.4...0.3.0) (2026-07-24)
 
 A breaking release that rounds out the operator set and the type system. Most 0.2
