@@ -1,0 +1,7 @@
+groups:list<list<string>>.flatten()
+-- Input --
+{ groups: [] }
+-- Expression type --
+list<string>
+-- Output --
+[]

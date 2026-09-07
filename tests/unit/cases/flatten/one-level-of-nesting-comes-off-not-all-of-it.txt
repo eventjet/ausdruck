@@ -1,0 +1,10 @@
+groups:list<list<list<int>>>.flatten()
+-- Input --
+{ groups: [[[1], [2]], [[3]]] }
+-- Expression type --
+list<list<int>>
+-- Output --
+[[1], [2], [3]]
+-- Note --
+T is whatever the inner lists hold, list<int> here, so flattening a three-deep list answers a two-deep one. Reaching
+the ints takes a second call, which a-second-call-reaches-the-elements pins.
