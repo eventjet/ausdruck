@@ -1,12 +1,20 @@
 version: 2
 updates:
+  # Dependabot pull requests are squash-merged like any other, so their titles have
+  # to parse as Conventional Commits for release-please to see them at all.
   - package-ecosystem: composer
     directory: /
     schedule:
       interval: daily
     target-branch: master
+    commit-message:
+      prefix: chore
+      include: scope
   - package-ecosystem: github-actions
     directory: .github/workflows
     schedule:
       interval: daily
     target-branch: master
+    commit-message:
+      prefix: chore
+      include: scope

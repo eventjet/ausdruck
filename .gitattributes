@@ -1,6 +1,7 @@
 /.github/ export-ignore
 /.gitattributes export-ignore
 /.gitignore export-ignore
+/.release-please-manifest.json export-ignore
 /composer-require-checker.json export-ignore
 /features/ export-ignore
 /infection.json export-ignore
@@ -9,4 +10,5 @@
 /phpstan-baseline.neon export-ignore
 /phpunit.xml export-ignore
 /psalm.xml export-ignore
+/release-please-config.json export-ignore
 /tests/ export-ignore

@@ -330,3 +330,20 @@ To access an argument, you must specify its type, just like when accessing scope
 #### Example
 
 `|item| item:int > 5`
+
+## Releases
+
+Versions live in [CHANGELOG.md](CHANGELOG.md), and the migration steps behind each
+breaking change in [UPGRADING.md](UPGRADING.md).
+
+While the version stays below `1.0.0`, Composer treats the **minor** as the
+compatibility boundary — `^0.3` resolves to `>=0.3.0 <0.4.0`. So a breaking change
+moves the minor, and everything else is a patch.
+
+Releasing is automated with
+[release-please](https://github.com/googleapis/release-please): pull request titles
+are [Conventional Commits](https://www.conventionalcommits.org/), and the version,
+changelog entry, tag, and GitHub release are derived from them. If you are
+contributing, [docs/RELEASING.md](docs/RELEASING.md) has the type → section → bump
+table and how to declare a breaking change; the compatibility promise itself is in
+[docs/BACKWARD-COMPATIBILITY.md](docs/BACKWARD-COMPATIBILITY.md).
