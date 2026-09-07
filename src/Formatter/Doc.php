@@ -29,6 +29,10 @@ use function strlen;
  * ones holding non-ASCII string literals, and the disagreement makes such an expression break a little earlier than it
  * had to.
  *
+ * A string literal holding a line break is counted the same way, by how long it is rather than by where it leaves the
+ * cursor, and errs in the same direction: everything after it is measured as if the line were longer than it is, so
+ * the expression around it breaks a little earlier than it had to.
+ *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
@@ -135,7 +139,7 @@ final class Doc
     public static function commaSeparated(string $open, array $items, string $close): self
     {
         if ($items === []) {
-            return new self(DocKind::Text, $open . $close, [], true);
+            return self::text($open . $close)->asBracketedSequence();
         }
         $parts = [];
         foreach ($items as $item) {
@@ -226,6 +230,8 @@ final class Doc
      * The document laid out to fit within $width columns, breaking the groups that don't. A group with no break points
      * — a long string literal, a variable with a long type annotation — is spelled past the width rather than mangled,
      * so $width is where lines are preferred to end, not a guarantee about where they do.
+     *
+     * @param positive-int $width
      */
     public function render(int $width): string
     {

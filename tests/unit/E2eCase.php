@@ -90,6 +90,7 @@ final readonly class E2eCase
 
     /**
      * @param array<string, mixed> $input
+     * @param positive-int $width
      */
     private function __construct(
         public string $source,
@@ -184,13 +185,19 @@ final readonly class E2eCase
     /**
      * The number of columns the Formatted section was laid out to. A case writes one so the shape it pins can be shown
      * at the size that provokes it, rather than by padding an expression out to the formatter's default width.
+     *
+     * Zero columns is rejected along with everything that isn't a number: a width is the last column a line may use,
+     * so the narrowest one a case can pin a shape at is one.
+     *
+     * @return positive-int
      */
     private static function parseWidth(string $src): int
     {
-        if (!ctype_digit($src)) {
-            throw new RuntimeException(sprintf('Width must be a number of columns, got %s', $src));
+        $width = ctype_digit($src) ? (int)$src : 0;
+        if ($width < 1) {
+            throw new RuntimeException(sprintf('Width must be a positive number of columns, got %s', $src));
         }
-        return (int)$src;
+        return $width;
     }
 
     /**

@@ -38,6 +38,8 @@ final class ExpressionFormatter
      * $expression spelled to fit within $width columns. A line only ends where a node offers to end one, so a run with
      * nothing to break — a long string literal, a variable with a long type annotation — is spelled past $width rather
      * than mangled.
+     *
+     * @param positive-int $width
      */
     public static function format(Expression $expression, int $width = self::DEFAULT_WIDTH): string
     {
