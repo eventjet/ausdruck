@@ -1,0 +1,13 @@
+xs:list<int>.merge([10, 20, 30, 40, 50])
+-- Functions --
+merge: fn(list<int>, list<int>) -> list<int>
+-- Width --
+30
+-- Formatted --
+xs:list<int>.merge:list<int>([
+    10,
+    20,
+    30,
+    40,
+    50,
+])

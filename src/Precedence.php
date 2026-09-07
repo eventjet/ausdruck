@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Formatter\Doc;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\Token;
 use LogicException;
 
+use function array_reverse;
 use function sprintf;
 
 /**
@@ -31,6 +33,10 @@ use function sprintf;
  *
  * Grouping, on the other hand, is not stored anywhere: parentheses leave no trace in the tree, so the same tree always
  * prints the same way regardless of whether it was built with them, in the builder API, or by the parser.
+ *
+ * Both printers answer a {@see Doc} rather than a string, so one spelling serves both putting the operator on a line
+ * and laying it out across several. Where the parentheses go isn't part of that choice: they undo the cascade, which
+ * is a fact about the tree, so the same ones are spelled however much room the line has.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -66,16 +72,45 @@ enum Precedence: int
      * too. It is a {@see Token} rather than a string for the same reason {@see self::unary()} takes one: a spelling
      * the lexer has no token for is not something a caller may ask for, and taking the token is what makes that
      * unsayable.
+     *
+     * A run of operators at one left-associative level is spelled as one sequence rather than as nested ones. The tree
+     * `a:int - b:int - c:int` is a subtraction whose left operand is another, and spelling the inner one on its own
+     * would make it a group of its own to lay out, so a chain long enough to break would step further to the right at
+     * every operator. Read as a sequence, it breaks all at once and at one depth:
+     *
+     * ```
+     * a:int
+     *     - b:int
+     *     - c:int
+     * ```
+     *
+     * There is no such run to read at the comparison level, which is the one level that isn't left-associative: a
+     * comparison over a comparison needs the parentheses that stop it from being a run at all.
      */
-    public static function binary(Token $token, Expression $left, Expression $right): string
+    public static function binary(Token $token, Expression $left, Expression $right): Doc
     {
         $level = self::ofToken($token);
-        return sprintf(
-            '%s %s %s',
-            self::parenthesize($left, $level->leftSlot()),
-            $token->value,
-            self::parenthesize($right, $level->tighter()),
-        );
+        /** @var non-empty-list<array{Token, Expression}> $rest */
+        $rest = [[$token, $right]];
+        $first = $left;
+        while (
+            $level->isLeftAssociative()
+            && $first instanceof BinaryOperator
+            && self::ofToken($first->token()) === $level
+        ) {
+            $rest[] = [$first->token(), $first->right];
+            $first = $first->left;
+        }
+        // The run is read from its outermost operator inwards, so it comes off backwards. Turning it around once is
+        // linear, where prepending each operator would copy everything collected so far every time.
+        $rest = array_reverse($rest);
+        $parts = [];
+        foreach ($rest as [$operator, $operand]) {
+            $parts[] = Doc::line();
+            $parts[] = Doc::text(sprintf('%s ', $operator->value));
+            $parts[] = self::parenthesize($operand, $level->tighter());
+        }
+        return Doc::group(self::parenthesize($first, $level->leftSlot()), Doc::indent(...$parts));
     }
 
     /**
@@ -87,9 +122,9 @@ enum Precedence: int
      *
      * @param Token::Minus|Token::Not $token
      */
-    public static function unary(Token $token, Expression $operand): string
+    public static function unary(Token $token, Expression $operand): Doc
     {
-        return sprintf('%s%s', $token->value, self::parenthesize($operand, self::Unary));
+        return Doc::concat(Doc::text($token->value), self::parenthesize($operand, self::Unary));
     }
 
     /**
@@ -100,10 +135,10 @@ enum Precedence: int
      * re-parses into a different tree than the `(2).foo` / `(-2).foo` receiver it was printed from. The hazard is
      * lexical, not a matter of binding, which is why it lives here rather than in {@see self::of()}.
      */
-    public static function parenthesizeTarget(Expression $target): string
+    public static function parenthesizeTarget(Expression $target): Doc
     {
         if ($target instanceof Literal && $target->isNumber()) {
-            return sprintf('(%s)', $target);
+            return Doc::text(sprintf('(%s)', $target));
         }
         return self::parenthesize($target, self::Primary);
     }
@@ -112,9 +147,10 @@ enum Precedence: int
      * Prints $operand as it appears in an operand slot that the parser reads at $slot, wrapping it in parentheses when
      * it binds looser than $slot and would otherwise be re-parsed into a different tree.
      */
-    private static function parenthesize(Expression $operand, self $slot): string
+    private static function parenthesize(Expression $operand, self $slot): Doc
     {
-        return self::of($operand)->bindsLooserThan($slot) ? sprintf('(%s)', $operand) : (string)$operand;
+        $doc = Doc::of($operand);
+        return self::of($operand)->bindsLooserThan($slot) ? Doc::bracket('(', $doc, ')') : $doc;
     }
 
     /**
@@ -182,5 +218,16 @@ enum Precedence: int
     private function leftSlot(): self
     {
         return $this === self::Comparison ? $this->tighter() : $this;
+    }
+
+    /**
+     * Whether a level folds an operand into its own left side, which is exactly what {@see self::leftSlot()} answers by
+     * naming the level itself: a level that reads its left operand at its own level is one whose operators chain, and
+     * one that reads it tighter is one whose operators can't appear twice without parentheses. Derived from that method
+     * rather than listed again, so a level can't be left-associative in one of the two and not the other.
+     */
+    private function isLeftAssociative(): bool
+    {
+        return $this->leftSlot() === $this;
     }
 }

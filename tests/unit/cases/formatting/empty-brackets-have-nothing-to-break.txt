@@ -1,0 +1,10 @@
+{items: [], meta: {}}
+-- Note --
+Both inner brackets are past the width and stay put: there is nothing between them to move onto a line of its own.
+-- Width --
+10
+-- Formatted --
+{
+    items: [],
+    meta: {},
+}

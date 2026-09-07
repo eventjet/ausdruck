@@ -1,0 +1,10 @@
+a:int - b:int - c:int - d:int
+-- Note --
+Subtraction is left-associative, so this is one run rather than nested pairs, and it breaks as one.
+-- Width --
+20
+-- Formatted --
+a:int
+    - b:int
+    - c:int
+    - d:int

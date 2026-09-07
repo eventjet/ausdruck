@@ -1,0 +1,8 @@
+numbers:list<int>.map:list<int>(|n| n:int).unique().take(3)
+-- Width --
+30
+-- Formatted --
+numbers:list<int>
+    .map:list<int>(|n| n:int)
+    .unique:list<int>()
+    .take:list<int>(3)

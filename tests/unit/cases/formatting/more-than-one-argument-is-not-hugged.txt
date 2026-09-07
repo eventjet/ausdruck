@@ -1,0 +1,13 @@
+xs:list<int>.merge([10, 20, 30], 40)
+-- Note --
+The tight parentheses are for a sole argument. A call with a second one has to spell it, so the argument list breaks
+like any other comma-separated sequence even though the first argument ends in a bracket of its own.
+-- Functions --
+merge: fn(list<int>, list<int>, int) -> list<int>
+-- Width --
+30
+-- Formatted --
+xs:list<int>.merge:list<int>(
+    [10, 20, 30],
+    40,
+)

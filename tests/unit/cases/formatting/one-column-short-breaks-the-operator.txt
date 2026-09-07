@@ -1,0 +1,8 @@
+a:int + b:int
+-- Note --
+The same expression as a-line-may-end-on-the-last-column, one column short of fitting.
+-- Width --
+12
+-- Formatted --
+a:int
+    + b:int

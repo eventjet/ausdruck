@@ -1,0 +1,10 @@
+numbers:list<int>.unique().take(3)
+-- Note --
+Two is where a run starts: one call has nothing to line up against and breaks its arguments instead, as in
+a-single-call-breaks-its-arguments.
+-- Width --
+30
+-- Formatted --
+numbers:list<int>
+    .unique:list<int>()
+    .take:list<int>(3)

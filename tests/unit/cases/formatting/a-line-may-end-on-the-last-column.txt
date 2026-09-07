@@ -1,0 +1,7 @@
+a:int + b:int
+-- Note --
+Thirteen columns wide, laid out to thirteen: a width is the last column a line may use, not the first it may not.
+-- Width --
+13
+-- Formatted --
+a:int + b:int

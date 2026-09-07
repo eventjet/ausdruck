@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
+use Eventjet\Ausdruck\Formatter\ExpressionFormatter;
 use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\SyntaxError;
@@ -56,6 +57,14 @@ final class EndToEndTest extends TestCase
 
         if ($case->expressionType !== null) {
             self::assertSame($case->expressionType, (string)$expression->getType());
+        }
+        if ($case->formatted !== null) {
+            $formatted = ExpressionFormatter::format($expression, $case->width);
+            self::assertSame($case->formatted, $formatted);
+            self::assertTrue(
+                $expression->equals(ExpressionParser::parse($formatted, $case->declarations)),
+                'Formatting an expression has to leave a source that reads back as the same expression',
+            );
         }
         if ($case->output === null) {
             return;

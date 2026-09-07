@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Formatter\Doc;
+use Eventjet\Ausdruck\Formatter\HasDoc;
+use Eventjet\Ausdruck\Formatter\PrintsItsDoc;
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\Token;
 use Override;
@@ -17,13 +20,16 @@ use Override;
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-abstract class BinaryOperator extends Expression
+abstract class BinaryOperator extends Expression implements HasDoc
 {
+    use PrintsItsDoc;
+
     public function __construct(public readonly Expression $left, public readonly Expression $right)
     {
     }
 
-    final public function __toString(): string
+    #[Override]
+    final public function doc(): Doc
     {
         return Precedence::binary($this->token(), $this->left, $this->right);
     }

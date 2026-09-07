@@ -1,0 +1,10 @@
+items:list<int>.filter(|i| i:int > 100)
+-- Note --
+One call, so there is no run of them to line up: breaking before the only dot would push the argument list over a line
+end without buying it any room, and the argument list is what breaks instead.
+-- Width --
+20
+-- Formatted --
+items:list<int>.filter:list<int>(
+    |i| i:int > 100,
+)
