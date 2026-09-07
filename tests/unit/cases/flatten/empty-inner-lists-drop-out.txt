@@ -1,0 +1,10 @@
+groups:list<list<int>>.flatten()
+-- Input --
+{ groups: [[], [1], [], [2, 3], []] }
+-- Expression type --
+list<int>
+-- Output --
+[1, 2, 3]
+-- Note --
+An inner list that contributes nothing leaves no key behind: the elements around it close
+up rather than being numbered past a gap.

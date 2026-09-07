@@ -1,0 +1,16 @@
+specs:list<Spec>.map(|s| items:list<Item>.filter(|i| i:Item.kind === s:Spec.kind).map(|i| {kind: s:Spec.kind, label: s:Spec.label, id: i:Item.id})).flatten()
+-- Types --
+Spec: { kind: string, label: string }
+Item: { kind: string, id: string }
+-- Input --
+{ specs: [{kind: "a", label: "Alpha"}, {kind: "b", label: "Beta"}], items: [{kind: "a", id: "1"}, {kind: "b", id: "2"}, {kind: "a", id: "3"}] }
+-- Expression type --
+list<{ kind: string, label: string, id: string }>
+-- Output --
+[{kind: "a", label: "Alpha", id: "1"}, {kind: "a", label: "Alpha", id: "3"}, {kind: "b", label: "Beta", id: "2"}]
+-- Note --
+The shape flatten was asked for: the lambda builds its list out of a second collection it
+closes over, not out of the element it was handed, so the nesting is the map's doing
+rather than something the receiver already had. One spec matching two items contributes
+two entries, and a spec matching none contributes nothing -- which is the whole difference
+between this and a map that answers one entry per element.

@@ -291,6 +291,7 @@ $declarations = new Declarations(functions: ['myMap' => $myMap]);
 | `count`    | `fn(list<any>) -> int`                     | Returns the number of elements in a list                               | `foo:list<string>.count()`                |
 | `contains` | `fn<T>(list<T>, T) -> bool`                | Returns whether a list contains a value                                | `foo:list<string>.contains("bar")`        |
 | `filter`   | `fn<T>(list<T>, fn(T) -> bool) -> list<T>` | Returns a new list of the elements matching a [predicate](#lambdas)    | `foo:list<int>.filter(\|i\| i:int > 2)`   |
+| `flatten`  | `fn<T>(list<list<T>>) -> list<T>`          | Returns one list with the elements of every inner list, in order       | `foo:list<list<int>>.flatten()`           |
 | `head`     | `fn<T>(list<T>) -> Option<T>`              | Returns the first element of a list as an `Option`                     | `foo:list<string>.head()`                 |
 | `isSome`   | `fn(Option<any>) -> bool`                  | Takes an Option and returns whether it is `Some`                       | `foo:Option<int>.isSome()`                |
 | `map`      | `fn<T, U>(list<T>, fn(T) -> U) -> list<U>` | Returns a new list with the results of applying a [function](#lambdas) | `foo:list<int>.map(\|i\| i:int - 2)`      |
