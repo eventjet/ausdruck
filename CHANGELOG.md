@@ -11,6 +11,23 @@ changes; see [UPGRADING.md](UPGRADING.md) for the migration steps behind each on
 This changelog begins at 0.3.0. Earlier releases are recorded in the
 [git tags](https://github.com/eventjet/ausdruck/tags).
 
+## [0.4.0](https://github.com/eventjet/ausdruck/compare/0.3.1...0.4.0) (2026-09-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* `flatten` is now a predefined function. An integration that declared its own now gets "Can't shadow predefined functions: flatten" from `Scope` and "Can't override built-in function flatten" from `Declarations`.
+
+### Features
+
+* add an expression formatter ([#107](https://github.com/eventjet/ausdruck/issues/107)) ([5cdd0c9](https://github.com/eventjet/ausdruck/commit/5cdd0c99111fdcd0f47259591c1a0b26af215ae6))
+* add the flatten built-in ([e0627b5](https://github.com/eventjet/ausdruck/commit/e0627b55f07c580f3f7d1275bbc42e37eba41ef8))
+
+
+### Continuous Integration
+
+* match the release title to the unprefixed tag ([#114](https://github.com/eventjet/ausdruck/issues/114)) ([ad103d5](https://github.com/eventjet/ausdruck/commit/ad103d5c2dee8c3257cbecdf01ebd85fcae28083))
+
 ## [0.3.1](https://github.com/eventjet/ausdruck/compare/0.3.0...0.3.1) (2026-09-07)
 
 
