@@ -1,0 +1,5 @@
+[None, Some(1)]
+-- Expression type --
+list<Option<int>>
+-- Output --
+[None, Some(1)]

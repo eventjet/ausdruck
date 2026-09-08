@@ -144,7 +144,6 @@ final class TypeTest extends TestCase
             ['{name: string}', '{name: string, age: int}'],
             ['{name: string}', '{name: int}'],
             ['{name: string}', '{firstName: string}'],
-            ['Some<string>', 'Some<int>'],
             ['any', 'string'],
         ];
         foreach ($cases as [$a, $b]) {
@@ -657,12 +656,6 @@ final class TypeTest extends TestCase
         self::assertTrue($alias->isSubtypeOf(Type::struct(['name' => Type::string()])));
     }
 
-    /**
-     * isStruct() and getFieldType() already see through an alias to answer this; isOption() has to as well, or
-     * {@see Get::evaluate()}'s null check -- which reads isOption() directly rather than going through
-     * isSubtypeOf() -- rejects a missing variable declared with an alias for an Option the same way it would reject
-     * one that's actually required.
-     */
     public function testAliasOfAnOptionIsRecognizedAsOne(): void
     {
         $alias = Type::alias('Maybe', Type::option(Type::string()));

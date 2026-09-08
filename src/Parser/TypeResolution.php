@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Eventjet\Ausdruck\EnumDefinition;
 use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Type;
 use Eventjet\Ausdruck\TypeConstructor;
@@ -38,10 +39,12 @@ final class TypeResolution
     /**
      * @param array<string, Type> $aliases
      * @param array<string, true> $typeVariables
+     * @param array<string, EnumDefinition> $enums
      */
     public function __construct(
         private readonly array $aliases,
         private readonly array $typeVariables = [],
+        private readonly array $enums = [],
     ) {
     }
 
@@ -140,9 +143,28 @@ final class TypeResolution
      */
     public function resolveApplication(ApplicationTypeNode $node): Type|TypeError
     {
+        if ($node->name === '!') {
+            return Type::never();
+        }
         if (array_key_exists($node->name, $this->typeVariables)) {
             // A variable stands for one complete type, so like an alias it takes no arguments of its own.
             return self::checkArity($node, 0) ?? Type::var($node->name);
+        }
+        $enum = $this->enums[$node->name] ?? null;
+        if ($enum !== null) {
+            $error = self::checkArity($node, count($enum->parameters));
+            if ($error !== null) {
+                return $error;
+            }
+            $arguments = [];
+            foreach ($node->args as $argument) {
+                $type = $this->resolve($argument);
+                if ($type instanceof TypeError) {
+                    return $type;
+                }
+                $arguments[] = $type;
+            }
+            return $enum->type(...$arguments);
         }
         $constructor = TypeConstructor::tryFrom($node->name);
         if ($constructor === null) {
@@ -163,9 +185,6 @@ final class TypeResolution
             TypeConstructor::Any => Type::any(),
             TypeConstructor::Map => $this->resolveMap($node),
             TypeConstructor::List => $this->resolveList($node),
-            TypeConstructor::Option => $this->resolveOption($node),
-            TypeConstructor::Some => $this->resolveSome($node),
-            TypeConstructor::None => Type::none(),
         };
     }
 
@@ -200,7 +219,7 @@ final class TypeResolution
             }
             $typeVariables[$parameter->name] = true;
         }
-        $inner = new self($this->aliases, $typeVariables);
+        $inner = new self($this->aliases, $typeVariables, $this->enums);
         $argTypes = [];
         foreach ($node->parameters as $parameter) {
             $argType = $inner->resolve($parameter);
@@ -294,22 +313,6 @@ final class TypeResolution
     }
 
     /**
-     * An Option is a Some that may be absent, so it is the type of its argument and nothing more—which is what
-     * {@see self::resolveSome()} already resolves.
-     */
-    private function resolveOption(ApplicationTypeNode $node): Type|TypeError
-    {
-        $some = $this->resolveSome($node);
-        return $some instanceof TypeError ? $some : Type::option($some);
-    }
-
-    private function resolveSome(ApplicationTypeNode $node): Type|TypeError
-    {
-        assert(count($node->args) === 1);
-        return $this->resolve($node->args[0]);
-    }
-
-    /**
      * A binder introduces a name, so the name has to be free to introduce: one the language already spells is a type
      * rather than a placeholder for one, one this same binder or an enclosing one already declared would make two
      * parameters answer to the same name, and one an alias already names is a type just as much as a built-in
@@ -332,7 +335,7 @@ final class TypeResolution
      */
     private function checkTypeVariable(Identifier $parameter, array $typeVariables): TypeError|null
     {
-        if (TypeConstructor::isReservedName($parameter->name)) {
+        if (TypeConstructor::isReservedName($parameter->name) || isset($this->enums[$parameter->name])) {
             return TypeError::create(
                 TypeConstructor::reservedNameMessage($parameter->name),
                 $parameter->location,

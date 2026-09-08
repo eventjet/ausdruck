@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
+use Eventjet\Ausdruck\EnumValue;
+use Eventjet\Ausdruck\EvaluationError;
 use Eventjet\Ausdruck\Formatter\ExpressionFormatter;
 use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Scope;
+use Eventjet\Ausdruck\Signature;
 use Eventjet\Ausdruck\Type;
+use Eventjet\Ausdruck\TypeDependentFunction;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -44,8 +48,11 @@ final class EndToEndTest extends TestCase
     {
         if ($case->error !== null) {
             try {
-                ExpressionParser::parse($case->source, $case->declarations);
-            } catch (SyntaxError|TypeError $e) {
+                $expression = ExpressionParser::parse($case->source, $case->declarations);
+                if ($case->error->class === EvaluationError::class) {
+                    $expression->evaluate(new Scope($case->input));
+                }
+            } catch (SyntaxError|TypeError|EvaluationError $e) {
                 self::assertInstanceOf($case->error->class, $e);
                 self::assertSame($case->error->message, $e->getMessage());
                 return;
@@ -54,6 +61,13 @@ final class EndToEndTest extends TestCase
         }
 
         $expression = ExpressionParser::parse($case->source, $case->declarations);
+
+        if ($case->printed !== null) {
+            self::assertSame($case->printed, (string)$expression);
+            $reparsed = ExpressionParser::parse($case->printed, $case->declarations);
+            self::assertTrue($expression->equals($reparsed));
+            self::assertTrue($expression->getType()->equals($reparsed->getType()));
+        }
 
         if ($case->expressionType !== null) {
             self::assertSame($case->expressionType, (string)$expression->getType());
@@ -91,5 +105,38 @@ final class EndToEndTest extends TestCase
 
         self::assertSame('foo', $expression->evaluate($scope));
         self::assertSame('foo', $reparsed->evaluate($scope));
+    }
+
+    public function testBuilderHeadPreservesLambdaTypeWithAnAnyResult(): void
+    {
+        $expression = ExpressionParser::parse('[|x| x:int]')->call('head', Type::any(), []);
+
+        $value = $expression->evaluate(new Scope());
+
+        self::assertInstanceOf(EnumValue::class, $value);
+        self::assertTrue($value->type->equals(Type::option(Type::func(Type::int(), [Type::any()]))));
+        $callback = $value->fields[0];
+        self::assertIsCallable($callback);
+        self::assertSame(42, $callback(42));
+    }
+
+    public function testTypeDependentFunctionSupportsExpressionAndDirectPhpCalls(): void
+    {
+        $item = Type::var('T');
+        $signature = Signature::over(Type::option($item), [Type::bool(), $item]);
+        $function = new TypeDependentFunction(
+            $signature,
+            static fn(Type $type, bool $present, mixed $payload): EnumValue => new EnumValue($type, $present ? 'Some' : 'None', $present ? [$payload] : []),
+        );
+        $declarations = new Declarations(functions: ['option' => $signature->toType()]);
+        $scope = new Scope(funcs: ['option' => $function]);
+
+        $expression = ExpressionParser::parse('true.option(42).unwrap()', $declarations);
+        self::assertSame(42, $expression->evaluate($scope));
+
+        $value = $function(true, payload: 'text');
+        self::assertInstanceOf(EnumValue::class, $value);
+        self::assertTrue($value->type->equals(Type::option(Type::string())));
+        self::assertSame(['text'], $value->fields);
     }
 }

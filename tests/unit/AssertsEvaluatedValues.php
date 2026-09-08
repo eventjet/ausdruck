@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
+use Eventjet\Ausdruck\EnumValue;
+
 use function array_keys;
 use function get_object_vars;
 use function is_array;
@@ -27,6 +29,13 @@ trait AssertsEvaluatedValues
 {
     private static function assertEvaluatesTo(mixed $expected, mixed $actual): void
     {
+        if ($expected instanceof EnumValue) {
+            self::assertInstanceOf(EnumValue::class, $actual);
+            self::assertSame($expected->type->asEnum()?->definition, $actual->type->asEnum()?->definition);
+            self::assertSame($expected->variant, $actual->variant);
+            self::assertEvaluatesTo($expected->fields, $actual->fields);
+            return;
+        }
         if (is_array($expected) && is_array($actual)) {
             self::assertSame(array_keys($expected), array_keys($actual), 'List keys differ');
             /** @var mixed $item */

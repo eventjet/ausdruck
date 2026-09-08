@@ -1,0 +1,7 @@
+value:Maybe.unwrap()
+-- Types --
+Maybe: Option<int>
+-- Input --
+{ value: Some(1) }
+-- Output --
+1

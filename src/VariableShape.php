@@ -22,6 +22,18 @@ final class VariableShape implements ComparableShape
     ) {
     }
 
+    #[Override]
+    public function accepts(mixed $value): bool
+    {
+        return Type::fromValue($value)->isSubtypeOf(Type::of($this));
+    }
+
+    #[Override]
+    public function refine(Type $actual): Type
+    {
+        return Type::of($this);
+    }
+
     /**
      * @param array<string, true> $found
      * @return array<string, true>
@@ -89,6 +101,9 @@ final class VariableShape implements ComparableShape
     #[Override]
     public function bind(Type $actual, array $bindings): array
     {
-        return array_key_exists($this->name, $bindings) ? $bindings : [...$bindings, $this->name => $actual];
+        $bindings[$this->name] = array_key_exists($this->name, $bindings)
+            ? $bindings[$this->name]->refine($actual)
+            : $actual;
+        return $bindings;
     }
 }

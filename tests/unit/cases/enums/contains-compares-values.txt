@@ -1,0 +1,3 @@
+[Some(1)].contains(Some(1))
+-- Output --
+true

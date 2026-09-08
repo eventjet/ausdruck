@@ -1,10 +1,5 @@
 x:int.unwrap()
--- Input --
-{ x: 5 }
--- Expression type --
-int
--- Output --
-5
+-- Type error --
+unwrap must be called on an expression of type Option<any>, but x:int is of type int
 -- Note --
-unwrap is declared as fn<T>(Option<T>) -> T. x isn't an Option, but a value is always a subtype of an Option of itself,
-which is why the call is valid at all. That coercion is what decides T here too: nothing else in the call could have.
+A plain value cannot be implicitly wrapped in an enum variant.

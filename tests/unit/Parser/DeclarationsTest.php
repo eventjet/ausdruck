@@ -25,6 +25,14 @@ final class DeclarationsTest extends TestCase
         new Declarations(functions: ['substr' => Type::func(Type::string(), [Type::int()])]);
     }
 
+    public function testVariableCannotShadowAnEnumVariant(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Variable shadows enum variant None');
+
+        new Declarations(variables: ['item' => Type::int(), 'None' => Type::int()]);
+    }
+
     /**
      * A function without a function type is not a function anyone could ever call: rejecting it here, rather than
      * downgrading it to "undeclared" wherever it's read, means every {@see Signature} in {@see Declarations::$functions}

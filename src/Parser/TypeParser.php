@@ -92,6 +92,10 @@ final class TypeParser
         if ($parsedToken === null) {
             return null;
         }
+        if ($parsedToken->token === Token::Not) {
+            $tokens->next();
+            return new ApplicationTypeNode('!', [], $parsedToken->location());
+        }
         if ($parsedToken->token === Token::OpenBrace) {
             return self::parseStruct($tokens);
         }

@@ -9,7 +9,6 @@ use Countable;
 use function array_map;
 use function array_slice;
 use function count;
-use function in_array;
 use function substr;
 
 /**
@@ -69,6 +68,7 @@ final class BuiltinFunctions
         // apart.
         $predicate = Type::func(Type::bool(), [$item]);
         $mapped = Type::var('U');
+        $head = Signature::over(Type::option($item), [$items]);
         return [
             'contains' => ['impl' => self::contains(...), 'signature' => Signature::over(Type::bool(), [$items, $item])],
             // Not generic: count and isSome answer the same thing whatever the list or Option holds, so the element
@@ -80,7 +80,7 @@ final class BuiltinFunctions
             ],
             'filter' => ['impl' => self::filter(...), 'signature' => Signature::over($items, [$items, $predicate])],
             'flatten' => ['impl' => self::flatten(...), 'signature' => Signature::over($items, [Type::listOf($items)])],
-            'head' => ['impl' => self::head(...), 'signature' => Signature::over(Type::option($item), [$items])],
+            'head' => ['impl' => new TypeDependentFunction($head, self::head(...)), 'signature' => $head],
             'isSome' => [
                 'impl' => self::isSome(...),
                 'signature' => Signature::over(Type::bool(), [Type::option(Type::any())]),
@@ -97,7 +97,7 @@ final class BuiltinFunctions
             'tail' => ['impl' => self::tail(...), 'signature' => Signature::over($items, [$items])],
             'take' => ['impl' => self::take(...), 'signature' => Signature::over($items, [$items, Type::int()])],
             'unique' => ['impl' => self::unique(...), 'signature' => Signature::over($items, [$items])],
-            'unwrap' => ['impl' => self::identity(...), 'signature' => Signature::over($item, [Type::option($item)])],
+            'unwrap' => ['impl' => self::unwrap(...), 'signature' => Signature::over($item, [Type::option($item)])],
         ];
     }
 
@@ -148,7 +148,7 @@ final class BuiltinFunctions
     private static function contains(array $haystack, mixed $needle): bool
     {
         foreach ($haystack as $item) {
-            if ($item !== $needle) {
+            if (!ValueEquality::equals($item, $needle)) {
                 continue;
             }
             return true;
@@ -201,21 +201,15 @@ final class BuiltinFunctions
     /**
      * @template T
      * @param list<T> $items
-     * @return T | null
      */
-    private static function head(array $items): mixed
+    private static function head(Type $returnType, array $items): EnumValue
     {
-        return $items[0] ?? null;
+        return $items === [] ? new EnumValue($returnType, 'None') : new EnumValue($returnType, 'Some', [$items[0]]);
     }
 
-    /**
-     * @template U
-     * @param U | null $option
-     * @return ($option is null ? false : true)
-     */
-    private static function isSome(mixed $option): bool
+    private static function isSome(EnumValue $option): bool
     {
-        return $option !== null;
+        return $option->variant === 'Some';
     }
 
     /**
@@ -237,7 +231,7 @@ final class BuiltinFunctions
     {
         $unique = [];
         foreach ($items as $item) {
-            if (in_array($item, $unique, true)) {
+            if (self::contains($unique, $item)) {
                 continue;
             }
             $unique[] = $item;
@@ -245,13 +239,11 @@ final class BuiltinFunctions
         return $unique;
     }
 
-    /**
-     * @template T
-     * @param T $value
-     * @return T
-     */
-    private static function identity(mixed $value): mixed
+    private static function unwrap(EnumValue $value): mixed
     {
-        return $value;
+        if ($value->variant === 'None') {
+            throw new EvaluationError('Cannot unwrap None');
+        }
+        return $value->fields[0];
     }
 }

@@ -11,6 +11,22 @@ changes; see [UPGRADING.md](UPGRADING.md) for the migration steps behind each on
 This changelog begins at 0.3.0. Earlier releases are recorded in the
 [git tags](https://github.com/eventjet/ausdruck/tags).
 
+## [Unreleased]
+
+### Added
+
+- Nominal generic sum types registered through `EnumDefinition`, with unit and
+  positional variants, tagged `EnumValue` values, and constructor expressions.
+- Parseable bottom type `!` for unconstrained variant arguments.
+
+### Changed
+
+- **Breaking:** `Option<T>` is a predefined enum. Construct `Some(value)` or
+  `None` explicitly; neither is a type, and nullable/raw-value coercions are removed.
+- **Breaking:** `head`, `/`, and `%` return tagged values; `unwrap(None)` fails.
+  See [UPGRADING.md](UPGRADING.md) for PHP interop migration.
+- Equality and collection membership compare tagged payloads structurally.
+
 ## [0.4.0](https://github.com/eventjet/ausdruck/compare/0.3.1...0.4.0) (2026-09-07)
 
 

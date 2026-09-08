@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Test\Unit;
 
 use Eventjet\Ausdruck\BuiltinFunctions;
+use Eventjet\Ausdruck\EnumValue;
 use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\TypeNode;
 use Eventjet\Ausdruck\Parser\Types;
@@ -86,6 +87,24 @@ final class BuiltinFunctionsTest extends TestCase
         foreach (array_keys(BuiltinFunctions::implementations()) as $name) {
             self::assertNotNull($scope->func($name), sprintf('Built-in "%s" has no implementation in Scope', $name));
         }
+    }
+
+    public function testHeadRemainsCallableDirectlyFromPhp(): void
+    {
+        $head = (new Scope())->func('head');
+        self::assertNotNull($head);
+
+        $some = $head([42]);
+        self::assertInstanceOf(EnumValue::class, $some);
+        self::assertTrue($some->type->equals(Type::option(Type::int())));
+        self::assertSame('Some', $some->variant);
+        self::assertSame([42], $some->fields);
+
+        $none = $head([]);
+        self::assertInstanceOf(EnumValue::class, $none);
+        self::assertTrue($none->type->equals(Type::none()));
+        self::assertSame('None', $none->variant);
+        self::assertSame([], $none->fields);
     }
 
     public function testDeclarationsExposeExactlyTheBuiltinsWithADeclaredType(): void

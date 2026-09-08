@@ -1,0 +1,5 @@
+Some(value:int)
+-- Input --
+{ value: 42 }
+-- Output --
+Some(42)

@@ -1,0 +1,9 @@
+Ready
+-- Enums --
+Status = Ready | Waiting
+-- Expression type --
+Status
+-- Output --
+Ready
+-- Printed --
+Ready

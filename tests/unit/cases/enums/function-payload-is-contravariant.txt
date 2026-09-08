@@ -1,0 +1,7 @@
+consumer:Consumer<int>.accept()
+-- Enums --
+Consumer<T> = Consume(fn(T) -> int)
+-- Functions --
+accept: fn(Consumer<any>) -> bool
+-- Type error --
+accept must be called on an expression of type Consumer<any>, but consumer:Consumer<int> is of type Consumer<int>

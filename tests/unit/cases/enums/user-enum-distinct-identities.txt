@@ -1,0 +1,6 @@
+Ready === Waiting
+-- Enums --
+First = Ready
+Second = Waiting
+-- Type error --
+The expressions of both sides of === must be of the same type. Left: First, right: Second

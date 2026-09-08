@@ -11,6 +11,7 @@ use Eventjet\Ausdruck\Literal;
 use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\Types;
+use Eventjet\Ausdruck\Prelude;
 use Eventjet\Ausdruck\Scope;
 use Eventjet\Ausdruck\Type;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -145,35 +146,35 @@ final class ExpressionTest extends TestCase
             ['-a:int', new Scope(['a' => PHP_INT_MIN + 1]), PHP_INT_MAX],
             ['-a:float', new Scope(['a' => 1.5]), -1.5],
             // An int quotient truncates toward zero.
-            ['a:int / b:int', new Scope(['a' => 7, 'b' => 2]), 3],
-            ['a:int / b:int', new Scope(['a' => -7, 'b' => 2]), -3],
-            ['a:float / b:float', new Scope(['a' => 7.0, 'b' => 2.0]), 3.5],
+            ['a:int / b:int', new Scope(['a' => 7, 'b' => 2]), Prelude::option()->value('Some', 3)],
+            ['a:int / b:int', new Scope(['a' => -7, 'b' => 2]), Prelude::option()->value('Some', -3)],
+            ['a:float / b:float', new Scope(['a' => 7.0, 'b' => 2.0]), Prelude::option()->value('Some', 3.5)],
             // A zero divisor makes the quotient none, whatever the number type. Negative zero counts as zero.
-            ['a:int / b:int', new Scope(['a' => 1, 'b' => 0]), null],
-            ['a:float / b:float', new Scope(['a' => 1.0, 'b' => 0.0]), null],
-            ['x:float / negZero:float', new Scope(['x' => 1.0, 'negZero' => -0.0]), null],
+            ['a:int / b:int', new Scope(['a' => 1, 'b' => 0]), Prelude::option()->value('None')],
+            ['a:float / b:float', new Scope(['a' => 1.0, 'b' => 0.0]), Prelude::option()->value('None')],
+            ['x:float / negZero:float', new Scope(['x' => 1.0, 'negZero' => -0.0]), Prelude::option()->value('None')],
             // PHP_INT_MIN / -1 is the other quotient int doesn't have: it overflows by one, and intdiv() would throw.
             // Its neighbors — same dividend, same divisor — divide normally, and the matching remainder exists: it's 0.
-            ['a:int / b:int', new Scope(['a' => PHP_INT_MIN, 'b' => -1]), null],
-            ['a:int / b:int', new Scope(['a' => PHP_INT_MIN, 'b' => 1]), PHP_INT_MIN],
-            ['a:int / b:int', new Scope(['a' => 7, 'b' => -1]), -7],
-            ['a:int % b:int', new Scope(['a' => PHP_INT_MIN, 'b' => -1]), 0],
+            ['a:int / b:int', new Scope(['a' => PHP_INT_MIN, 'b' => -1]), Prelude::option()->value('None')],
+            ['a:int / b:int', new Scope(['a' => PHP_INT_MIN, 'b' => 1]), Prelude::option()->value('Some', PHP_INT_MIN)],
+            ['a:int / b:int', new Scope(['a' => 7, 'b' => -1]), Prelude::option()->value('Some', -7)],
+            ['a:int % b:int', new Scope(['a' => PHP_INT_MIN, 'b' => -1]), Prelude::option()->value('Some', 0)],
             ['(a:int / b:int).isSome()', new Scope(['a' => 1, 'b' => 0]), false],
             ['(a:int / b:int).isSome()', new Scope(['a' => 1, 'b' => 2]), true],
             ['(a:int / b:int).unwrap:int()', new Scope(['a' => 9, 'b' => 2]), 4],
             // The remainder takes the dividend's sign, for floats (fmod) just like for ints (%).
-            ['a:int % b:int', new Scope(['a' => 7, 'b' => 3]), 1],
-            ['a:int % b:int', new Scope(['a' => -7, 'b' => 3]), -1],
-            ['a:float % b:float', new Scope(['a' => 5.5, 'b' => 2.0]), 1.5],
-            ['a:float % b:float', new Scope(['a' => -5.5, 'b' => 2.0]), -1.5],
-            ['a:int % b:int', new Scope(['a' => 7, 'b' => 0]), null],
-            ['a:float % b:float', new Scope(['a' => 5.5, 'b' => 0.0]), null],
+            ['a:int % b:int', new Scope(['a' => 7, 'b' => 3]), Prelude::option()->value('Some', 1)],
+            ['a:int % b:int', new Scope(['a' => -7, 'b' => 3]), Prelude::option()->value('Some', -1)],
+            ['a:float % b:float', new Scope(['a' => 5.5, 'b' => 2.0]), Prelude::option()->value('Some', 1.5)],
+            ['a:float % b:float', new Scope(['a' => -5.5, 'b' => 2.0]), Prelude::option()->value('Some', -1.5)],
+            ['a:int % b:int', new Scope(['a' => 7, 'b' => 0]), Prelude::option()->value('None')],
+            ['a:float % b:float', new Scope(['a' => 5.5, 'b' => 0.0]), Prelude::option()->value('None')],
             ['(a:int % 3).unwrap:int() === 0', new Scope(['a' => 9]), true],
             ['(a:int % 3).unwrap:int() === 0', new Scope(['a' => 10]), false],
             ['a:int + b:int * c:int', new Scope(['a' => 2, 'b' => 3, 'c' => 4]), 14],
             ['(a:int + b:int) * c:int', new Scope(['a' => 2, 'b' => 3, 'c' => 4]), 20],
             ['a:int - b:int + c:int', new Scope(['a' => 10, 'b' => 3, 'c' => 4]), 11],
-            ['a:int * b:int / c:int', new Scope(['a' => 10, 'b' => 3, 'c' => 4]), 7],
+            ['a:int * b:int / c:int', new Scope(['a' => 10, 'b' => 3, 'c' => 4]), Prelude::option()->value('Some', 7)],
             ['"foo" === "bar"', new Scope(), false],
             ['"foo" === "foo"', new Scope(), true],
             ['foo:any === bar:any', new Scope(['foo' => 12.34, 'bar' => 12.34]), true],
@@ -211,10 +212,10 @@ final class ExpressionTest extends TestCase
                 [false, true, false],
             ],
             ['ints:list<int>.map:list<int>(|i| i:int -2)', new Scope(['ints' => []]), []],
-            ['maybe:Option<string>', new Scope(['maybe' => 'foo']), 'foo'],
-            ['maybe:Option<string>', new Scope(['maybe' => null]), null],
-            ['maybe:Option<int>.isSome:bool()', new Scope(['maybe' => 23]), true],
-            ['maybe:Option<int>.isSome:bool()', new Scope(['maybe' => null]), false],
+            ['maybe:Option<string>', new Scope(['maybe' => Prelude::option()->value('Some', 'foo')]), Prelude::option()->value('Some', 'foo')],
+            ['maybe:Option<string>', new Scope(['maybe' => Prelude::option()->value('None')]), Prelude::option()->value('None')],
+            ['maybe:Option<int>.isSome:bool()', new Scope(['maybe' => Prelude::option()->value('Some', 23)]), true],
+            ['maybe:Option<int>.isSome:bool()', new Scope(['maybe' => Prelude::option()->value('None')]), false],
             ['ints:list<int>.unique:list<int>()', new Scope(['ints' => [23, 10, 23, 42, 420, 420]]), [23, 10, 42, 420]],
             ['ints:list<int>.unique:list<int>()', new Scope(['ints' => []]), []],
             ['foo', new Scope(['foo' => 'test']), 'test', new Declarations(variables: ['foo' => Type::string()])],
@@ -347,9 +348,9 @@ final class ExpressionTest extends TestCase
                 [],
             ],
             [
-                'maybes:list<Option<string>>.filter:list<Some<string>>(|m| m:Option<string>.isSome())',
-                new Scope(['maybes' => ['foo', null, 'bar']]),
-                ['foo', 'bar'],
+                'maybes:list<Option<string>>.filter:list<Option<string>>(|m| m:Option<string>.isSome())',
+                new Scope(['maybes' => [Prelude::option()->value('Some', 'foo'), Prelude::option()->value('None'), Prelude::option()->value('Some', 'bar')]]),
+                [Prelude::option()->value('Some', 'foo'), Prelude::option()->value('Some', 'bar')],
             ],
             [
                 'bag.codes.filter:list<Code>(|c| c:Code.groups.contains("a")).take(2).map:list<{foo: string}>(|c| {foo: "test"})',
@@ -465,7 +466,7 @@ final class ExpressionTest extends TestCase
         yield 'String does not accept empty PHP array' => [
             ['foo:string'],
             new Scope(['foo' => []]),
-            'Expected variable "foo" to be of type string, got array: Expected string, got list<never>',
+            'Expected variable "foo" to be of type string, got array: Expected string, got list<!>',
         ];
         // Operands evaluate left to right, so the dividend runs even when the divisor turns out to be zero.
         yield 'Division evaluates its dividend even when the divisor is zero' => [
@@ -476,7 +477,7 @@ final class ExpressionTest extends TestCase
         yield 'Unwrapping a none quotient' => [
             ['(a:int / b:int).unwrap:int()'],
             new Scope(['a' => 1, 'b' => 0]),
-            'Expected int, got None',
+            'Cannot unwrap None',
         ];
         // PHP's int arithmetic isn't closed: a sum, difference or product past the range evaluates to a float rather
         // than wrapping. An int-typed expression that answered one would be handing back a value of a type it doesn't

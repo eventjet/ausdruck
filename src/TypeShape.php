@@ -13,13 +13,13 @@ namespace Eventjet\Ausdruck;
  *
  * The behavior that differs per shape lives here too, one method per operation, rather than as an `instanceof` chain
  * repeated on {@see Type} for every operation that needs one: a new shape has to implement this interface to exist
- * at all, which the compiler enforces. The two operations that only run once a second shape is already known to be
- * concrete -- the comparison halves of {@see Type::isSubtypeOf()} and {@see Type::bind()} -- live on
- * {@see ComparableShape} instead, which every shape but {@see AliasShape} also implements; see that interface for
- * why. {@see Type} keeps the coercion between two different shapes that {@see Type::isSubtypeOf()} and
- * {@see Type::bind()} each start with -- None into Option, never, any, and so on -- since that isn't any one shape's
+ * at all, which the compiler enforces. Operations that require aliases to be resolved first -- validation,
+ * comparison, binding, and refinement -- live on {@see ComparableShape} instead, which every shape but
+ * {@see AliasShape} also implements. {@see Type} keeps the coercion between two different shapes that
+ * {@see Type::isSubtypeOf()} and
+ * {@see Type::bind()} each start with -- bottom types, any, and empty collections -- since that isn't any one shape's
  * business either. {@see Type} also keeps a handful of small, private predicates that only ever ask about one
- * specific shape by name -- is this an `Option`, a `list`, a struct -- rather than dispatching on whichever shape a
+ * specific shape by name -- is this an enum, a list, a struct -- rather than dispatching on whichever shape a
  * {@see Type} happens to hold; those aren't operations that differ per shape, so they have no reason to live here.
  *
  * @internal

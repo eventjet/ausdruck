@@ -33,7 +33,6 @@ final class TypeCompatibilityTest extends TestCase
             ['fn(int) -> string', 'fn(int) -> string'],
             ['fn(int, string) -> bool', 'fn(int, string) -> bool'],
             ['Option<string>', 'Option<string>'],
-            ['Some<string>', 'Some<string>'],
 
             // Every type is a subtype of any
             ['bool', 'any'],
@@ -44,7 +43,6 @@ final class TypeCompatibilityTest extends TestCase
             ['fn(int) -> string', 'any'],
             ['fn(int, string) -> bool', 'any'],
             ['Option<int>', 'any'],
-            ['Some<int>', 'any'],
 
             // Functions
             ['fn() -> string', 'fn() -> any'],
@@ -53,10 +51,7 @@ final class TypeCompatibilityTest extends TestCase
 
             // Option
             ['Option<string>', 'Option<any>'],
-            ['Some<string>', 'Option<string>'],
-            ['Some<string>', 'string'],
-            ['string', 'Some<string>'],
-            ['None', 'None'],
+            ['Option<!>', 'Option<string>'],
 
             // Lists
             ['list<any>', 'list<any>'],
@@ -83,7 +78,6 @@ final class TypeCompatibilityTest extends TestCase
             ['any', 'fn(int) -> string'],
             ['any', 'fn(int, string) -> bool'],
             ['any', 'Option<bool>'],
-            ['any', 'Some<bool>'],
 
             // Functions
             ['fn() -> any', 'fn() -> int'],
@@ -99,8 +93,7 @@ final class TypeCompatibilityTest extends TestCase
             // Option
             ['Option<int>', 'Option<string>'],
             ['Option<any>', 'Option<string>'],
-            ['Option<string>', 'Some<string>'],
-            ['None', 'string'],
+            ['Option<!>', 'string'],
 
             // Lists
             ['list<string>', 'list<int>'],

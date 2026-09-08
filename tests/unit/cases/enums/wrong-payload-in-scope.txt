@@ -1,0 +1,5 @@
+value:Option<int>
+-- Input --
+{ value: Some("bad") }
+-- Evaluation error --
+Expected variable "value" to be of type Option<int>, got Eventjet\Ausdruck\EnumValue: Expected Option<int>, got Option<string>

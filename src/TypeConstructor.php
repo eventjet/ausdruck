@@ -44,9 +44,6 @@ enum TypeConstructor: string
     case Any = 'any';
     case Map = 'map';
     case List = 'list';
-    case Option = 'Option';
-    case Some = 'Some';
-    case None = 'None';
 
     /**
      * The message {@see Type::var()} and {@see Type::alias()} reject a reserved name with, worded once here so the
@@ -81,8 +78,8 @@ enum TypeConstructor: string
     {
         return match ($this) {
             self::Map => 2,
-            self::List, self::Option, self::Some => 1,
-            self::String, self::Int, self::Float, self::Bool, self::Any, self::None => 0,
+            self::List => 1,
+            self::String, self::Int, self::Float, self::Bool, self::Any => 0,
         };
     }
 }

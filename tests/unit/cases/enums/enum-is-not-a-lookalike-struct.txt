@@ -1,0 +1,5 @@
+left:any === right:any
+-- Input --
+{ left: Some(1), right: { type: {}, variant: "Some", fields: [1] } }
+-- Output --
+false

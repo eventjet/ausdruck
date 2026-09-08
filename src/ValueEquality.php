@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck;
 
 use function array_key_exists;
+use function array_keys;
 use function count;
 use function get_object_vars;
+use function is_array;
 use function is_object;
 
 /**
@@ -28,10 +30,41 @@ final class ValueEquality
 
     public static function equals(mixed $left, mixed $right): bool
     {
+        if (is_array($left) && is_array($right)) {
+            if (array_keys($left) !== array_keys($right)) {
+                return false;
+            }
+            /** @var mixed $value */
+            foreach ($left as $key => $value) {
+                if (!self::equals($value, $right[$key])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if ($left instanceof EnumValue || $right instanceof EnumValue) {
+            return self::enumsEqual($left, $right);
+        }
         if (is_object($left) && is_object($right)) {
             return self::structsEqual($left, $right);
         }
         return $left === $right;
+    }
+
+    private static function enumsEqual(mixed $left, mixed $right): bool
+    {
+        if (!$left instanceof EnumValue || !$right instanceof EnumValue
+            || $left->type->asEnum()?->definition !== $right->type->asEnum()?->definition
+            || $left->variant !== $right->variant) {
+            return false;
+        }
+        /** @var mixed $field */
+        foreach ($left->fields as $index => $field) {
+            if (!self::equals($field, $right->fields[$index])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static function structsEqual(object $left, object $right): bool

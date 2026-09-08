@@ -1,0 +1,7 @@
+consumer:Consumer<any>.accept()
+-- Enums --
+Consumer<T> = Consume(fn(T) -> int)
+-- Functions --
+accept: fn(Consumer<int>) -> bool
+-- Expression type --
+bool

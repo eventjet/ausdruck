@@ -6,12 +6,14 @@ namespace Eventjet\Ausdruck;
 
 use Override;
 
+use function array_is_list;
 use function array_map;
+use function is_array;
 
 /**
  * A name applied to its type arguments -- `list<T>`, `map<K, V>`, or a bare `int` with none. Every
- * {@see TypeConstructor} other than `Option` and `Some` themselves, plus `None`, `any` and `never`, is one of these;
- * see {@see Type::listOf()}, {@see Type::mapOf()}, {@see Type::option()} and the other scalar factories.
+ * {@see TypeConstructor} and the bottom type `!` use this shape. Named sums use {@see EnumShape}.
+ * See {@see Type::listOf()}, {@see Type::mapOf()} and the scalar factories.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck
@@ -25,6 +27,53 @@ final class ApplicationShape implements ComparableShape
         public readonly string $name,
         public readonly array $args = [],
     ) {
+    }
+
+    #[Override]
+    public function accepts(mixed $value): bool
+    {
+        if ($this->name !== TypeConstructor::List->value && $this->name !== TypeConstructor::Map->value) {
+            return Type::fromValue($value)->isSubtypeOf(Type::of($this));
+        }
+        if (!is_array($value)) {
+            return false;
+        }
+        if ($this->name === TypeConstructor::List->value) {
+            if (!array_is_list($value)) {
+                return false;
+            }
+            /** @var mixed $item */
+            foreach ($value as $item) {
+                if (!$this->args[0]->accepts($item)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if ($value !== [] && array_is_list($value)) {
+            return false;
+        }
+        /** @var mixed $item */
+        foreach ($value as $key => $item) {
+            if (!$this->args[0]->accepts($key) || !$this->args[1]->accepts($item)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    #[Override]
+    public function refine(Type $actual): Type
+    {
+        $shape = $actual->shape();
+        if (!$shape instanceof self || $shape->name !== $this->name) {
+            return Type::of($this);
+        }
+        $arguments = [];
+        foreach ($this->args as $index => $argument) {
+            $arguments[] = $argument->refine($shape->args[$index]);
+        }
+        return Type::of(new self($this->name, $arguments));
     }
 
     /**

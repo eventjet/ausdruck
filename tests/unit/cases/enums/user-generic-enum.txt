@@ -1,0 +1,9 @@
+Ok(Some(42))
+-- Enums --
+Result<T, E> = Ok(T) | Err(E)
+-- Expression type --
+Result<Option<int>, !>
+-- Output --
+Ok(Some(42))
+-- Printed --
+Ok(Some(42))

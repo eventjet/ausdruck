@@ -1,0 +1,7 @@
+Err("failure").wrap()
+-- Functions --
+wrap: fn<A, B>(Result<A, B>) -> Option<B>
+-- Enums --
+Result<T, E> = Ok(T) | Err(E)
+-- Expression type --
+Option<string>

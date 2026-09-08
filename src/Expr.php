@@ -40,6 +40,12 @@ final class Expr
     {
     }
 
+    /** @param list<Expression> $fields */
+    public static function variant(EnumDefinition $definition, string $variant, array $fields = [], Span|null $location = null): Expression
+    {
+        return new VariantExpression($definition, $variant, $fields, $location ?? self::dummySpan());
+    }
+
     public static function eq(Expression $left, Expression $right): Comparison
     {
         return self::comparison(ComparisonOperator::Equals, $left, $right);
@@ -56,7 +62,7 @@ final class Expr
     }
 
     /**
-     * @param string | int | float | bool | null | array<array-key, mixed> $value
+     * @param string | int | float | bool | null | EnumValue | array<array-key, mixed> $value
      */
     public static function literal(mixed $value, Span|null $location = null): Literal
     {
@@ -317,7 +323,7 @@ final class Expr
      */
     private static function assertSameType(Expression $left, Expression $right, string $operator): void
     {
-        if ($right->matchesType($left->getType())) {
+        if ($right->isSubtypeOf($left->getType()) || $left->isSubtypeOf($right->getType())) {
             return;
         }
         throw TypeError::create(

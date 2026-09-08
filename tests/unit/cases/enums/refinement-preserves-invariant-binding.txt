@@ -1,0 +1,6 @@
+Pair(a:Transform<!>, b:Transform<int>)
+-- Enums --
+Transform<T> = Transform(fn(T) -> T)
+Product<T> = Pair(T, T)
+-- Type error --
+Invalid field 2 of Pair

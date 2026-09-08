@@ -9,7 +9,6 @@ use Override;
 use Stringable;
 
 use function array_is_list;
-use function array_key_first;
 use function array_map;
 use function assert;
 use function get_object_vars;
@@ -27,7 +26,7 @@ final class Type implements Stringable
      * The bottom type's own name -- see {@see self::never()} for why this, alone among the names this class spells,
      * isn't read from a {@see TypeConstructor} case.
      */
-    private const string NEVER = 'never';
+    private const string NEVER = '!';
 
     private function __construct(
         private readonly TypeShape $shape,
@@ -195,8 +194,11 @@ final class Type implements Stringable
             [$keyType, $valueType] = self::keyAndValueTypeFromArray($value);
             return array_is_list($value) ? self::listOf($valueType) : self::mapOf($keyType, $valueType);
         }
+        if ($value instanceof EnumValue) {
+            return $value->type;
+        }
         if ($value === null) {
-            return self::none();
+            throw new InvalidArgumentException('PHP null is not a language value; construct an enum variant explicitly');
         }
         return match (gettype($value)) {
             'string' => self::string(),
@@ -210,12 +212,12 @@ final class Type implements Stringable
 
     public static function option(self $some): self
     {
-        return new self(new ApplicationShape(TypeConstructor::Option->value, [$some]));
+        return Prelude::option()->type($some);
     }
 
     public static function none(): self
     {
-        return new self(new ApplicationShape(TypeConstructor::None->value));
+        return Prelude::option()->type(self::never());
     }
 
     /**
@@ -227,13 +229,10 @@ final class Type implements Stringable
     }
 
     /**
-     * The bottom type: the element type of an empty list or map, since nothing about an empty one says what its
-     * elements would be -- see {@see self::keyAndValueTypeFromArray()}. `never` is deliberately not a
-     * {@see TypeConstructor} case -- see that enum's own class doc -- so unlike every other name spelled below,
-     * {@see self::NEVER} is this class's own single source for it, read here and everywhere {@see self::isNamed()}
-     * asks about it, rather than a literal repeated at each site.
+     * The uninhabited type, written `!`. Constructors use it for parameters whose
+     * variants carry no evidence, and empty PHP collections use it as their element type.
      */
-    private static function never(): self
+    public static function never(): self
     {
         return new self(new ApplicationShape(self::NEVER));
     }
@@ -276,8 +275,14 @@ final class Type implements Stringable
         if ($value === []) {
             return [self::never(), self::never()];
         }
-        $firstKey = array_key_first($value);
-        return [self::fromValue($firstKey), self::fromValue($value[$firstKey])];
+        $keyType = self::never();
+        $valueType = self::never();
+        /** @var mixed $item */
+        foreach ($value as $key => $item) {
+            $keyType = $keyType->common(self::fromValue($key));
+            $valueType = $valueType->common(self::fromValue($item));
+        }
+        return [$keyType, $valueType];
     }
 
     #[Override]
@@ -306,10 +311,21 @@ final class Type implements Stringable
      */
     public function assert(mixed $value): mixed
     {
-        $valueType = self::fromValue($value);
-        return $valueType->isSubtypeOf($this)
-            ? $value
-            : throw new Parser\TypeError(sprintf('Expected %s, got %s', $this, $valueType));
+        if (!$this->accepts($value)) {
+            throw new Parser\TypeError(sprintf('Expected %s, got %s', $this, self::fromValue($value)));
+        }
+        return $value;
+    }
+
+    /**
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     */
+    public function accepts(mixed $value): bool
+    {
+        $shape = $this->canonical()->shape;
+        assert($shape instanceof ComparableShape);
+        return $shape->accepts($value);
     }
 
     public function equals(self $type): bool
@@ -317,9 +333,54 @@ final class Type implements Stringable
         return $this->isSubtypeOf($type) && $type->isSubtypeOf($this);
     }
 
+    /**
+     * Fill only bottom types left by constructors with no evidence for an argument.
+     * Concrete bindings still win, so later incompatible arguments are rejected.
+     * A refinement must still accept the original type, including when enum fields use arguments contravariantly.
+     *
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     */
+    public function refine(self $actual): self
+    {
+        $self = $this->canonical();
+        $actual = $actual->canonical();
+        if ($self->isNamed(self::NEVER)) {
+            return $actual;
+        }
+        $shape = $self->shape;
+        assert($shape instanceof ComparableShape);
+        $refined = $shape->refine($actual);
+        return $refined->shape() === $shape || !$self->isSubtypeOf($refined) ? $this : $refined;
+    }
+
+    /**
+     * A collection element type: retain compatible types and refine constructor holes,
+     * falling back to any for heterogeneous values.
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     */
+    public function common(self $other): self
+    {
+        $refined = $this->refine($other);
+        if ($other->isSubtypeOf($refined)) {
+            return $refined;
+        }
+        return $this->isSubtypeOf($other) ? $other : self::any();
+    }
+
+    /** @internal
+     * @psalm-internal Eventjet\Ausdruck
+     */
+    public function asEnum(): EnumShape|null
+    {
+        $shape = $this->canonical()->shape;
+        return $shape instanceof EnumShape ? $shape : null;
+    }
+
     public function isOption(): bool
     {
-        return $this->canonical()->isNamed(TypeConstructor::Option->value);
+        return $this->asEnum()?->definition === Prelude::option();
     }
 
     /**
@@ -341,13 +402,6 @@ final class Type implements Stringable
     {
         $self = $this->canonical();
         $other = $other->canonical();
-        if ($self->isNamed(TypeConstructor::None->value)) {
-            return $other->isNamed(TypeConstructor::None->value) || $other->isNamed(TypeConstructor::Option->value);
-        }
-        $otherOption = $other->optionArg();
-        if ($otherOption !== null && !$self->isNamed(TypeConstructor::Option->value)) {
-            return $self->isSubtypeOf($otherOption);
-        }
         if ($self->isNamed(self::NEVER)) {
             return true;
         }
@@ -362,9 +416,7 @@ final class Type implements Stringable
         // shape at all -- is {@see ComparableShape::isSubtypeOf()}'s own to make. A {@see AliasShape} never reaches
         // here, having already been seen through by {@see self::canonical()} above -- which is exactly what
         // {@see ComparableShape} guarantees to its only caller, so the narrowing below is asserted rather than
-        // re-checked -- this is also why `Option<X>` needs no case of its own above: once $self and $other are both
-        // Options, they're both ApplicationShapes of that name, and the pairwise-argument comparison below is the
-        // same recursive `X.isSubtypeOf(Y)` a dedicated case would run.
+        // re-checked. EnumShape compares instantiated fields, including their function variance.
         $selfShape = $self->shape;
         $otherShape = $other->shape;
         assert($selfShape instanceof ComparableShape);
@@ -405,12 +457,8 @@ final class Type implements Stringable
      * any other self-contained generic function type, see {@see Signature::hasOwnBinder()}. Doing it anyway costs
      * nothing and keeps {@see AliasShape::bind()} genuinely unreachable rather than merely unexercised.
      *
-     * Shape, here, is the same shape {@see self::isSubtypeOf()} accepts as a match, not just equal names: $actual is
-     * always the type of a value this type would have to accept, so wherever isSubtypeOf() would let $actual through
-     * by a coercion rather than a plain name match, there is something to learn from that too. A value that isn't
-     * itself an `Option` is still accepted where an `Option<X>` is expected as long as the value is a subtype of `X`,
-     * so `X` faces the value directly. `None`, which isSubtypeOf() accepts into an `Option` unconditionally without
-     * looking inside it, teaches nothing either way, which the ordinary name-mismatch case already gives for free.
+     * Enum arguments are traversed by EnumShape, just as collection arguments are
+     * traversed by ApplicationShape. No variant implicitly converts its payload.
      *
      * The first binding for a variable is the one that's kept, with one exception: a function's parameters, unlike
      * everywhere else a variable can appear, are contravariant, so a parameter actually typed `any` -- which is every
@@ -439,14 +487,6 @@ final class Type implements Stringable
     {
         $self = $this->canonical();
         $actual = $actual->canonical();
-        $selfOption = $self->optionArg();
-        if (
-            $selfOption !== null
-            && !$actual->isNamed(TypeConstructor::Option->value)
-            && !$actual->isNamed(TypeConstructor::None->value)
-        ) {
-            return $selfOption->bind($actual, $bindings);
-        }
         // What's left, or nothing to learn if $actual isn't even the same kind of shape -- {@see ComparableShape::bind()}'s
         // own to decide, $actual (still a {@see self}, not unwrapped here) and all; see {@see self::isSubtypeOf()}
         // for the same question asked there, including why the narrowing below is asserted rather than re-checked.
@@ -547,23 +587,7 @@ final class Type implements Stringable
     }
 
     /**
-     * $this's own type argument, if $this is an `Option<...>` -- not seen through an alias first, so a caller that
-     * needs that calls {@see self::canonical()} itself. The one place {@see self::isSubtypeOf()} and {@see self::bind()}
-     * ask whether a type is an `Option` and read its argument, rather than each checking
-     * `$shape instanceof ApplicationShape && $shape->name === TypeConstructor::Option->value` and indexing
-     * `$shape->args[0]` directly.
-     */
-    private function optionArg(): self|null
-    {
-        $shape = $this->shape;
-        return $shape instanceof ApplicationShape && $shape->name === TypeConstructor::Option->value
-            ? $shape->args[0]
-            : null;
-    }
-
-    /**
-     * $this's own element type, if $this is a `list<...>` -- the same shortcut as {@see self::optionArg()}, for
-     * `list` instead of `Option`.
+     * This type's own element type, if it is a list.
      */
     private function listArg(): self|null
     {
@@ -577,7 +601,7 @@ final class Type implements Stringable
      * Whether this type is $name, told apart from a variable or a struct that merely happens to share the name by
      * $shape rather than by $name alone -- $name is not unique on its own: {@see self::var()} takes any name without
      * checking it against what a real type of that name would be. Only meaningful for the handful of names
-     * {@see TypeConstructor} spells and that this class also builds directly, like `None` and `never`; a plain
+     * {@see TypeConstructor} spells and that this class also builds directly, like the bottom type `!`; a plain
      * user-facing type is compared by identity through {@see self::isSubtypeOf()} instead, which needs more than a
      * name match.
      */

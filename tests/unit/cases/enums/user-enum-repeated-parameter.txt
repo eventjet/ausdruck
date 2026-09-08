@@ -1,0 +1,5 @@
+Pair(1, "two")
+-- Enums --
+Product<T> = Pair(T, T)
+-- Type error --
+Invalid field 2 of Pair
