@@ -13,11 +13,44 @@ use Eventjet\Ausdruck\Parser\Types;
 use Eventjet\Ausdruck\Prelude;
 use Eventjet\Ausdruck\Type;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 final class EnumTest extends TestCase
 {
+    /** @return iterable<string, array{string, list<string>, array<string, list<Type>>, string}> */
+    public static function invalidDefinitions(): iterable
+    {
+        yield 'no variants' => ['Empty', [], [], 'An enum needs variants and distinct type parameters'];
+        yield 'duplicate parameters' => ['Result', ['T', 'T'], ['Ok' => [Type::var('T')]], 'An enum needs variants and distinct type parameters'];
+        yield 'invalid name' => ['Bad-name', [], ['Ready' => []], 'Invalid enum identifier: Bad-name'];
+        yield 'invalid second variant' => ['Status', [], ['Ready' => [], 'Bad-name' => []], 'Invalid enum identifier: Bad-name'];
+        yield 'invalid name prefix' => ['1Status', [], ['Ready' => []], 'Invalid enum identifier: 1Status'];
+        yield 'invalid name suffix' => ['Status!', [], ['Ready' => []], 'Invalid enum identifier: Status!'];
+        yield 'trailing newline' => ["Status\n", [], ['Ready' => []], "Invalid enum identifier: Status\n"];
+    }
+
+    /** @param list<string> $parameters
+     * @param array<string, list<Type>> $variants
+     */
+    #[DataProvider('invalidDefinitions')]
+    public function testInvalidDefinitionsAreRejected(string $name, array $parameters, array $variants, string $message): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage($message);
+
+        new EnumDefinition($name, $parameters, $variants);
+    }
+
+    public function testValueRejectsAnUnknownVariant(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unknown variant Missing');
+
+        Prelude::option()->value('Missing');
+    }
+
     public function testFunctionAliasRejectsShadowingANestedBinderBeforeAnOption(): void
     {
         $first = ExpressionParser::parse('first:fn<A>(A) -> A')->getType();
