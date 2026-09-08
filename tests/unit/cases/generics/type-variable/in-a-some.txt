@@ -1,5 +1,3 @@
 foo:fn<T>(Some<T>) -> T
--- Expression type --
-fn<T>(T) -> T
--- Note --
-Some<T> is T that happens to be there, so it resolves to T itself.
+-- Type error --
+Unknown type Some

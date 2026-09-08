@@ -1,0 +1,3 @@
+[Some(1), Some(1), None].unique()
+-- Output --
+[Some(1), None]

@@ -17,9 +17,9 @@ namespace Eventjet\Ausdruck;
  * concrete -- the comparison halves of {@see Type::isSubtypeOf()} and {@see Type::bind()} -- live on
  * {@see ComparableShape} instead, which every shape but {@see AliasShape} also implements; see that interface for
  * why. {@see Type} keeps the coercion between two different shapes that {@see Type::isSubtypeOf()} and
- * {@see Type::bind()} each start with -- None into Option, never, any, and so on -- since that isn't any one shape's
+ * {@see Type::bind()} each start with -- bottom types, any, and empty collections -- since that isn't any one shape's
  * business either. {@see Type} also keeps a handful of small, private predicates that only ever ask about one
- * specific shape by name -- is this an `Option`, a `list`, a struct -- rather than dispatching on whichever shape a
+ * specific shape by name -- is this an enum, a list, a struct -- rather than dispatching on whichever shape a
  * {@see Type} happens to hold; those aren't operations that differ per shape, so they have no reason to live here.
  *
  * @internal

@@ -1,0 +1,7 @@
+Pair(None, Some(1))
+-- Enums --
+Product<T> = Pair(T, T)
+-- Expression type --
+Product<Option<int>>
+-- Output --
+Pair(None, Some(1))

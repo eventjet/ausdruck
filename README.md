@@ -2,6 +2,62 @@
 
 A small expression engine for PHP.
 
+## Sum types and Option
+
+`Option<T>` is a predefined enum with two variants: `Some(T)` and `None`.
+Construct values explicitly; `Some` and `None` are constructors, not types.
+
+```text
+Some(42)                  // Option<int>
+None                      // Option<!>, usable where Option<T> is expected
+Some(None)                // Option<Option<!>>; distinct from None
+Some(42).unwrap()          // 42
+[None].head()              // Some(None)
+```
+
+The comments above are explanatory; expression source does not support comments.
+`!` is the uninhabited type. An inferred constructor uses it for type arguments
+its fields do not determine. Later arguments can refine those unknown positions.
+There is no implicit conversion from `T` to `Option<T>`, and PHP `null` is not `None`.
+`head`, `/`, and `%` return tagged values; `unwrap()` throws on `None`.
+
+The same machinery supports enums registered from PHP:
+
+```php
+use Eventjet\Ausdruck\EnumDefinition;
+use Eventjet\Ausdruck\EnumValue;
+use Eventjet\Ausdruck\Parser\ExpressionParser;
+use Eventjet\Ausdruck\Parser\Types;
+use Eventjet\Ausdruck\Prelude;
+use Eventjet\Ausdruck\Scope;
+use Eventjet\Ausdruck\Type;
+
+$result = new EnumDefinition('Result', ['T', 'E'], [
+    'Ok' => [Type::var('T')],
+    'Err' => [Type::var('E')],
+]);
+$types = new Types(enums: [$result]);
+$expression = ExpressionParser::parse('Ok(Some(42))', $types);
+$value = $expression->evaluate(new Scope());
+// $value is an EnumValue: variant 'Ok', with a Some(42) value in fields[0].
+
+$some = Prelude::option()->value('Some', 42);
+$none = Prelude::option()->value('None');
+$typedNone = new EnumValue(Type::option(Type::int()), 'None');
+$error = $result->value('Err', 'missing');
+$resultType = $result->type(Type::int(), Type::string());
+```
+
+Each definition has its own identity. Register the same definition object wherever
+its type is parsed. Variants may have zero, one, or several positional fields;
+constructor inference checks their arity and payload types. Variant names are
+available unqualified and must be unique within a registry. Enums can be nested in
+collections, structs, aliases, and generic function signatures. Equality compares
+the definition, variant, and payload recursively.
+
+This surface covers types and constructors. Pattern matching, recursive enum
+declarations, and the full Rust Option method set are not implemented.
+
 ## Quick start
 
 ```

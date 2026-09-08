@@ -1,0 +1,5 @@
+value:Option<int>.unwrap()
+-- Input --
+{ value: Some(42) }
+-- Output --
+42

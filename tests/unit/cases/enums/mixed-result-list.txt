@@ -1,0 +1,7 @@
+[Ok(1), Err("bad")]
+-- Enums --
+Result<T, E> = Ok(T) | Err(E)
+-- Expression type --
+list<Result<int, string>>
+-- Output --
+[Ok(1), Err("bad")]

@@ -1,0 +1,5 @@
+value:Option<int>
+-- Input --
+{ value: 42 }
+-- Evaluation error --
+Expected variable "value" to be of type Option<int>, got int: Expected Option<int>, got int

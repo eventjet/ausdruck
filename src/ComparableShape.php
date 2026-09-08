@@ -24,7 +24,7 @@ interface ComparableShape extends TypeShape
     /**
      * Whether $this -- the actual value's shape -- is a subtype of $supertype -- the declared one it's checked
      * against -- called from {@see Type::isSubtypeOf()} once both sides are already known to be concrete shapes --
-     * aliases seen through, the None/any/Option/never/map coercions all handled. $supertype may be any shape, not
+     * aliases seen through, the bottom/any/empty-map coercions all handled. $supertype may be any shape, not
      * necessarily this one's own class, so telling that mismatch apart from a real comparison is this method's own
      * first step rather than a gate {@see Type} runs before calling it -- most implementations reject it before
      * recovering $supertype's own class for the real comparison that follows: name, args, signature, or fields,

@@ -47,8 +47,6 @@ final class ExpressionParserErrorTest extends TestCase
         // A generic constructor's `<` opens an argument list that has to close, whichever constructor it is: an
         // unclosed one is an error, not a rewind to a less-than that was never there.
         yield 'end of string after generic open angle' => ['foo:map<'];
-        yield 'end of string after option open angle' => ['foo:Option<'];
-        yield 'end of string after some open angle' => ['foo:Some<'];
         yield 'two variables separated by a space' => ['foo:string bar:int'];
         yield 'standalone dot' => ['.'];
         yield 'prop access without an object' => ['.foo:string'];
@@ -263,10 +261,10 @@ final class ExpressionParserErrorTest extends TestCase
         // Every constructor states how many type arguments it takes in one place, so the wording of a wrong count is
         // the same whichever one it's given to, and the count itself is never restated per constructor. These pin the
         // arities that nothing else reaches: Some at either end, and a surplus of more than one.
-        yield 'some without type argument' => ['foo:Some', 'The Some type requires one argument, none given'];
+        yield 'some without type argument' => ['foo:Some', 'Unknown type Some'];
         yield 'some with two type arguments' => [
             'foo:Some<string, int>',
-            'Invalid type "Some<string, int>": Some expects exactly one argument, got 2',
+            'Unknown type Some',
         ];
         yield 'list with three type arguments' => [
             'foo:list<string, int, bool>',
@@ -278,7 +276,7 @@ final class ExpressionParserErrorTest extends TestCase
         ];
         yield 'None with a type argument' => [
             'foo:None<int>',
-            'Invalid type "None<int>": None does not accept arguments',
+            'Unknown type None',
         ];
         yield 'any with a type argument' => ['foo:any<int>', 'Invalid type "any<int>": any does not accept arguments'];
         yield 'inline variable type does not match declared' => [
@@ -347,7 +345,7 @@ final class ExpressionParserErrorTest extends TestCase
             'x:string.foo()',
             'Function foo is not declared and has no inline type',
         ];
-        yield 'some with invalid type argument' => ['foo:Some<Foo>', 'Unknown type Foo'];
+        yield 'some with invalid type argument' => ['foo:Some<Foo>', 'Unknown type Some'];
         yield 'unknown type in struct field' => ['foo:{ name: Foo }', 'Unknown type Foo'];
         yield 'access to unknown struct field' => [
             'foo:{ name: string }.age',

@@ -24,16 +24,16 @@ use Override;
 abstract class Division extends BinaryOperator
 {
     #[Override]
-    final public function evaluate(Scope $scope): int|float|null
+    final public function evaluate(Scope $scope): EnumValue
     {
         if ($this->left->matchesType(Type::float())) {
             $dividend = Operand::float($this->left->evaluate($scope));
             $divisor = Operand::float($this->right->evaluate($scope));
-            return $divisor === 0.0 ? null : $this->applyFloat($dividend, $divisor);
+            return $this->result($divisor === 0.0 ? null : $this->applyFloat($dividend, $divisor));
         }
         $dividend = Operand::int($this->left->evaluate($scope));
         $divisor = Operand::int($this->right->evaluate($scope));
-        return $divisor === 0 ? null : $this->applyInt($dividend, $divisor);
+        return $this->result($divisor === 0 ? null : $this->applyInt($dividend, $divisor));
     }
 
     #[Override]
@@ -51,4 +51,9 @@ abstract class Division extends BinaryOperator
      * The float result for a divisor already known to be nonzero.
      */
     abstract protected function applyFloat(float $dividend, float $divisor): float;
+
+    private function result(int|float|null $value): EnumValue
+    {
+        return new EnumValue($this->getType(), $value === null ? 'None' : 'Some', $value === null ? [] : [$value]);
+    }
 }

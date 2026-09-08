@@ -1,0 +1,7 @@
+value:Result<int, string>
+-- Enums --
+Result<T, E> = Ok(T) | Err(E)
+-- Input --
+{ value: Err("oops") }
+-- Output --
+Err("oops")

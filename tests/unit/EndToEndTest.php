@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
+use Eventjet\Ausdruck\EvaluationError;
 use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
 use Eventjet\Ausdruck\Parser\SyntaxError;
@@ -43,8 +44,11 @@ final class EndToEndTest extends TestCase
     {
         if ($case->error !== null) {
             try {
-                ExpressionParser::parse($case->source, $case->declarations);
-            } catch (SyntaxError|TypeError $e) {
+                $expression = ExpressionParser::parse($case->source, $case->declarations);
+                if ($case->error->class === EvaluationError::class) {
+                    $expression->evaluate(new Scope($case->input));
+                }
+            } catch (SyntaxError|TypeError|EvaluationError $e) {
                 self::assertInstanceOf($case->error->class, $e);
                 self::assertSame($case->error->message, $e->getMessage());
                 return;
@@ -53,6 +57,13 @@ final class EndToEndTest extends TestCase
         }
 
         $expression = ExpressionParser::parse($case->source, $case->declarations);
+
+        if ($case->printed !== null) {
+            self::assertSame($case->printed, (string)$expression);
+            $reparsed = ExpressionParser::parse($case->printed, $case->declarations);
+            self::assertTrue($expression->equals($reparsed));
+            self::assertTrue($expression->getType()->equals($reparsed->getType()));
+        }
 
         if ($case->expressionType !== null) {
             self::assertSame($case->expressionType, (string)$expression->getType());

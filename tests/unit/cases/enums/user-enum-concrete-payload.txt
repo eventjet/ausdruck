@@ -1,0 +1,5 @@
+Code("bad")
+-- Enums --
+Status = Code(int) | Missing
+-- Type error --
+Invalid field 1 of Code

@@ -1,0 +1,3 @@
+None === Some(None)
+-- Output --
+false

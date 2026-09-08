@@ -89,6 +89,9 @@ final class VariableShape implements ComparableShape
     #[Override]
     public function bind(Type $actual, array $bindings): array
     {
-        return array_key_exists($this->name, $bindings) ? $bindings : [...$bindings, $this->name => $actual];
+        $bindings[$this->name] = array_key_exists($this->name, $bindings)
+            ? $bindings[$this->name]->refine($actual)
+            : $actual;
+        return $bindings;
     }
 }

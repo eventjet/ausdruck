@@ -63,7 +63,7 @@ final class ExpressionParser
     public static function parseTyped(string $expression, Type $type, Declarations|Types|null $types = null): Expression
     {
         $expr = self::parse($expression, $types);
-        if ($expr->matchesType($type)) {
+        if ($expr->isSubtypeOf($type)) {
             return $expr;
         }
         throw TypeError::create(
@@ -261,6 +261,17 @@ final class ExpressionParser
         }
         if (is_string($token)) {
             $this->tokens->next();
+            $enum = $this->declarations->types->variant($token);
+            if ($enum !== null) {
+                $fields = [];
+                $end = $parsedToken->location();
+                if ($enum->variants[$token] !== []) {
+                    $this->expect(Token::OpenParen);
+                    $fields = $this->parseCommaSeparated(Token::CloseParen, $this->parseExpression(...));
+                    $end = $this->expect(Token::CloseParen)->location();
+                }
+                return Expr::variant($enum, $token, $fields, $parsedToken->location()->to($end));
+            }
             return $this->variable($token, $parsedToken->location());
         }
         if ($token instanceof Literal) {

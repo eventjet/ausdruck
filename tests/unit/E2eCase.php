@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace Eventjet\Ausdruck\Test\Unit;
 
 use Eventjet\Ausdruck\AbstractLiteral;
+use Eventjet\Ausdruck\EnumDefinition;
+use Eventjet\Ausdruck\EvaluationError;
 use Eventjet\Ausdruck\Parser\Declarations;
 use Eventjet\Ausdruck\Parser\ExpressionParser;
+use Eventjet\Ausdruck\Parser\FunctionTypeNode;
 use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
 use Eventjet\Ausdruck\Parser\TypeNode;
+use Eventjet\Ausdruck\Parser\TypeResolution;
 use Eventjet\Ausdruck\Parser\Types;
+use Eventjet\Ausdruck\Prelude;
 use Eventjet\Ausdruck\StructLiteral;
 use Eventjet\Ausdruck\Type;
 use FilesystemIterator;
@@ -20,12 +25,14 @@ use RuntimeException;
 use SplFileInfo;
 
 use function array_diff;
+use function array_fill_keys;
 use function array_key_exists;
 use function array_keys;
 use function array_map;
 use function explode;
 use function file_get_contents;
 use function implode;
+use function preg_match;
 use function sprintf;
 use function str_ends_with;
 use function str_replace;
@@ -61,9 +68,9 @@ final readonly class E2eCase
     /**
      * The sections that say the source is rejected, and what each of them expects it to be rejected with.
      *
-     * @var array<string, class-string<SyntaxError | TypeError>>
+     * @var array<string, class-string<SyntaxError | TypeError | EvaluationError>>
      */
-    private const ERROR_SECTIONS = ['Syntax error' => SyntaxError::class, 'Type error' => TypeError::class];
+    private const ERROR_SECTIONS = ['Syntax error' => SyntaxError::class, 'Type error' => TypeError::class, 'Evaluation error' => EvaluationError::class];
     /**
      * Every section a case may write. A name that isn't one of these is a typo, and a typo that went unnoticed would be
      * a case that quietly stopped asserting what it was written to assert.
@@ -75,10 +82,13 @@ final readonly class E2eCase
         'Input',
         'Output',
         'Expression type',
+        'Printed',
         'Types',
+        'Enums',
         'Functions',
         'Syntax error',
         'Type error',
+        'Evaluation error',
         'Note',
     ];
 
@@ -92,6 +102,7 @@ final readonly class E2eCase
         public array $input = [],
         public string|null $expressionType = null,
         public E2eError|null $error = null,
+        public string|null $printed = null,
     ) {
     }
 
@@ -129,11 +140,12 @@ final readonly class E2eCase
                 sprintf('Unknown section %s; a case has %s', implode(' and ', $unknown), implode(', ', self::SECTIONS)),
             );
         }
-        $types = new Types(array_key_exists('Types', $sections) ? self::parseTypes($sections['Types']) : []);
+        $enums = isset($sections['Enums']) ? self::parseEnums($sections['Enums']) : [];
+        $types = new Types(array_key_exists('Types', $sections) ? self::parseTypes($sections['Types'], $enums) : [], $enums);
         $functions = array_key_exists('Functions', $sections)
             ? self::parseFunctions($sections['Functions'], $types)
             : [];
-        $output = array_key_exists('Output', $sections) ? self::parseOutput($sections['Output']) : null;
+        $output = array_key_exists('Output', $sections) ? self::parseOutput($sections['Output'], $types) : null;
         $expressionType = $sections['Expression type'] ?? null;
         $error = self::parseError($sections);
         if ($error !== null && ($output !== null || $expressionType !== null)) {
@@ -155,9 +167,10 @@ final readonly class E2eCase
             $sections['Source'],
             new Declarations(types: $types, functions: $functions),
             $output,
-            array_key_exists('Input', $sections) ? self::parseInput($sections['Input']) : [],
+            array_key_exists('Input', $sections) ? self::parseInput($sections['Input'], $types) : [],
             $expressionType,
             $error,
+            $sections['Printed'] ?? null,
         );
     }
 
@@ -185,9 +198,50 @@ final readonly class E2eCase
         return array_map(static fn(array $lines): string => trim(implode("\n", $lines)), $sectionLines);
     }
 
-    private static function parseOutput(string $src): AbstractLiteral
+    /**
+     * @return list<EnumDefinition>
+     * @psalm-suppress InternalClass
+     * @psalm-suppress InternalMethod
+     */
+    private static function parseEnums(string $src): array
     {
-        $output = ExpressionParser::parse($src);
+        $enums = ['Option' => Prelude::option()];
+        $result = [];
+        foreach (explode("\n", $src) as $line) {
+            if (preg_match('/^([A-Za-z_][A-Za-z_0-9]*)(?:<([^>]+)>)?\s*=\s*(.+)$/D', trim($line), $parts) !== 1) {
+                throw new RuntimeException('Expected Enum<T> = Variant(T) | Unit');
+            }
+            $parameters = $parts[2] === '' ? [] : array_map(trim(...), explode(',', $parts[2]));
+            $resolution = new TypeResolution([], array_fill_keys($parameters, true), $enums);
+            $variants = [];
+            foreach (explode('|', $parts[3]) as $variant) {
+                if (preg_match('/^([A-Za-z_][A-Za-z_0-9]*)(\(.*\))?$/D', trim($variant), $fields) !== 1) {
+                    throw new RuntimeException('Invalid variant declaration');
+                }
+                $node = self::parseTypeString('fn' . ($fields[2] ?? '()') . ' -> any');
+                if (!$node instanceof FunctionTypeNode) {
+                    throw new RuntimeException('Invalid variant fields');
+                }
+                $payload = [];
+                foreach ($node->parameters as $parameter) {
+                    $type = $resolution->resolve($parameter);
+                    if ($type instanceof TypeError) {
+                        throw $type;
+                    }
+                    $payload[] = $type;
+                }
+                $variants[$fields[1]] = $payload;
+            }
+            $definition = new EnumDefinition($parts[1], $parameters, $variants);
+            $enums[$parts[1]] = $definition;
+            $result[] = $definition;
+        }
+        return $result;
+    }
+
+    private static function parseOutput(string $src, Types $types): AbstractLiteral
+    {
+        $output = ExpressionParser::parse($src, $types);
         if (!$output instanceof AbstractLiteral) {
             throw new RuntimeException(sprintf('Output section must be a literal, got %s', $output));
         }
@@ -197,9 +251,9 @@ final readonly class E2eCase
     /**
      * @return array<string, mixed>
      */
-    private static function parseInput(string $src): array
+    private static function parseInput(string $src, Types $types): array
     {
-        $inputStruct = ExpressionParser::parse($src);
+        $inputStruct = ExpressionParser::parse($src, $types);
         if (!$inputStruct instanceof StructLiteral) {
             throw new RuntimeException('Input section must be a struct literal');
         }
@@ -230,13 +284,14 @@ final readonly class E2eCase
      * A Types section is a sequence of `Name: <type>` declarations. Each type is resolved against the aliases declared
      * before it, so `Bag` can be a struct of `Item`s.
      *
+     * @param list<EnumDefinition> $enums
      * @return array<string, Type>
      */
-    private static function parseTypes(string $src): array
+    private static function parseTypes(string $src, array $enums): array
     {
         $aliases = [];
         foreach (self::parseTypeDeclarations($src) as $name => $node) {
-            $aliases[$name] = self::resolve($node, new Types($aliases));
+            $aliases[$name] = self::resolve($node, new Types($aliases, $enums));
         }
         return $aliases;
     }

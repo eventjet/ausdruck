@@ -1,0 +1,3 @@
+[None].head()
+-- Output --
+Some(None)

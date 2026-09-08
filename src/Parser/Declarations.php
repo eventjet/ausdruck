@@ -34,6 +34,9 @@ final class Declarations
         array $functions = [],
     ) {
         foreach ($variables as $name => $type) {
+            if ($types->variant($name) !== null) {
+                throw new InvalidArgumentException('Variable shadows enum variant ' . $name);
+            }
             self::checkVariableIsSelfContained($name, $type);
         }
         $fns = BuiltinFunctions::signatures();
@@ -45,7 +48,7 @@ final class Declarations
             if ($signature === null) {
                 throw new InvalidArgumentException(sprintf('%s is declared as %s, which is not a function type', $name, $type));
             }
-            self::checkBinderDoesNotShadowAnAlias($name, $type, $signature, $types);
+            self::checkBinderDoesNotShadowAType($name, $type, $signature, $types);
             $fns[$name] = $signature;
         }
         $this->functions = $fns;
@@ -53,15 +56,15 @@ final class Declarations
 
     /**
      * The one restriction {@see TypeResolution::checkTypeVariable()} enforces that a builder-constructed function's
-     * own derived binder has no counterpart for: a written `fn<...>` binder is checked against $types's aliases at
+     * own derived binder has no counterpart for: a written `fn<...>` binder is checked against $types's declared names at
      * parse time, but a binder {@see Signature::quantified()} derives from {@see Type::func()}'s own free variables
      * never passes through the parser at all, so this is the one place left to ask the same question of it before
      * it's handed back as $name's own signature.
      */
-    private static function checkBinderDoesNotShadowAnAlias(string $name, Type $type, Signature $signature, Types $types): void
+    private static function checkBinderDoesNotShadowAType(string $name, Type $type, Signature $signature, Types $types): void
     {
         foreach ($signature->binder() as $variable) {
-            if (!$types->hasAlias($variable)) {
+            if (!$types->hasType($variable)) {
                 continue;
             }
             throw new InvalidArgumentException(sprintf(

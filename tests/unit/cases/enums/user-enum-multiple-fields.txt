@@ -1,0 +1,7 @@
+Pair(1, "two")
+-- Enums --
+Product<A, B> = Pair(A, B) | Empty
+-- Expression type --
+Product<int, string>
+-- Output --
+Pair(1, "two")

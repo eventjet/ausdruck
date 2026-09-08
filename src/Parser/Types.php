@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Parser;
 
+use Eventjet\Ausdruck\EnumDefinition;
+use Eventjet\Ausdruck\Prelude;
 use Eventjet\Ausdruck\Type;
+use Eventjet\Ausdruck\TypeConstructor;
 use InvalidArgumentException;
 
 use function array_key_exists;
+use function array_keys;
 
 /**
  * The public entry point for resolving a {@see TypeNode} against a set of aliases. Resolution itself is
@@ -23,6 +27,12 @@ final class Types
      */
     private readonly array $aliases;
 
+    /** @var array<string, EnumDefinition> */
+    private readonly array $enums;
+
+    /** @var array<string, EnumDefinition> */
+    private readonly array $variants;
+
     /**
      * An alias stands for one complete type -- see {@see Type::alias()}, which is what actually promotes every entry
      * here: each is wrapped through it exactly the way a consumer calling {@see Type::alias()} directly would wrap
@@ -30,12 +40,29 @@ final class Types
      * rejected with {@see Type::alias()}'s own message, rather than this constructor keeping a second copy of that
      * check.
      *
+     * @param list<EnumDefinition> $enums
      * @param array<string, Type> $aliases
      *
      * @throws InvalidArgumentException {@see Type::alias()}
      */
-    public function __construct(array $aliases = [])
+    public function __construct(array $aliases = [], array $enums = [])
     {
+        $definitions = [];
+        $variants = [];
+        foreach ([Prelude::option(), ...$enums] as $enum) {
+            if (isset($definitions[$enum->name]) || isset($aliases[$enum->name]) || TypeConstructor::isReservedName($enum->name)) {
+                throw new InvalidArgumentException('Duplicate or reserved type ' . $enum->name);
+            }
+            $definitions[$enum->name] = $enum;
+            foreach (array_keys($enum->variants) as $name) {
+                if (isset($variants[$name]) || $name === 'true' || $name === 'false') {
+                    throw new InvalidArgumentException('Duplicate or reserved variant ' . $name);
+                }
+                $variants[$name] = $enum;
+            }
+        }
+        $this->enums = $definitions;
+        $this->variants = $variants;
         $wrapped = [];
         foreach ($aliases as $name => $type) {
             $wrapped[$name] = Type::alias($name, $type);
@@ -60,11 +87,11 @@ final class Types
      */
     public function resolve(TypeNode $node): Type|TypeError
     {
-        return (new TypeResolution($this->aliases))->resolve($node);
+        return (new TypeResolution($this->aliases, enums: $this->enums))->resolve($node);
     }
 
     /**
-     * Whether $name is one of the aliases this scope resolves a reference to -- the same question
+     * Whether $name is a declared alias or enum in this scope -- the same question
      * {@see TypeResolution::checkTypeVariable()} asks of a written `fn<...>` binder's own names, from outside the one
      * door that builds a {@see TypeResolution} in the first place. {@see Declarations::__construct()} is the other
      * place a name has to clear that same restriction: the binder {@see \Eventjet\Ausdruck\Signature::quantified()}
@@ -74,8 +101,16 @@ final class Types
      * @internal
      * @psalm-internal Eventjet\Ausdruck\Parser
      */
-    public function hasAlias(string $name): bool
+    public function hasType(string $name): bool
     {
-        return array_key_exists($name, $this->aliases);
+        return array_key_exists($name, $this->aliases) || array_key_exists($name, $this->enums);
+    }
+
+    /** @internal
+     * @psalm-internal Eventjet\Ausdruck\Parser
+     */
+    public function variant(string $name): EnumDefinition|null
+    {
+        return $this->variants[$name] ?? null;
     }
 }

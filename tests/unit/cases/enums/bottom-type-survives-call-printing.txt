@@ -1,0 +1,7 @@
+None.unwrap().identity:any()
+-- Functions --
+identity: fn<T>(T) -> T
+-- Expression type --
+any
+-- Printed --
+None.unwrap:any().identity:any()

@@ -1,0 +1,5 @@
+Some(Some(42)).unwrap().unwrap()
+-- Expression type --
+int
+-- Output --
+42

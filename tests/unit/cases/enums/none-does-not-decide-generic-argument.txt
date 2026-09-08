@@ -1,0 +1,5 @@
+None.withFallback(42)
+-- Functions --
+withFallback: fn<T>(Option<T>, T) -> T
+-- Expression type --
+int

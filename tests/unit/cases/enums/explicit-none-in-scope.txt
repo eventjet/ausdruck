@@ -1,0 +1,5 @@
+value:Option<int>.isSome()
+-- Input --
+{ value: None }
+-- Output --
+false

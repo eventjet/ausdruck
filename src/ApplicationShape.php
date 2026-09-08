@@ -10,8 +10,8 @@ use function array_map;
 
 /**
  * A name applied to its type arguments -- `list<T>`, `map<K, V>`, or a bare `int` with none. Every
- * {@see TypeConstructor} other than `Option` and `Some` themselves, plus `None`, `any` and `never`, is one of these;
- * see {@see Type::listOf()}, {@see Type::mapOf()}, {@see Type::option()} and the other scalar factories.
+ * {@see TypeConstructor} and the bottom type `!` use this shape. Named sums use {@see EnumShape}.
+ * See {@see Type::listOf()}, {@see Type::mapOf()} and the scalar factories.
  *
  * @internal
  * @psalm-internal Eventjet\Ausdruck

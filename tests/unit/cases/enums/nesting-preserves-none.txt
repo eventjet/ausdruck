@@ -1,0 +1,7 @@
+Some(None)
+-- Expression type --
+Option<Option<!>>
+-- Output --
+Some(None)
+-- Printed --
+Some(None)

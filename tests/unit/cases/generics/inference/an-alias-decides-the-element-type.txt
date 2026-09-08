@@ -6,6 +6,6 @@ Numbers: list<int>
 -- Expression type --
 Option<int>
 -- Output --
-1
+Some(1)
 -- Note --
 An alias is a name for a type, so a variable is decided by the type the name stands for rather than by the name.

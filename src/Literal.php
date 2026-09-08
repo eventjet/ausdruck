@@ -27,7 +27,7 @@ final class Literal extends AbstractLiteral
     use LocationTrait;
 
     /**
-     * @param string | int | float | bool | null | array<array-key, mixed> $value
+     * @param string | int | float | bool | null | EnumValue | array<array-key, mixed> $value
      */
     public function __construct(private readonly mixed $value, Span $location)
     {
@@ -35,14 +35,14 @@ final class Literal extends AbstractLiteral
     }
 
     /**
-     * The source spelling of a value, where it has one. `none` doesn't: {@see Type::fromValue()} reads PHP's null as
-     * the None type, and it prints here as `null` because that is what it is in PHP, but the language has no null
-     * literal to read it back with. A none-valued expression therefore prints to something the parser rejects — the
-     * one value this produces that doesn't round-trip, and the reason the test cases that evaluate to none assert
-     * through `isSome` instead of naming the value.
+     * Source spelling for literal values and enum variants. PHP null only appears in
+     * diagnostic dumps of missing scope values; it is not a language literal.
      */
     private static function dumpValue(mixed $value): string
     {
+        if ($value instanceof EnumValue) {
+            return $value->variant . ($value->fields === [] ? '' : '(' . implode(', ', array_map(self::dumpValue(...), $value->fields)) . ')');
+        }
         if (is_string($value)) {
             return sprintf('"%s"', $value);
         }

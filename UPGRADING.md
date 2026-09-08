@@ -1,5 +1,30 @@
 # Upgrading
 
+## Unreleased: Option becomes an enum
+
+This is a behavioral breaking change. `Option<T>` now uses the same nominal enum
+representation as consumer-defined sum types.
+
+- Replace `Some<T>` type annotations with `Option<T>`. `None` is also a value
+  constructor, not a type; annotate an absent value as `Option<T>`.
+- Wrap present expression values with `Some(value)`, and write `None` for absence.
+  Plain values no longer coerce to options. Missing variables are errors even
+  when declared as options.
+- Supply `EnumValue` objects in PHP scopes and host function results. Use
+  `Prelude::option()->value('Some', $value)` and `Prelude::option()->value('None')`.
+  PHP `null` is not a language value and `Type::fromValue(null)` rejects it.
+- `head`, division, and modulo now return tagged `EnumValue` objects. Read their
+  `variant` and `fields` in PHP, or use the existing `isSome()` and `unwrap()` in
+  expressions. Unwrapping `None` throws `EvaluationError`.
+- Filtering options keeps their option type; it does not narrow to `Some<T>` or
+  unwrap their payloads. Map `unwrap()` explicitly if needed after filtering.
+- `Type::option($payload)` remains a convenience for the predefined enum.
+  `Type::none()` now denotes `Option<!>`; `!` is the parseable bottom type,
+  including in diagnostics for empty PHP collections.
+
+Use `EnumDefinition`, `EnumValue`, and `Types(enums: [...])` for additional enums;
+see the README for a complete example. This change does not add pattern matching.
+
 ## From 0.2 to 0.3
 
 Ausdruck 0.3 is a breaking release. Most 0.2 expressions and integrations keep working

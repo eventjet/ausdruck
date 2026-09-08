@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck\Test\Unit;
 
+use Eventjet\Ausdruck\EvaluationError;
 use Eventjet\Ausdruck\Parser\SyntaxError;
 use Eventjet\Ausdruck\Parser\TypeError;
 
@@ -16,7 +17,7 @@ use Eventjet\Ausdruck\Parser\TypeError;
 final readonly class E2eError
 {
     /**
-     * @param class-string<SyntaxError | TypeError> $class
+     * @param class-string<SyntaxError | TypeError | EvaluationError> $class
      */
     public function __construct(public string $class, public string $message)
     {
