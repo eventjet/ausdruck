@@ -113,4 +113,14 @@ final class Types
     {
         return $this->variants[$name] ?? null;
     }
+
+    /** @internal
+     * @psalm-internal Eventjet\Ausdruck\Parser
+     */
+    public function checkVariableName(string $name): void
+    {
+        if ($this->variant($name) !== null) {
+            throw new InvalidArgumentException('Variable shadows enum variant ' . $name);
+        }
+    }
 }

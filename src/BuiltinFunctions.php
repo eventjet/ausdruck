@@ -68,6 +68,7 @@ final class BuiltinFunctions
         // apart.
         $predicate = Type::func(Type::bool(), [$item]);
         $mapped = Type::var('U');
+        $head = Signature::over(Type::option($item), [$items]);
         return [
             'contains' => ['impl' => self::contains(...), 'signature' => Signature::over(Type::bool(), [$items, $item])],
             // Not generic: count and isSome answer the same thing whatever the list or Option holds, so the element
@@ -79,7 +80,7 @@ final class BuiltinFunctions
             ],
             'filter' => ['impl' => self::filter(...), 'signature' => Signature::over($items, [$items, $predicate])],
             'flatten' => ['impl' => self::flatten(...), 'signature' => Signature::over($items, [Type::listOf($items)])],
-            'head' => ['impl' => self::head(...), 'signature' => Signature::over(Type::option($item), [$items])],
+            'head' => ['impl' => new TypeDependentFunction($head, self::head(...)), 'signature' => $head],
             'isSome' => [
                 'impl' => self::isSome(...),
                 'signature' => Signature::over(Type::bool(), [Type::option(Type::any())]),
@@ -201,9 +202,9 @@ final class BuiltinFunctions
      * @template T
      * @param list<T> $items
      */
-    private static function head(array $items): EnumValue
+    private static function head(Type $returnType, array $items): EnumValue
     {
-        return $items === [] ? Prelude::option()->value('None') : Prelude::option()->value('Some', $items[0]);
+        return $items === [] ? new EnumValue($returnType, 'None') : new EnumValue($returnType, 'Some', [$items[0]]);
     }
 
     private static function isSome(EnumValue $option): bool

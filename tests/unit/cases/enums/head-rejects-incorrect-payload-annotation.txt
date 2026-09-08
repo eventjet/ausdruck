@@ -1,0 +1,5 @@
+items:list<any>.head:Option<int>().unwrap()
+-- Input --
+{items: ["wrong"]}
+-- Evaluation error --
+Expected int, got string

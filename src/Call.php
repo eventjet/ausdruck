@@ -12,7 +12,6 @@ use Override;
 use Throwable;
 
 use function array_map;
-use function array_unshift;
 use function count;
 use function sprintf;
 
@@ -69,8 +68,15 @@ final class Call extends Expression implements HasDoc
         if ($func === null) {
             throw new EvaluationError(sprintf('Unknown function "%s"', $this->name));
         }
-        $args = array_map(static fn(Expression $arg): mixed => $arg->evaluate($scope), $this->arguments);
-        array_unshift($args, $this->target->evaluate($scope));
+        if ($func instanceof TypeDependentFunction) {
+            $func = $func->specialize(
+                $this->target->getType(),
+                array_map(static fn(Expression $argument): Type => $argument->getType(), $this->arguments),
+                $this->type,
+            );
+        }
+        $arguments = array_map(static fn(Expression $arg): mixed => $arg->evaluate($scope), $this->arguments);
+        $args = [$this->target->evaluate($scope), ...$arguments];
         try {
             return $this->type->assert($func(...$args));
         } catch (Throwable $error) {

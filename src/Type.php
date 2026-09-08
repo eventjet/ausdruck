@@ -336,6 +336,7 @@ final class Type implements Stringable
     /**
      * Fill only bottom types left by constructors with no evidence for an argument.
      * Concrete bindings still win, so later incompatible arguments are rejected.
+     * A refinement must still accept the original type, including when enum fields use arguments contravariantly.
      *
      * @internal
      * @psalm-internal Eventjet\Ausdruck
@@ -350,7 +351,7 @@ final class Type implements Stringable
         $shape = $self->shape;
         assert($shape instanceof ComparableShape);
         $refined = $shape->refine($actual);
-        return $refined->shape() === $shape ? $this : $refined;
+        return $refined->shape() === $shape || !$self->isSubtypeOf($refined) ? $this : $refined;
     }
 
     /**
@@ -362,7 +363,7 @@ final class Type implements Stringable
     public function common(self $other): self
     {
         $refined = $this->refine($other);
-        if ($this->isSubtypeOf($refined) && $other->isSubtypeOf($refined)) {
+        if ($other->isSubtypeOf($refined)) {
             return $refined;
         }
         return $this->isSubtypeOf($other) ? $other : self::any();

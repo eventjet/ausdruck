@@ -34,9 +34,7 @@ final class Declarations
         array $functions = [],
     ) {
         foreach ($variables as $name => $type) {
-            if ($types->variant($name) !== null) {
-                throw new InvalidArgumentException('Variable shadows enum variant ' . $name);
-            }
+            $types->checkVariableName($name);
             self::checkVariableIsSelfContained($name, $type);
         }
         $fns = BuiltinFunctions::signatures();

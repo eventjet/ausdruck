@@ -1,0 +1,5 @@
+|item, Ready| item:int
+-- Enums --
+Status = Ready | Waiting
+-- Syntax error --
+Variable shadows enum variant Ready

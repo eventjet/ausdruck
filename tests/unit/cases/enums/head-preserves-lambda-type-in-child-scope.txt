@@ -1,0 +1,5 @@
+[42].map(|item| [item:int].map([|x| x:int].head().unwrap()).head().unwrap())
+-- Expression type --
+list<int>
+-- Output --
+[42]

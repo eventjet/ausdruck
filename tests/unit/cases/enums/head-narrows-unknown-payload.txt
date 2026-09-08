@@ -1,0 +1,7 @@
+items:list<any>.head:Option<int>().unwrap()
+-- Input --
+{items: [42]}
+-- Expression type --
+int
+-- Output --
+42

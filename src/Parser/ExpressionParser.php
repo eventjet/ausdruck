@@ -13,6 +13,7 @@ use Eventjet\Ausdruck\ListLiteral;
 use Eventjet\Ausdruck\Precedence;
 use Eventjet\Ausdruck\StructLiteral;
 use Eventjet\Ausdruck\Type;
+use InvalidArgumentException;
 
 use function assert;
 use function is_string;
@@ -414,11 +415,22 @@ final class ExpressionParser
         $start = $this->expect(Token::Pipe);
         $params = $this->parseCommaSeparated(
             Token::Pipe,
-            fn(): string => $this->expectIdentifier('parameter name')[0],
+            $this->lambdaParameter(...),
         );
         $this->expect(Token::Pipe);
         $body = $this->parseExpression();
         return Expr::lambda($body, $params, $start->location()->to($body->location()));
+    }
+
+    private function lambdaParameter(): string
+    {
+        [$name, $location] = $this->expectIdentifier('parameter name');
+        try {
+            $this->declarations->types->checkVariableName($name);
+        } catch (InvalidArgumentException $error) {
+            throw SyntaxError::create($error->getMessage(), $location);
+        }
+        return $name;
     }
 
     private function dot(Expression $target): Call|FieldAccess

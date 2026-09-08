@@ -1,0 +1,6 @@
+Pair(a:Consumer<!>, b:Consumer<int>)
+-- Enums --
+Consumer<T> = Consume(fn(T) -> int)
+Product<T> = Pair(T, T)
+-- Expression type --
+Product<Consumer<!>>
