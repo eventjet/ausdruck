@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Formatter\Doc;
+use Eventjet\Ausdruck\Formatter\HasDoc;
+use Eventjet\Ausdruck\Formatter\PrintsItsDoc;
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\TypeError;
 use InvalidArgumentException;
@@ -12,14 +15,14 @@ use RuntimeException;
 
 use function array_map;
 use function count;
-use function implode;
 
 /** @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class VariantExpression extends AbstractLiteral
+final class VariantExpression extends AbstractLiteral implements HasDoc
 {
     use LocationTrait;
+    use PrintsItsDoc;
 
     private readonly Type $type;
 
@@ -34,9 +37,12 @@ final class VariantExpression extends AbstractLiteral
         }
     }
 
-    public function __toString(): string
+    #[Override]
+    public function doc(): Doc
     {
-        return $this->variant . ($this->fields === [] ? '' : '(' . implode(', ', $this->fields) . ')');
+        return $this->fields === []
+            ? Doc::text($this->variant)
+            : Doc::commaSeparated($this->variant . '(', array_map(Doc::of(...), $this->fields), ')');
     }
 
     #[Override]

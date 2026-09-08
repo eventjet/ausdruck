@@ -1,0 +1,7 @@
+Pair(|x| None, |x| Some(42))
+-- Enums --
+Product<T> = Pair(T, T)
+-- Expression type --
+Product<fn(any) -> Option<int>>
+-- Printed --
+Pair(|x| None, |x| Some(42))

@@ -22,6 +22,18 @@ final class VariableShape implements ComparableShape
     ) {
     }
 
+    #[Override]
+    public function accepts(mixed $value): bool
+    {
+        return Type::fromValue($value)->isSubtypeOf(Type::of($this));
+    }
+
+    #[Override]
+    public function refine(Type $actual): Type
+    {
+        return Type::of($this);
+    }
+
     /**
      * @param array<string, true> $found
      * @return array<string, true>

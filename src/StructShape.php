@@ -9,6 +9,8 @@ use Override;
 use function array_intersect_key;
 use function array_key_exists;
 use function array_map;
+use function get_object_vars;
+use function is_object;
 use function sprintf;
 
 /**
@@ -25,6 +27,35 @@ final class StructShape implements ComparableShape
     public function __construct(
         public readonly array $fields,
     ) {
+    }
+
+    #[Override]
+    public function accepts(mixed $value): bool
+    {
+        if (!is_object($value) || $value instanceof EnumValue) {
+            return false;
+        }
+        $fields = get_object_vars($value);
+        foreach ($this->fields as $name => $field) {
+            if (!array_key_exists($name, $fields) || !$field->accepts($fields[$name])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    #[Override]
+    public function refine(Type $actual): Type
+    {
+        $shape = $actual->shape();
+        if (!$shape instanceof self) {
+            return Type::of($this);
+        }
+        $fields = [];
+        foreach ($this->fields as $name => $field) {
+            $fields[$name] = isset($shape->fields[$name]) ? $field->refine($shape->fields[$name]) : $field;
+        }
+        return Type::struct($fields);
     }
 
     /**

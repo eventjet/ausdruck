@@ -21,6 +21,34 @@ final class EnumShape implements ComparableShape
     }
 
     #[Override]
+    public function accepts(mixed $value): bool
+    {
+        if (!$value instanceof EnumValue || !$value->type->isSubtypeOf(Type::of($this))) {
+            return false;
+        }
+        foreach ($this->fields($value->variant) as $index => $field) {
+            if (!$field->accepts($value->fields[$index])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    #[Override]
+    public function refine(Type $actual): Type
+    {
+        $shape = $actual->shape();
+        if (!$shape instanceof self || $shape->definition !== $this->definition) {
+            return Type::of($this);
+        }
+        $arguments = [];
+        foreach ($this->arguments as $index => $argument) {
+            $arguments[] = $argument->refine($shape->arguments[$index]);
+        }
+        return $this->definition->type(...$arguments);
+    }
+
+    #[Override]
     public function collectVariables(array $found): array
     {
         foreach ($this->arguments as $argument) {

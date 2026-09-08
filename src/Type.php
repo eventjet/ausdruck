@@ -14,7 +14,6 @@ use function assert;
 use function get_object_vars;
 use function gettype;
 use function is_array;
-use function is_callable;
 use function is_string;
 use function sprintf;
 
@@ -312,32 +311,21 @@ final class Type implements Stringable
      */
     public function assert(mixed $value): mixed
     {
-        // Callable signatures are supplied by declarations, as with host functions.
-        if ($this->asFunction() !== null && is_callable($value)) {
-            return $value;
-        }
-        $valueType = self::fromValue($value);
-        if (!$valueType->isSubtypeOf($this)) {
-            throw new Parser\TypeError(sprintf('Expected %s, got %s', $this, $valueType));
-        }
-        $shape = $this->canonical()->shape;
-        if (is_array($value) && $shape instanceof ApplicationShape) {
-            /** @var mixed $item */
-            foreach ($value as $key => $item) {
-                if ($shape->name === TypeConstructor::List->value) {
-                    $shape->args[0]->assert($item);
-                } elseif ($shape->name === TypeConstructor::Map->value) {
-                    $shape->args[0]->assert($key);
-                    $shape->args[1]->assert($item);
-                }
-            }
-        }
-        if ($value instanceof EnumValue && $shape instanceof EnumShape) {
-            foreach ($shape->fields($value->variant) as $index => $field) {
-                $field->assert($value->fields[$index]);
-            }
+        if (!$this->accepts($value)) {
+            throw new Parser\TypeError(sprintf('Expected %s, got %s', $this, self::fromValue($value)));
         }
         return $value;
+    }
+
+    /**
+     * @internal
+     * @psalm-internal Eventjet\Ausdruck
+     */
+    public function accepts(mixed $value): bool
+    {
+        $shape = $this->canonical()->shape;
+        assert($shape instanceof ComparableShape);
+        return $shape->accepts($value);
     }
 
     public function equals(self $type): bool
@@ -360,29 +348,9 @@ final class Type implements Stringable
             return $actual;
         }
         $shape = $self->shape;
-        $other = $actual->shape;
-        if ($shape instanceof EnumShape && $other instanceof EnumShape && $shape->definition === $other->definition) {
-            $arguments = [];
-            foreach ($shape->arguments as $index => $argument) {
-                $arguments[] = $argument->refine($other->arguments[$index]);
-            }
-            return $shape->definition->type(...$arguments);
-        }
-        if ($shape instanceof ApplicationShape && $other instanceof ApplicationShape && $shape->name === $other->name) {
-            $arguments = [];
-            foreach ($shape->args as $index => $argument) {
-                $arguments[] = $argument->refine($other->args[$index]);
-            }
-            return self::of(new ApplicationShape($shape->name, $arguments));
-        }
-        if ($shape instanceof StructShape && $other instanceof StructShape) {
-            $fields = [];
-            foreach ($shape->fields as $name => $field) {
-                $fields[$name] = isset($other->fields[$name]) ? $field->refine($other->fields[$name]) : $field;
-            }
-            return self::struct($fields);
-        }
-        return $this;
+        assert($shape instanceof ComparableShape);
+        $refined = $shape->refine($actual);
+        return $refined->shape() === $shape ? $this : $refined;
     }
 
     /**

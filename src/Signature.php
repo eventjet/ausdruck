@@ -12,6 +12,7 @@ use function array_keys;
 use function array_map;
 use function array_slice;
 use function count;
+use function is_callable;
 use function sprintf;
 
 /**
@@ -391,5 +392,23 @@ final class Signature implements Stringable, ComparableShape
             $bindings = $parameter->bind($otherParameter, $bindings);
         }
         return $this->returnType->bind($actualShape->returnType, $bindings);
+    }
+
+    #[Override]
+    public function accepts(mixed $value): bool
+    {
+        // Host callable signatures come from declarations, not PHP reflection.
+        return is_callable($value);
+    }
+
+    #[Override]
+    public function refine(Type $actual): Type
+    {
+        $shape = $actual->shape();
+        if (!$shape instanceof self || $this->hasOwnBinder() || $shape->hasOwnBinder()) {
+            return $this->toType();
+        }
+        // Widening a parameter would narrow the function type, invalidating the earlier binding.
+        return Type::func($this->returnType->refine($shape->returnType), $this->parameters);
     }
 }
