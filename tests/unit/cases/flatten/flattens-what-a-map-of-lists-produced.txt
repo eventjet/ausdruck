@@ -1,0 +1,10 @@
+groups:list<list<int>>.map(|g| g:list<int>.filter(|n| n:int > 2)).flatten()
+-- Input --
+{ groups: [[1, 2, 3], [4], [1]] }
+-- Expression type --
+list<int>
+-- Output --
+[3, 4]
+-- Note --
+The nesting flatten exists for: a lambda that answers a list turns map into list<list<T>>, and nothing else in the
+language collapses that back to the list<T> the caller wanted.

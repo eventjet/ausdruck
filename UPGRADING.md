@@ -24,6 +24,21 @@ representation as consumer-defined sum types.
 
 Use `EnumDefinition`, `EnumValue`, and `Types(enums: [...])` for additional enums;
 see the README for a complete example. This change does not add pattern matching.
+## From 0.3 to 0.4
+
+### Behavioral changes
+
+#### `flatten` is a built-in name now
+
+0.4 adds a `flatten` built-in. A name is either the library's or yours, never both, so an
+integration that supplied its own `flatten` is rejected on construction rather than
+quietly losing to the built-in: `Scope` throws `Can't shadow predefined functions:
+flatten` and `Declarations(functions: [...])` throws `Can't override built-in function
+flatten`.
+
+If yours is `fn<T>(list<list<T>>) -> list<T>` — the shape a `map` over lists asks for —
+drop it and the built-in takes over, unchanged at the call site. If it means something
+else, rename it in the declaration, the scope, and every expression that calls it.
 
 ## From 0.2 to 0.3
 

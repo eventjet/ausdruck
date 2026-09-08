@@ -4,20 +4,24 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Eventjet\Ausdruck\Formatter\Doc;
+use Eventjet\Ausdruck\Formatter\HasDoc;
+use Eventjet\Ausdruck\Formatter\PrintsItsDoc;
 use Eventjet\Ausdruck\Parser\Span;
 use Override;
 use RuntimeException;
 
 use function array_map;
-use function implode;
 use function sprintf;
 
 /**
  * @internal
  * @psalm-internal Eventjet\Ausdruck
  */
-final class ListLiteral extends AbstractLiteral
+final class ListLiteral extends AbstractLiteral implements HasDoc
 {
+    use PrintsItsDoc;
+
     /**
      * @param list<Expression> $elements
      */
@@ -25,9 +29,10 @@ final class ListLiteral extends AbstractLiteral
     {
     }
 
-    public function __toString()
+    #[Override]
+    public function doc(): Doc
     {
-        return '[' . implode(', ', $this->elements) . ']';
+        return Doc::commaSeparated('[', array_map(Doc::of(...), $this->elements), ']');
     }
 
     #[Override]

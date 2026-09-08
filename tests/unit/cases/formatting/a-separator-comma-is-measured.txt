@@ -1,0 +1,18 @@
+xs:list<int>.merge([10, 20, 30], 40)
+-- Note --
+The list is seventeen columns where it sits, laid out to sixteen, and the seventeenth is the comma separating it from
+the argument after it. Unlike the trailing comma in a-trailing-comma-is-not-measured, that one is on the line whether
+the list breaks or not, so it counts against the room the list has.
+-- Functions --
+merge: fn(list<int>, list<int>, int) -> list<int>
+-- Width --
+16
+-- Formatted --
+xs:list<int>.merge:list<int>(
+    [
+        10,
+        20,
+        30,
+    ],
+    40,
+)

@@ -78,6 +78,7 @@ final class BuiltinFunctions
                 'signature' => Signature::over(Type::int(), [Type::listOf(Type::any())]),
             ],
             'filter' => ['impl' => self::filter(...), 'signature' => Signature::over($items, [$items, $predicate])],
+            'flatten' => ['impl' => self::flatten(...), 'signature' => Signature::over($items, [Type::listOf($items)])],
             'head' => ['impl' => self::head(...), 'signature' => Signature::over(Type::option($item), [$items])],
             'isSome' => [
                 'impl' => self::isSome(...),
@@ -178,6 +179,22 @@ final class BuiltinFunctions
             $out[] = $item;
         }
         return $out;
+    }
+
+    /**
+     * @template T
+     * @param list<list<T>> $lists
+     * @return list<T>
+     */
+    private static function flatten(array $lists): array
+    {
+        $flat = [];
+        foreach ($lists as $list) {
+            foreach ($list as $item) {
+                $flat[] = $item;
+            }
+        }
+        return $flat;
     }
 
     /**

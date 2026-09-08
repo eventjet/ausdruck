@@ -347,6 +347,7 @@ $declarations = new Declarations(functions: ['myMap' => $myMap]);
 | `count`    | `fn(list<any>) -> int`                     | Returns the number of elements in a list                               | `foo:list<string>.count()`                |
 | `contains` | `fn<T>(list<T>, T) -> bool`                | Returns whether a list contains a value                                | `foo:list<string>.contains("bar")`        |
 | `filter`   | `fn<T>(list<T>, fn(T) -> bool) -> list<T>` | Returns a new list of the elements matching a [predicate](#lambdas)    | `foo:list<int>.filter(\|i\| i:int > 2)`   |
+| `flatten`  | `fn<T>(list<list<T>>) -> list<T>`          | Returns one list with the elements of every inner list, in order       | `foo:list<list<int>>.flatten()`           |
 | `head`     | `fn<T>(list<T>) -> Option<T>`              | Returns the first element of a list as an `Option`                     | `foo:list<string>.head()`                 |
 | `isSome`   | `fn(Option<any>) -> bool`                  | Takes an Option and returns whether it is `Some`                       | `foo:Option<int>.isSome()`                |
 | `map`      | `fn<T, U>(list<T>, fn(T) -> U) -> list<U>` | Returns a new list with the results of applying a [function](#lambdas) | `foo:list<int>.map(\|i\| i:int - 2)`      |
@@ -386,3 +387,51 @@ To access an argument, you must specify its type, just like when accessing scope
 #### Example
 
 `|item| item:int > 5`
+
+### Formatting
+
+`ExpressionFormatter::format()` spells an expression back out across as many lines as it takes to stay within a column
+width, which defaults to 80. An expression that already fits comes back exactly as `(string) $expression` prints it;
+one that doesn't is broken at the places its parts offer.
+
+```php
+use Eventjet\Ausdruck\Formatter\ExpressionFormatter;
+use Eventjet\Ausdruck\Parser\ExpressionParser;
+
+$expression = ExpressionParser::parse($source, $declarations);
+echo ExpressionFormatter::format($expression);
+echo ExpressionFormatter::format($expression, 120);
+```
+
+A run of calls breaks at the dots, a bracket puts one item to a line and ends in a trailing comma, and a call whose only
+argument is a list or struct literal keeps its parentheses tight around it:
+
+```
+numbers:list<int>
+    .filter:list<int>(|n| n:int > 100 && n:int < 1000)
+    .map:list<{ value: int, half: Option<int> }>(|n| {
+        value: n:int,
+        half: n:int / 2,
+    })
+```
+
+The result always reads back as the same expression, so formatting a stored expression and saving what comes out is
+safe. Lines only end where a part of the expression offers to end one, so a long string literal or a long type
+annotation is spelled past the width rather than mangled.
+
+## Releases
+
+Versions live in [CHANGELOG.md](CHANGELOG.md), and the migration steps behind each
+breaking change in [UPGRADING.md](UPGRADING.md).
+
+While the version stays below `1.0.0`, Composer treats the **minor** as the
+compatibility boundary — `^0.3` resolves to `>=0.3.0 <0.4.0`. So a breaking change
+moves the minor, and everything else is a patch.
+
+Releasing is automated with
+[release-please](https://github.com/googleapis/release-please): pull request titles
+are [Conventional Commits](https://www.conventionalcommits.org/), and the version,
+changelog entry, tag, and GitHub release are derived from them. If you are
+contributing, [docs/RELEASING.md](docs/RELEASING.md) has the type → section → bump
+table and how to declare a breaking change; the compatibility promise itself is in
+[docs/BACKWARD-COMPATIBILITY.md](docs/BACKWARD-COMPATIBILITY.md).

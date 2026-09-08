@@ -1,0 +1,12 @@
+(a:int + b:int) * c:int
+-- Note --
+The addition binds looser than the multiplication it sits in, so the parentheses are what keep the tree, and they stay
+however the line breaks.
+-- Width --
+12
+-- Formatted --
+(
+    a:int
+        + b:int
+)
+    * c:int

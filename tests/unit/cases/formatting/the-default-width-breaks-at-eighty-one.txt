@@ -1,0 +1,6 @@
+name:string === "the default width is exactly eighty columns and this exceeds it"
+-- Note --
+Eighty-one columns, one past the default, and no Width section to say so.
+-- Formatted --
+name:string
+    === "the default width is exactly eighty columns and this exceeds it"

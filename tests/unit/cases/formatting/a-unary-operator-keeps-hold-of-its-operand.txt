@@ -1,0 +1,12 @@
+-(a:int + b:int + c:int + d:int)
+-- Note --
+There is no line end between the minus and what it negates: the operand is where the breaking happens.
+-- Width --
+20
+-- Formatted --
+-(
+    a:int
+        + b:int
+        + c:int
+        + d:int
+)

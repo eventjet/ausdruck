@@ -1,0 +1,12 @@
+groups:list<list<list<int>>>.flatten().flatten()
+-- Input --
+{ groups: [[[1], [2]], [[3]]] }
+-- Expression type --
+list<int>
+-- Output --
+[1, 2, 3]
+-- Note --
+What one-level-of-nesting-comes-off-not-all-of-it leaves as a claim, asserted: a flatten
+result is an ordinary list<T>, so it is a legal receiver for the next flatten, and T is
+decided again from what that receiver holds. Chaining is how a caller peels more than one
+level, since no single call does.

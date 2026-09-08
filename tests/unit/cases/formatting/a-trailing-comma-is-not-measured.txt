@@ -1,0 +1,8 @@
+[100, 200, 300]
+-- Note --
+Fifteen columns wide, laid out to fifteen. The comma a broken list would end in doesn't count against the flat one,
+which never has it; measuring it would break a list that fits.
+-- Width --
+15
+-- Formatted --
+[100, 200, 300]

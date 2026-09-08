@@ -1,0 +1,13 @@
+orders:list<Order>.head().unwrap().items.count()
+-- Note --
+A field access is a name and nothing else, so a line of its own would buy no room for what follows it: `.items` stays
+with the call it reads from, and the run carries on to the call after it.
+-- Types --
+Order: { items: list<int> }
+-- Width --
+30
+-- Formatted --
+orders:list<Order>
+    .head:Option<{ items: list<int> }>()
+    .unwrap:{ items: list<int> }().items
+    .count:int()

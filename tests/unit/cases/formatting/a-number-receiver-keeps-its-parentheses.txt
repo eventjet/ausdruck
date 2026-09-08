@@ -1,0 +1,10 @@
+(2).abs()
+-- Note --
+Spelled without them, the dot would re-tokenize as a decimal point. The parentheses are lexical rather than a matter of
+binding, so no width makes them optional, and an empty argument list has nothing to put on a line of its own either.
+-- Functions --
+abs: fn(int) -> int
+-- Width --
+5
+-- Formatted --
+(2).abs:int()

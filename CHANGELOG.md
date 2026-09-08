@@ -1,9 +1,10 @@
 # Changelog
 
-All notable changes to this project are documented in this file.
+All notable changes to this project are documented in this file. It is generated from
+[Conventional Commits](https://www.conventionalcommits.org/) by
+[release-please](https://github.com/googleapis/release-please), and this project adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 While the version stays below `1.0.0`, a minor bump (`0.x`) may carry breaking
 changes; see [UPGRADING.md](UPGRADING.md) for the migration steps behind each one.
 
@@ -26,7 +27,36 @@ This changelog begins at 0.3.0. Earlier releases are recorded in the
   See [UPGRADING.md](UPGRADING.md) for PHP interop migration.
 - Equality and collection membership compare tagged payloads structurally.
 
-## [0.3.0] - 2026-07-24
+## [0.4.0](https://github.com/eventjet/ausdruck/compare/0.3.1...0.4.0) (2026-09-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* `flatten` is now a predefined function. An integration that declared its own now gets "Can't shadow predefined functions: flatten" from `Scope` and "Can't override built-in function flatten" from `Declarations`.
+
+### Features
+
+* add an expression formatter ([#107](https://github.com/eventjet/ausdruck/issues/107)) ([5cdd0c9](https://github.com/eventjet/ausdruck/commit/5cdd0c99111fdcd0f47259591c1a0b26af215ae6))
+* add the flatten built-in ([e0627b5](https://github.com/eventjet/ausdruck/commit/e0627b55f07c580f3f7d1275bbc42e37eba41ef8))
+
+
+### Continuous Integration
+
+* match the release title to the unprefixed tag ([#114](https://github.com/eventjet/ausdruck/issues/114)) ([ad103d5](https://github.com/eventjet/ausdruck/commit/ad103d5c2dee8c3257cbecdf01ebd85fcae28083))
+
+## [0.3.1](https://github.com/eventjet/ausdruck/compare/0.3.0...0.3.1) (2026-09-07)
+
+
+### Documentation
+
+* warn that the override marker activates anywhere in a description ([#112](https://github.com/eventjet/ausdruck/issues/112)) ([b6e84a3](https://github.com/eventjet/ausdruck/commit/b6e84a301779a7148c7402abf72931a3ecb2c52a))
+
+
+### Continuous Integration
+
+* automate releases with release-please ([#110](https://github.com/eventjet/ausdruck/issues/110)) ([ca0740c](https://github.com/eventjet/ausdruck/commit/ca0740cf7e1c8666e7035b3e1331be4d87b27cdf))
+
+## [0.3.0](https://github.com/eventjet/ausdruck/compare/0.2.4...0.3.0) (2026-07-24)
 
 A breaking release that rounds out the operator set and the type system. Most 0.2
 expressions and integrations keep working unchanged; the migration notes for the
@@ -85,6 +115,3 @@ cases that don't are in [UPGRADING.md](UPGRADING.md).
 - `Parser\Delimiters` — an internal token detail with no role in the public API.
 - The `Eq` and `Gt` node classes — the `@internal` concrete nodes that `eq()` and `gt()`
   returned in 0.2; now that those builders return `self`, they fold into `Comparison`.
-
-[Unreleased]: https://github.com/eventjet/ausdruck/compare/0.3.0...HEAD
-[0.3.0]: https://github.com/eventjet/ausdruck/compare/0.2.4...0.3.0

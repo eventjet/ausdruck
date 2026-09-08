@@ -1,0 +1,6 @@
+nums:list<int>.flatten()
+-- Type error --
+flatten must be called on an expression of type list<list<any>>, but nums:list<int> is of type list<int>
+-- Note --
+Nothing decides T here: int is not a list, so the receiver never faces the inner list<T>. An undecided variable
+becomes any, so the type the receiver is reported against reads list<list<any>>.

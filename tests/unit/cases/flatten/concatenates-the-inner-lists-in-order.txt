@@ -1,0 +1,7 @@
+groups:list<list<int>>.flatten()
+-- Input --
+{ groups: [[1, 2], [3, 4]] }
+-- Expression type --
+list<int>
+-- Output --
+[1, 2, 3, 4]

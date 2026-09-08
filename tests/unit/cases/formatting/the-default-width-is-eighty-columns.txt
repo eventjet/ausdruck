@@ -1,0 +1,5 @@
+name:string === "the default width is exactly eighty columns and this fills it."
+-- Note --
+No Width section, so this is the formatter's default. The expression is exactly eighty columns wide.
+-- Formatted --
+name:string === "the default width is exactly eighty columns and this fills it."
