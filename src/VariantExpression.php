@@ -7,6 +7,7 @@ namespace Eventjet\Ausdruck;
 use Eventjet\Ausdruck\Parser\Span;
 use Eventjet\Ausdruck\Parser\TypeError;
 use InvalidArgumentException;
+use Override;
 use RuntimeException;
 
 use function array_map;
@@ -35,14 +36,16 @@ final class VariantExpression extends AbstractLiteral
 
     public function __toString(): string
     {
-        return $this->variant . ($this->fields === [] ? '' : '(' . implode(', ', array_map(static fn(Expression $e): string => (string)$e, $this->fields)) . ')');
+        return $this->variant . ($this->fields === [] ? '' : '(' . implode(', ', $this->fields) . ')');
     }
 
+    #[Override]
     public function evaluate(Scope $scope): EnumValue
     {
         return new EnumValue($this->type, $this->variant, array_map(static fn(Expression $e): mixed => $e->evaluate($scope), $this->fields));
     }
 
+    #[Override]
     public function value(): EnumValue
     {
         return new EnumValue($this->type, $this->variant, array_map(
@@ -51,11 +54,13 @@ final class VariantExpression extends AbstractLiteral
         ));
     }
 
+    #[Override]
     public function getType(): Type
     {
         return $this->type;
     }
 
+    #[Override]
     public function equals(Expression $other): bool
     {
         if (!$other instanceof self || $this->definition !== $other->definition || $this->variant !== $other->variant || count($this->fields) !== count($other->fields)) {

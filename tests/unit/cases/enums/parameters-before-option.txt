@@ -1,0 +1,9 @@
+Pair(42, "text", None)
+-- Enums --
+Pair<A, B> = Pair(A, B, Option<int>)
+-- Expression type --
+Pair<int, string>
+-- Output --
+Pair(42, "text", None)
+-- Printed --
+Pair(42, "text", None)

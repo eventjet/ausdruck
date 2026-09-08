@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Eventjet\Ausdruck;
 
+use Override;
+
 use function array_combine;
 use function array_keys;
 use function array_map;
@@ -18,6 +20,7 @@ final class EnumShape implements ComparableShape
     {
     }
 
+    #[Override]
     public function collectVariables(array $found): array
     {
         foreach ($this->arguments as $argument) {
@@ -26,6 +29,7 @@ final class EnumShape implements ComparableShape
         return $found;
     }
 
+    #[Override]
     public function collectBinderNames(array $found): array
     {
         foreach ($this->arguments as $argument) {
@@ -34,16 +38,19 @@ final class EnumShape implements ComparableShape
         return $found;
     }
 
+    #[Override]
     public function toString(): string
     {
         return TypeSyntax::application($this->definition->name, array_map(static fn(Type $t): string => (string)$t, $this->arguments));
     }
 
+    #[Override]
     public function substitute(array $bindings): Type
     {
         return $this->definition->type(...array_map(static fn(Type $t): Type => $t->substitute($bindings), $this->arguments));
     }
 
+    #[Override]
     public function isSubtypeOf(ComparableShape $supertype): bool
     {
         if (!$supertype instanceof self || $this->definition !== $supertype->definition) {
@@ -60,6 +67,7 @@ final class EnumShape implements ComparableShape
         return true;
     }
 
+    #[Override]
     public function bind(Type $actual, array $bindings): array
     {
         $shape = $actual->shape();

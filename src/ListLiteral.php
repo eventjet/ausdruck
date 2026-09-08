@@ -71,6 +71,7 @@ final class ListLiteral extends AbstractLiteral implements HasDoc
     #[Override]
     public function getType(): Type
     {
+        /** @var Type|null $elementType */
         $elementType = null;
         foreach ($this->elements as $element) {
             $type = $element->getType();

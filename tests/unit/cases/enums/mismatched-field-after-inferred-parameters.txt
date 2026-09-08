@@ -1,0 +1,5 @@
+Triple(42, "text", false)
+-- Enums --
+Triple<A, B, C> = Triple(A, B, Option<C>)
+-- Type error --
+Invalid field 3 of Triple

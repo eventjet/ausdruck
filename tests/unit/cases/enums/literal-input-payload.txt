@@ -1,0 +1,7 @@
+payload:Option<int>
+-- Input --
+{ payload: Some(42) }
+-- Expression type --
+Option<int>
+-- Output --
+Some(42)
