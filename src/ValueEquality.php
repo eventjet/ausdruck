@@ -43,23 +43,28 @@ final class ValueEquality
             return true;
         }
         if ($left instanceof EnumValue || $right instanceof EnumValue) {
-            if (!$left instanceof EnumValue || !$right instanceof EnumValue
-                || $left->type->asEnum()?->definition !== $right->type->asEnum()?->definition
-                || $left->variant !== $right->variant) {
-                return false;
-            }
-            /** @var mixed $field */
-            foreach ($left->fields as $index => $field) {
-                if (!self::equals($field, $right->fields[$index])) {
-                    return false;
-                }
-            }
-            return true;
+            return self::enumsEqual($left, $right);
         }
         if (is_object($left) && is_object($right)) {
             return self::structsEqual($left, $right);
         }
         return $left === $right;
+    }
+
+    private static function enumsEqual(mixed $left, mixed $right): bool
+    {
+        if (!$left instanceof EnumValue || !$right instanceof EnumValue
+            || $left->type->asEnum()?->definition !== $right->type->asEnum()?->definition
+            || $left->variant !== $right->variant) {
+            return false;
+        }
+        /** @var mixed $field */
+        foreach ($left->fields as $index => $field) {
+            if (!self::equals($field, $right->fields[$index])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static function structsEqual(object $left, object $right): bool
